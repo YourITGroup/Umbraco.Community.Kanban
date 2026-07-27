@@ -55,6 +55,7 @@ A **configuration** is a data type instance. Two property editors:
 | `laneSource` | Which `IKanbanLaneSource` resolves the lanes; defaults to auto-detect from the property's editor |
 | `manualLanes` | Value / label / colour rows, used by the `Manual` source |
 | `cardProperties` | Property aliases shown as summary items on cards |
+| `lanePageSize` | Cards loaded per lane before "Show more"; default 25 |
 | `allowDrag` | Default on |
 | `appliesTo` | Content type keys this configuration provides a content app for |
 | `tabName`, `tabIcon` | Content app label and icon |
@@ -132,7 +133,7 @@ All under `/umbraco/kanban/api/v1`, using Umbraco's Management API conventions (
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /board` | `configId` *or* inline config, `parentId`, `culture`, optional `lane`, `skip`, `take`. Returns lanes with their cards, per-lane paged |
+| `GET /board` | `configId` *or* inline config, `parentId`, `culture`, optional `lane`, `skip`, `take`. Returns lanes with their cards, per-lane paged. Every lane carries its **total count**, independent of how many cards were returned |
 | `GET /calendar` | `configId` or inline config, `parentId`, `culture`, `from`, `to`. Returns cards placed by date property, plus agenda ordering |
 | `PUT /card/{key}/lane` | Sets the lane property. Save only |
 | `PUT /card/{key}/date` | Takes a **calendar date**; the server reads the existing value's time-of-day and reassembles. Save only |
@@ -152,6 +153,9 @@ since a dragged-but-unpublished card must appear in its new lane. Grouping happe
 A configurable cap (default 1000 children) bounds the work. When a parent exceeds it, the response
 carries a truncation flag and the view shows "showing first N of M" rather than silently omitting
 cards.
+
+Lane totals are exact while the child count is within the cap. Past it they are lower bounds, and the
+response marks them as such so the UI can render "120+" rather than a wrong number.
 
 A search-index-backed source is a v2 concern, not a v1 requirement.
 
@@ -192,6 +196,19 @@ hosts/    collection-view adapter, content-app adapter (dashboard adapter later)
 
 Everything a third-party host needs is exported from a public entry module declared in
 `umbraco-package.json`'s `importmap`.
+
+### Board
+
+Lanes render as columns. Each lane header shows its label, its colour where the lane source supplies
+one, and the **total number of cards in that lane** — the lane's full total, not the number currently
+rendered.
+
+Each lane pages independently. A lane holding more cards than are loaded shows a **Show more** button
+at the foot of the column, appending the next page to that lane alone and leaving every other lane
+untouched. Lane page size is configurable, defaulting to 25.
+
+Card counts stay live: a drag between lanes decrements the source total and increments the target,
+and a server event for a card entering or leaving a lane adjusts both totals.
 
 ### Cards
 
@@ -249,6 +266,7 @@ Umbraco.Community.Kanban/
 Cover the logic that is easy to get wrong and invisible when broken:
 
 - Lane grouping, including unassigned and unmatched values
+- Per-lane paging and totals, including totals staying correct across a drag between lanes
 - Month-grid date placement, including month boundaries
 - Preserve-time-of-day arithmetic across DST transitions
 - Permission filtering on read and write
