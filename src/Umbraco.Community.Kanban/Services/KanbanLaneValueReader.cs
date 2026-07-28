@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 using Umbraco.Cms.Core.Models;
 
 namespace Umbraco.Community.Kanban.Services;
@@ -27,12 +28,61 @@ public static class KanbanLaneValueReader
 
         var value = content.GetValue(laneProperty, propertyCulture);
 
-        return value switch
+        var text = value switch
         {
             null => string.Empty,
-            string text => text,
+            string s => s,
             IConvertible convertible => convertible.ToString(CultureInfo.InvariantCulture),
             _ => value.ToString() ?? string.Empty,
         };
+
+        return UnwrapJsonArray(text);
+    }
+
+    /// <summary>
+    /// <c>Umbraco.DropDown.Flexible</c> and <c>Umbraco.CheckBoxList</c> both save through
+    /// <c>MultipleValueEditor</c>, which serialises the selection as a JSON array string
+    /// (<c>["doing"]</c>) even for a single-select dropdown. <c>Umbraco.RadioButtonList</c> saves a
+    /// bare string. Lanes are keyed on the bare option value, so unwrap the array here.
+    /// </summary>
+    private static string UnwrapJsonArray(string text)
+    {
+        if (text.Length == 0 || text.AsSpan().TrimStart().StartsWith("[") == false)
+        {
+            return text;
+        }
+
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(text);
+
+            if (document.RootElement.ValueKind != JsonValueKind.Array)
+            {
+                return text;
+            }
+
+            // A card can only live in one lane, so a multi-select (CheckBoxList) collapses to its first selected value.
+            foreach (JsonElement element in document.RootElement.EnumerateArray())
+            {
+                var candidate = element.ValueKind switch
+                {
+                    JsonValueKind.String => element.GetString(),
+                    JsonValueKind.Null or JsonValueKind.Undefined => null,
+                    _ => element.GetRawText(),
+                };
+
+                if (string.IsNullOrWhiteSpace(candidate) == false)
+                {
+                    return candidate;
+                }
+            }
+
+            // An empty (or all-empty) array means nothing is selected: the card is unassigned.
+            return string.Empty;
+        }
+        catch (JsonException)
+        {
+            return text;
+        }
     }
 }
