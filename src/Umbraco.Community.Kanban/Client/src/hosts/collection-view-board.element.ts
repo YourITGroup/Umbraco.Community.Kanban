@@ -39,6 +39,7 @@ export class UmbCommunityKanbanCollectionViewBoardElement extends UmbLitElement 
     this.consumeContext(UMB_VARIANT_CONTEXT, (context) => {
       this.observe(context?.displayCulture, (culture) => {
         this._culture = culture;
+        this.#cultureResolved = true;
       }, '_kanbanDisplayCulture');
     });
 
@@ -53,6 +54,16 @@ export class UmbCommunityKanbanCollectionViewBoardElement extends UmbLitElement 
   /** The parent/culture pair the board was last loaded for, so a re-render is not a re-fetch. */
   #loadedFor?: string;
 
+  /**
+   * Whether the variant context's observe callback has fired at least once. Entity and variant
+   * contexts resolve independently and asynchronously; without this, a load can fire on the
+   * entity context alone and then fire again moments later once culture arrives — two requests
+   * for one navigation. Set true regardless of the culture value received (including on an
+   * invariant site, where displayCulture may resolve to null/undefined), since what matters is
+   * that the callback has run once, not what it produced.
+   */
+  #cultureResolved = false;
+
   get #board() {
     return this.shadowRoot?.querySelector('umb-community-kanban-board') ?? undefined;
   }
@@ -62,7 +73,16 @@ export class UmbCommunityKanbanCollectionViewBoardElement extends UmbLitElement 
     // constructor — but updated() runs on every render, so it must fire only when the
     // parent or culture has actually changed. The collection's items observable owns
     // reloading for anything else.
-    if (!this._parentId) return;
+    if (!this._parentId) {
+      // A genuine context disconnect (parent gone) discards the board child entirely in
+      // render(). Clear the guard so a reconnect with the SAME parent GUID still reloads —
+      // otherwise the freshly-created board element never receives a load() call and sits on
+      // its own internal 'idle' status forever.
+      this.#loadedFor = undefined;
+      return;
+    }
+
+    if (!this.#cultureResolved) return;
 
     const key = `${this._parentId}|${this._culture ?? ''}`;
 

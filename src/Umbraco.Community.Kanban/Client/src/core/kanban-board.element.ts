@@ -35,13 +35,25 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
   @state()
   private _board?: KanbanBoardState;
 
+  /**
+   * Monotonically increasing token identifying the most recently started load. Hosts trigger
+   * loads from independent, asynchronously-timed signals (parent, culture, collection reload),
+   * so requests can overlap; a response is only applied if it's still the most recent one
+   * requested, otherwise an older, slower response could clobber a newer, faster one.
+   */
+  #loadToken = 0;
+
   /** Reloads the whole board. Hosts call this when their own data changes. */
   async load() {
     if (!this.parentId || !this.datasource) return;
 
+    const token = ++this.#loadToken;
+
     this._status = 'loading';
 
     const outcome = await this.datasource.getBoard(this.#query());
+
+    if (token !== this.#loadToken) return; // a newer load started; this response is stale
 
     if (outcome.kind === 'success') {
       this._board = toBoardState(outcome.board);
@@ -65,11 +77,19 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
   async #onLoadMore(event: CustomEvent<{ lane: string; skip: number }>) {
     if (!this.datasource || !this._board) return;
 
+    // Snapshot the current load token: if a full load() starts (and completes or not) while this
+    // page fetch is in flight, that reload owns `_board` going forward and this page's merge
+    // must not apply on top of it — the reload's _board may not even be the same object shape
+    // the merge was computed against.
+    const token = this.#loadToken;
+
     const outcome = await this.datasource.getBoard(
       this.#query({ lane: event.detail.lane, skip: event.detail.skip }),
     );
 
-    if (outcome.kind === 'success') {
+    if (token !== this.#loadToken) return; // a full reload started meanwhile; discard this page
+
+    if (outcome.kind === 'success' && this._board) {
       this._board = mergeLanePage(this._board, outcome.board);
     }
   }
