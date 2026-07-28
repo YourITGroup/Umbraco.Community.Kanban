@@ -72,38 +72,71 @@ variable is needed for visibility.
 
 ### 3.2 Opening the create modal
 
-`#onCreate` opens `UMB_DATATYPE_WORKSPACE_MODAL` (from `@umbraco-cms/backoffice/data-type`) via
-`UMB_MODAL_MANAGER_CONTEXT` (from `@umbraco-cms/backoffice/modal`) — the real data type workspace,
-rendered as a sidebar modal rather than a router navigation, so the editor never leaves the
-Collection data type's own workspace.
+The modal is `UMB_DATATYPE_WORKSPACE_MODAL` (from `@umbraco-cms/backoffice/data-type`) — the real
+data type workspace, rendered as a sidebar modal rather than a router navigation, so the editor never
+leaves the Collection data type's own workspace.
+
+It is opened through a **modal route registration**, not `UMB_MODAL_MANAGER_CONTEXT.open()`. This is
+not a stylistic choice: `UmbDataTypeWorkspaceContext` is route-driven, and create mode exists *only*
+as the route `create/parent/:entityType/:parentUnique` (verified in
+`data-type-workspace.context.js`). The modal element itself just renders
+`<umb-workspace .entityType=...>`, so opening it imperatively with no route would render a workspace
+with nothing to resolve. Every core inline-data-type-creation path
+(`umb-input-content-type-collection-configuration`, the data type picker flow) uses the route
+registration for the same reason.
 
 ```ts
-const modalManager = await this.getContext(UMB_MODAL_MANAGER_CONTEXT);
-
-const modalHandler = modalManager.open(this, UMB_DATATYPE_WORKSPACE_MODAL, {
-  data: {
-    entityType: UMB_DATA_TYPE_ENTITY_TYPE,
-    preset: {
-      editorUiAlias: KANBAN_BOARD_EDITOR_UI_ALIAS,
-      name: `${this.#workspace?.getName() ?? 'List View'} Kanban Board`,
+this.#createModal = new UmbModalRouteRegistrationController(this, UMB_DATATYPE_WORKSPACE_MODAL)
+  .addAdditionalPath('kanban-board')
+  .onSetup(() => ({
+    data: {
+      preset: {
+        editorUiAlias: KANBAN_BOARD_EDITOR_UI_ALIAS,
+        name: buildBoardDataTypeName(this.#workspace?.getName()),
+      },
     },
-  },
-});
+  }))
+  .onSubmit((value) => {
+    if (value?.unique) this.#onCreated(value.unique);
+  })
+  .observeRouteBuilder(() => {
+    this._canCreate = true;
+  });
 
-const value = await modalHandler.onSubmit().catch(() => undefined);
-if (value?.unique) await this.#load();
+// on click:
+this.#createModal.open({}, `create/parent/${UMB_DATA_TYPE_ENTITY_TYPE}/null`);
 ```
 
-This is exactly the `preset` mechanism core's own property-editor-UI picker flow uses
-(`entity-detail-workspace-base.ts`'s scaffold-then-`{...scaffold, ...preset}` merge) — not a
-bespoke API. The opened workspace is the full data type editor: name field (pre-filled, still
-editable), the "Kanban Board" property editor UI already selected (no searching required), and its
-full settings UI (`laneProperty`, `appliesTo`, lane overrides, etc.) ready for the editor to fill in
-and save.
+Three details that are load-bearing:
 
-`onSubmit()` resolves with `{ unique }` on save, and rejects/never resolves on cancel — `.catch(() =>
-undefined)` makes a cancelled modal a no-op: the empty state and its button are simply still there,
-unchanged.
+- **The `open()` second argument** is the inner workspace's create route, appended to the modal path.
+  Without it the modal opens on no route and renders nothing.
+- **`entityType` is not passed** in `onSetup`. The token already defaults it to `data-type`, and
+  `UmbModalContext` merges passed data over the token defaults with `umbDeepMerge(args.data,
+  defaultData)` — source wins, so the defaults survive and our `preset` is not clobbered by the
+  default `preset: {}`. The token's data type `Omit`s `entityType` accordingly.
+- **`addAdditionalPath('kanban-board')`.** The token's alias is the *generic* `Umb.Modal.Workspace`,
+  so the generated route would otherwise be the bare `modal/Umb.Modal.Workspace`, shared with any
+  other workspace modal registered in the same routing scope.
+
+The `preset` mechanism is core's own (`entity-detail-workspace-base.js` merges
+`{...scaffold, ...modalContext.data.preset}` after `createScaffold`), used verbatim by core's picker
+flow. Only `editorUiAlias` is preset; the property editor *schema* alias and its default config are
+derived from our UI manifest exactly as when an editor picks the editor by hand — which is what makes
+the saved data type indistinguishable from a hand-made one, and therefore visible to
+`GET /configurations`.
+
+The opened workspace is the full data type editor: name field (pre-filled, still editable), the
+"Kanban Board" property editor UI already selected (no searching required), and its full settings UI
+(`laneProperty`, `appliesTo`, lane overrides, etc.) ready to fill in and save.
+
+`onSubmit` fires only on save. A dismissed modal is a no-op — the empty state and its button are
+simply still there.
+
+**Button readiness.** `open()` silently does nothing until the router has handed over a route
+builder, so a button rendered before then would be dead on click. `observeRouteBuilder` sets
+`_canCreate`, and the empty state falls back to the original "Create one under Settings → Data Types."
+text until then — never a dead end.
 
 ### 3.3 Naming
 
@@ -112,6 +145,10 @@ the *current* Collection data type's own name — e.g. opening the tab on "List 
 proposes "List View - bookingList Kanban Board". This is available with no extra request:
 `UMB_DATA_TYPE_WORKSPACE_CONTEXT` (already consumed by this element to read `propertyEditorUiAlias`)
 extends `UmbEntityNamedDetailWorkspaceContextBase`, which exposes `getName()` synchronously.
+
+The logic lives in `buildBoardDataTypeName()` (`workspace-views/board-data-type-name.ts`) as a pure
+function so it is directly testable — see §4. It trims, and falls back to a bare `"Kanban Board"` when
+the name is absent or blank, rather than emitting a leading space or the literal word `"undefined"`.
 
 Because this is a modal *preset*, not a locked value, the editor can change the name before saving —
 this only removes the "come up with a name" step for the common case, it does not enforce a naming
@@ -133,20 +170,18 @@ state.
 
 ## 4. Testing
 
-Same conventions as milestone 2: Vitest for client logic.
+Same conventions as milestone 2. Vitest runs with `environment: 'node'` and there is no
+custom-elements registry, so element behaviour is not unit-testable in this project — no existing test
+instantiates an element, and this change does not introduce the first. The testable logic is therefore
+extracted rather than mocked:
 
-- Manifest/render test: zero configurations renders the button; one or more configurations renders
-  the `<uui-select>` and never the button.
-- `#onCreate` / modal interaction: fake `UMB_MODAL_MANAGER_CONTEXT` whose `open()` returns a fake
-  modal handler; assert the `preset` passed to `open()` has the correct `editorUiAlias` and a `name`
-  built from a faked workspace `getName()`.
-- Cancelled modal (`onSubmit()` rejects): assert `#load()` is not called again and `_selected` stays
-  unset.
-- Successful modal (`onSubmit()` resolves with a `unique`): assert `#load()` re-runs and
-  `setPropertyValue(KANBAN_BOARD_CONFIG_ID_KEY, unique)` is called with the new key.
+- `buildBoardDataTypeName()` — derives from the Collection data type's name; trims surrounding
+  whitespace; falls back to a bare `"Kanban Board"` for `undefined`, `null`, `''` and whitespace-only.
 
-Elements themselves are verified by `tsc --noEmit` plus `npm run build`, as in prior milestones —
-no browser automation.
+The element itself is verified by `tsc --noEmit` plus `npm run build`, as in prior milestones — no
+browser automation. Everything else about this change (route registration, preset merge, create-route
+prepend, button readiness) was verified by reading the installed backoffice v18 implementation rather
+than by test, and is recorded in §3.2 so the reasoning survives a version bump.
 
 **Manual verification:** on a site with zero Kanban Board data types, open a Collection data type's
 Kanban tab, click "Create Kanban Board data type", confirm the modal opens with the name pre-filled
@@ -155,10 +190,16 @@ now shows the `<uui-select>` with the new configuration already selected.
 
 ## 5. What could go wrong
 
-- **`UMB_DATATYPE_WORKSPACE_MODAL`'s `preset` shape could change across backoffice versions.** It is
-  core's own mechanism (used by `data-type-picker-flow-modal.element.ts`), not something we invented,
-  so it is no more fragile than the rest of this package's dependence on backoffice internals — but
-  it is still an unexported-from-public-API surface worth re-checking on a CMS version bump.
+- **This leans on several backoffice internals at once**: the `preset` merge, the generic
+  `Umb.Modal.Workspace` alias, and the literal `create/parent/:entityType/:parentUnique` route string.
+  All are core's own mechanisms (used verbatim by `data-type-picker-flow-modal` and
+  `input-content-type-collection-configuration`), so this is no more fragile than the rest of the
+  package's dependence on backoffice internals — but the create-route string in particular is a
+  hardcoded path into another package's router, and is the first thing to re-check on a CMS major bump.
+  Verified against `@umbraco-cms/backoffice` 18.
+- **`open()` failing silently** if the route builder is never handed over would leave a button that
+  does nothing. Mitigated by gating the button on `_canCreate` (§3.2) rather than rendering it
+  unconditionally.
 - **Two editors creating a board data type at the same time from two different Collection data
   types.** Not a new hazard — `GET /configurations` and Umbraco's own data type save already have
   this property; this feature doesn't add any new shared-state risk beyond what creating a data type
