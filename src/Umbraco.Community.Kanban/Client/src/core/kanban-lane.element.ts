@@ -50,7 +50,7 @@ export class UmbCommunityKanbanLaneElement extends UmbLitElement {
         ${laneHasMore(this.lane)
           ? html`<uui-button
               look="placeholder"
-              label=${this.localize.term('general_showMore')}
+              label=${this.localize.term('actions_showMore')}
               @click=${this.#onLoadMore}></uui-button>`
           : nothing}
       </div>
