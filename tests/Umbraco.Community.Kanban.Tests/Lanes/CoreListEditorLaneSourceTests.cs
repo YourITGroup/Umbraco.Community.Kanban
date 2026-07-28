@@ -52,6 +52,27 @@ public class CoreListEditorLaneSourceTests
     }
 
     [Fact]
+    public async Task GetLanes_ReadsAListOfObject()
+    {
+        var items = new List<object> { "Open", "Done" };
+        var source = new CoreListEditorLaneSource();
+
+        var lanes = await source.GetLanesAsync(Context("Umbraco.CheckBoxList", items));
+
+        lanes.Select(x => x.Value).Should().Equal("Open", "Done");
+    }
+
+    [Fact]
+    public async Task GetLanes_IsEmptyWhenItemsIsAnUnexpectedType()
+    {
+        var source = new CoreListEditorLaneSource();
+
+        var lanes = await source.GetLanesAsync(Context("Umbraco.DropDown.Flexible", 42));
+
+        lanes.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task GetLanes_IsEmptyWhenItemsIsMissing()
     {
         var context = new KanbanLaneSourceContext(
