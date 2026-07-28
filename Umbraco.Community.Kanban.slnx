@@ -1,8 +1,10 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Umbraco.Community.Kanban/Umbraco.Community.Kanban.csproj" />
+    <Project Path="src/Umbraco.Community.Kanban.Contentment/Umbraco.Community.Kanban.Contentment.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Umbraco.Community.Kanban.Tests/Umbraco.Community.Kanban.Tests.csproj" />
+    <Project Path="tests/Umbraco.Community.Kanban.Contentment.Tests/Umbraco.Community.Kanban.Contentment.Tests.csproj" />
   </Folder>
 </Solution>
