@@ -1,5 +1,7 @@
 import { css, customElement, html, nothing, property, repeat } from '@umbraco-cms/backoffice/external/lit';
+import type { PropertyValues } from '@umbraco-cms/backoffice/external/lit';
 import { UmbLitElement } from '@umbraco-cms/backoffice/lit-element';
+import { UmbEntityContext } from '@umbraco-cms/backoffice/entity';
 import { cardStateTag } from './card.model.js';
 import type { KanbanCardModel, KanbanCardPropertyModel } from '../data/kanban-board.types.js';
 
@@ -14,6 +16,29 @@ import type { KanbanCardModel, KanbanCardPropertyModel } from '../data/kanban-bo
 export class UmbCommunityKanbanCardElement extends UmbLitElement {
   @property({ attribute: false })
   card?: KanbanCardModel;
+
+  /**
+   * The card owns the entity identity for its own subtree. `<umb-entity-actions-bundle>` reads
+   * its entity from the ambient UMB_ENTITY_CONTEXT; its `entityType`/`unique` properties are
+   * deprecated and removed in Umbraco 19, and relying on the fallback context they create means
+   * relying on when the bundle happens to read them. Without this context the bundle would find
+   * the host's ambient context — the PARENT document — and aim every action at the wrong entity.
+   */
+  #entityContext = new UmbEntityContext(this);
+
+  constructor() {
+    super();
+
+    this.#entityContext.setEntityType('document');
+  }
+
+  override willUpdate(changedProperties: PropertyValues<this>) {
+    super.willUpdate(changedProperties);
+
+    if (changedProperties.has('card')) {
+      this.#entityContext.setUnique(this.card?.key ?? null);
+    }
+  }
 
   #onClick() {
     if (!this.card) return;
@@ -38,8 +63,6 @@ export class UmbCommunityKanbanCardElement extends UmbLitElement {
           ${this.card.icon ? html`<umb-icon name=${this.card.icon}></umb-icon>` : nothing}
           <span class="name">${this.card.name}</span>
           <umb-entity-actions-bundle
-            entity-type="document"
-            .unique=${this.card.key}
             .label=${this.card.name}
             @click=${(event: Event) => event.stopPropagation()}>
           </umb-entity-actions-bundle>
