@@ -1,5 +1,12 @@
+using System.Text.Json.Serialization;
+
 namespace Umbraco.Community.Kanban.Models.Api;
 
+/// <summary>
+/// Serialised as a string, not an ordinal, so the client matches on "Board" rather than on a
+/// number whose meaning would shift if this enum ever gained a member.
+/// </summary>
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum KanbanConfigurationKind
 {
     Board,

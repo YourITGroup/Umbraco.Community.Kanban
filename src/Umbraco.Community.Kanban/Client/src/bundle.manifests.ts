@@ -3,6 +3,7 @@ import { manifests as calendarManifests } from './property-editors/calendar/mani
 import { manifests as laneOverrideManifests } from './property-editors/lane-overrides/manifests.js';
 import { manifests as manualLaneManifests } from './property-editors/manual-lanes/manifests.js';
 import { manifests as collectionViewManifests } from './hosts/manifests.js';
+import { manifests as dataTypeWorkspaceViewManifests } from './workspace-views/manifests.js';
 
 export const manifests: Array<UmbExtensionManifest> = [
   ...boardManifests,
@@ -10,4 +11,5 @@ export const manifests: Array<UmbExtensionManifest> = [
   ...laneOverrideManifests,
   ...manualLaneManifests,
   ...collectionViewManifests,
+  ...dataTypeWorkspaceViewManifests,
 ];
