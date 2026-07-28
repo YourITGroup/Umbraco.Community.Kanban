@@ -202,7 +202,10 @@ drag-disabled rendering needs a flag it can trust from day one rather than a sha
 
 ### 3.6 Variants
 
-Cards show values for the `culture` the request names, falling back to the site's default. Property
+Cards show values for the `culture` the request names. A null culture means invariant, not "the
+site default" — no language service is involved anywhere in the read path; the collection supplies
+its own display culture, and that is itself null on an invariant site, so reading invariant values
+in that case is already correct. Property
 values come from the requested culture where the property varies, and from the invariant value where
 it does not. `State` is the document's state *for that culture*, not the node-wide state.
 
@@ -252,8 +255,11 @@ it is pure and directly tested.
   matches. It is a plain global custom element, usable outside a property-editor context.
 - Publish-state badge: a `<uui-tag>` whose colour and label come from the card's state, copying the
   document table collection view's state column. There is no packaged badge element to reuse.
-- `<umb-entity-actions-bundle>` for the standard entity actions, given `entityType: 'document'`, the
-  card's key as `unique`, and the card name as `label`.
+- `<umb-entity-actions-bundle>` for the standard entity actions. Its `entityType`/`unique`
+  properties are deprecated (removed in v19) and their fallback behaviour is
+  provider-ordering-dependent, so the card provides its own `UmbEntityContext` (`document`, the
+  card's key) instead — the ambient path the bundle itself already supports and relies on
+  internally — and passes only `label`.
 
 The card's state string is our own three-value vocabulary (§3.2), not Umbraco's
 `UmbDocumentVariantState` enum, so the badge switch has no dependency on an enum whose serialised
