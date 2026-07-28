@@ -20,7 +20,6 @@ Multiple editors viewing the same board see each other's changes in near-real-ti
 ## Non-goals for v1
 
 - Section dashboard host (planned next iteration; the architecture must not preclude it)
-- Contentment lane source (separate optional package)
 - Week/day time-gridded calendar views
 - Event durations or end dates
 - Custom SignalR hub, presence indicators, "who is editing" avatars
@@ -89,13 +88,45 @@ public interface IKanbanLaneSource
 }
 ```
 
-Built-in sources read `items` from `ConfigurationData` for `Umbraco.DropDown.Flexible`,
-`Umbraco.RadioButtonList` and `Umbraco.CheckBoxList`, plus a `Manual` source driven by
-`manualLanes`. `Umbraco.Community.Kanban.Contentment` adds a Data List source in a separate optional
-package, so the core package takes no Contentment dependency.
+Sources in the core package read `items` from `ConfigurationData` for `Umbraco.DropDown.Flexible`,
+`Umbraco.RadioButtonList` and `Umbraco.CheckBoxList`, plus a `Manual` source driven by `manualLanes`.
 
 An **(Unassigned)** lane always exists, collecting children whose lane value is empty or matches no
 known lane. It is drag-out-only — cards can leave it but not be dropped into it.
+
+### Contentment lane source
+
+`Umbraco.Community.Kanban.Contentment` is a separate project and a separate NuGet package, shipping
+in v1. It references Contentment; the core package does not, so installing the core package never
+drags Contentment in. Registering the package's composer is all that is needed to make Contentment
+Data List properties usable as lanes.
+
+It handles data types whose editor alias is `Umbraco.Community.Contentment.DataList`, and resolves
+lanes exactly the way Contentment's own value converter does
+(`DataEditors/DataList/DataListValueConverter.cs:80-95`):
+
+```csharp
+// ConfigurationData["dataSource"] is [ { key: "<type name with assembly>", value: { … } } ]
+var source = utility.GetConfigurationEditor<IContentmentDataSource>(key);
+var config = jsonSerializer.Deserialize<Dictionary<string, object>>(entry["value"]?.ToString() ?? "{}");
+IEnumerable<DataListItem> items = source.GetItems(config);
+```
+
+`DataListItem.Value` becomes the lane value, `Name` the label, and `Icon` the lane icon where one is
+supplied. `Disabled` items still render as lanes but reject drops. Any Contentment data source works,
+including custom ones, because resolution goes through `IContentmentDataSource` rather than
+enumerating known source types.
+
+Two constraints to respect:
+
+- `IContentmentDataSource` supersedes `IDataListSource`, which Contentment has marked obsolete for
+  removal in 8.0. Target the new interface.
+- Contentment's alias constants are `internal`, so the editor alias must be hard-coded. Cover it with
+  a test that fails loudly if a Contentment upgrade changes it, and pin a supported Contentment
+  version range in the package.
+
+Data Picker (`Umbraco.Community.Contentment.DataPicker`) is out of scope — its sources are built
+around search and paging rather than a bounded option set, which is not what a lane needs.
 
 ---
 
@@ -255,9 +286,10 @@ Standalone repo `YourITGroup/Umbraco.Community.Kanban`, wired into `YourITTeam.s
 Umbraco.Community.Kanban/
 ├── src/Umbraco.Community.Kanban/             RCL: endpoints, lane sources, config, embedded wwwroot
 ├── src/Umbraco.Community.Kanban.Client/      Vite + Lit + TypeScript
-├── src/Umbraco.Community.Kanban.Contentment/ optional Data List lane source
+├── src/Umbraco.Community.Kanban.Contentment/ Data List lane source, separate NuGet package
 └── tests/
     ├── Umbraco.Community.Kanban.Tests/       xUnit
+    ├── Umbraco.Community.Kanban.Contentment.Tests/ xUnit
     └── (client Vitest suites live beside the client source)
 ```
 
@@ -272,6 +304,7 @@ Cover the logic that is easy to get wrong and invisible when broken:
 - Permission filtering on read and write
 - The server-event reconciliation reducer
 - Lane source resolution per editor alias
+- Contentment Data List resolution, including a guard test on the hard-coded editor alias
 
 No browser automation in v1.
 
@@ -284,5 +317,6 @@ Each is independently useful:
 3. Drag write-back, pending state, publish-all
 4. Calendar month grid and agenda list
 5. Content app host and real-time sync
+6. Contentment Data List lane source package
 
-Contentment lane source and the section dashboard sit outside v1.
+The section dashboard sits outside v1.
