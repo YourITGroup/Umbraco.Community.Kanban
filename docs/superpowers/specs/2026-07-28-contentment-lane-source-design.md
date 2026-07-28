@@ -167,9 +167,10 @@ lane last.
 - **The hardcoded editor alias.** Mitigated by the reflection guard test above, which is why that test
   is worth more than its line count suggests.
 - **A data source throwing.** `GetItems` runs third-party code — a SQL source with a bad connection
-  string, an Examine source with no index. An exception must not take down `GET /board`; the seam
-  swallows and logs, returning no items, so a misconfigured source degrades to an empty board rather
-  than a 500.
+  string, an Examine source with no index. An exception must not take down `GET /board`. The guard sits
+  in the **lane source**, around the seam call, rather than inside the seam: there it is directly
+  testable with a throwing fake, whereas inside the seam it could only be verified by hand. A
+  misconfigured source degrades to an empty board rather than a 500, and logs.
 - **Multi-value Data Lists.** A Data List using a checkbox list editor stores `["a","b"]`.
   `KanbanLaneValueReader` already unwraps a JSON array to its first non-empty value, so a card lands in
   one lane. No change needed — verified, not assumed.
