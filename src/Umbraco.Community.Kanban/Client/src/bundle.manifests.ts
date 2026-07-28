@@ -3,5 +3,10 @@
 import type {} from '@umbraco-cms/backoffice/extension-registry';
 import { manifests as boardManifests } from './property-editors/board/manifests.js';
 import { manifests as calendarManifests } from './property-editors/calendar/manifests.js';
+import { manifests as laneOverrideManifests } from './property-editors/lane-overrides/manifests.js';
 
-export const manifests: Array<UmbExtensionManifest> = [...boardManifests, ...calendarManifests];
+export const manifests: Array<UmbExtensionManifest> = [
+  ...boardManifests,
+  ...calendarManifests,
+  ...laneOverrideManifests,
+];
