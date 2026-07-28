@@ -12,6 +12,13 @@ public sealed class ManualLaneSource : IKanbanLaneSource
 
     public string Alias => SourceAlias;
 
+    /// <summary>
+    /// This source deliberately claims any context whose configuration pins it via
+    /// <c>LaneSource == "manual"</c>, even when another source (e.g. a core list editor
+    /// source) could also handle the same context by editor alias. That overlap is by
+    /// design: Task 10's resolver arbitrates between candidate sources by preferring
+    /// the one pinned by <see cref="KanbanBoardConfiguration.LaneSource"/>.
+    /// </summary>
     public bool CanHandle(KanbanLaneSourceContext context) =>
         string.Equals(context.Configuration.LaneSource, SourceAlias, StringComparison.OrdinalIgnoreCase);
 

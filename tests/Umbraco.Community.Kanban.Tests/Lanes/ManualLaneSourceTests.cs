@@ -19,6 +19,19 @@ public class ManualLaneSourceTests
     }
 
     [Fact]
+    public void CanHandle_IsTrueEvenForACoreListEditor_BecauseThePinWins()
+    {
+        // Deliberate overlap with CoreListEditorLaneSource: the resolver prefers the pinned source.
+        var context = new KanbanLaneSourceContext(
+            "Umbraco.DropDown.Flexible",
+            new Dictionary<string, object>(),
+            new KanbanBoardConfiguration { LaneSource = "manual" });
+        var source = new ManualLaneSource();
+
+        source.CanHandle(context).Should().BeTrue();
+    }
+
+    [Fact]
     public async Task GetLanes_ReturnsTheConfiguredLanesInOrder()
     {
         var configuration = new KanbanBoardConfiguration
@@ -52,6 +65,32 @@ public class ManualLaneSourceTests
         var lanes = await source.GetLanesAsync(Context(configuration));
 
         lanes[0].Name.Should().Be("todo");
+    }
+
+    [Fact]
+    public async Task GetLanes_CopiesTheIconThrough()
+    {
+        var configuration = new KanbanBoardConfiguration
+        {
+            LaneSource = "manual",
+            ManualLanes = [new KanbanManualLane { Value = "todo", Label = "To do", Icon = "icon-todo" }],
+        };
+        var source = new ManualLaneSource();
+
+        var lanes = await source.GetLanesAsync(Context(configuration));
+
+        lanes[0].Icon.Should().Be("icon-todo");
+    }
+
+    [Fact]
+    public async Task GetLanes_ReturnsEmptyWhenNoManualLanesAreConfigured()
+    {
+        var configuration = new KanbanBoardConfiguration { LaneSource = "manual", ManualLanes = [] };
+        var source = new ManualLaneSource();
+
+        var lanes = await source.GetLanesAsync(Context(configuration));
+
+        lanes.Should().BeEmpty();
     }
 
     [Fact]
