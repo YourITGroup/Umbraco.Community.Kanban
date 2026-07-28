@@ -205,6 +205,11 @@ now shows the `<uui-select>` with the new configuration already selected.
   this property; this feature doesn't add any new shared-state risk beyond what creating a data type
   by hand already has.
 
+**Superseded:** the hardcoded `create/parent/:entityType/:parentUnique` string is gone. It is now
+generated from core's own exported `UMB_CREATE_DATA_TYPE_WORKSPACE_PATH_PATTERN` — see
+[2026-07-28-kanban-configuration-pickers-design.md](2026-07-28-kanban-configuration-pickers-design.md),
+which also replaces this design's `<uui-select>` empty-state binary with a picker.
+
 ## 6. Definition of done
 
 From a Collection data type's Kanban tab with zero Kanban Board data types configured anywhere, an

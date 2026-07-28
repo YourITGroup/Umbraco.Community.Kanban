@@ -23,7 +23,7 @@ public sealed class LanesController(IKanbanLaneResolver laneResolver) : KanbanCo
     [ProducesResponseType(typeof(KanbanLanePreviewResponseModel), StatusCodes.Status200OK)]
     public async Task<IActionResult> Preview(KanbanLanePreviewRequestModel request)
     {
-        var resolution = await laneResolver.ResolveAsync(request.ContentTypeKey, request.Configuration);
+        var resolution = await laneResolver.ResolveAsync(request.EffectiveContentTypeKey, request.Configuration);
 
         return Ok(KanbanLanePreviewResponseModel.From(resolution));
     }

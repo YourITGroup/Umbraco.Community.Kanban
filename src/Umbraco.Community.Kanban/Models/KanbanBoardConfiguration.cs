@@ -12,8 +12,47 @@ public class KanbanBoardConfiguration
     [ConfigurationField("laneProperty")]
     public string? LaneProperty { get; set; }
 
+    /// <summary>
+    /// The content type the lane property was picked from. Stored so the configuration editor can
+    /// show which property it named, and so lanes can be previewed there — the data type workspace
+    /// has no document, and therefore no content type, of its own.
+    /// </summary>
+    /// <remarks>
+    /// Not used when resolving a real board: that resolves against the content type of the document
+    /// being viewed, which may legitimately differ from the one browsed at configuration time.
+    /// </remarks>
+    [ConfigurationField("laneContentTypeKey")]
+    [JsonConverter(typeof(NullableGuidJsonConverter))]
+    public Guid? LaneContentTypeKey { get; set; }
+
+    /// <summary>
+    /// Pins a lane source by alias, overriding detection from the lane property's editor. Not
+    /// exposed in the configuration UI: <see cref="UseManualLanes" /> covers the only choice an
+    /// editor needs, and this remains for third-party sources registered through
+    /// <c>KanbanLaneSources()</c>.
+    /// </summary>
     [ConfigurationField("laneSource")]
     public string? LaneSource { get; set; }
+
+    /// <summary>
+    /// Whether to use <see cref="ManualLanes" /> instead of the lanes detected from the lane
+    /// property's own editor.
+    /// </summary>
+    [ConfigurationField("useManualLanes")]
+    public bool UseManualLanes { get; set; }
+
+    /// <summary>
+    /// The lane source alias this configuration pins, if any. An explicit
+    /// <see cref="LaneSource" /> wins over <see cref="UseManualLanes" /> so a board pinned to a
+    /// third-party source is not quietly reinterpreted as a manual one.
+    /// </summary>
+    [JsonIgnore]
+    public string? PinnedLaneSource =>
+        string.IsNullOrWhiteSpace(LaneSource) == false
+            ? LaneSource
+            : UseManualLanes
+                ? Constants.ManualLaneSourceAlias
+                : null;
 
     [ConfigurationField("manualLanes")]
     public KanbanManualLane[] ManualLanes { get; set; } = [];

@@ -15,7 +15,12 @@ describe('board property editor manifests', () => {
     expect(ui.meta.propertyEditorSchemaAlias).toBe(schema.alias);
   });
 
-  it('exposes every setting the server configuration model declares', () => {
+  /**
+   * Two server configuration fields are deliberately absent. `laneContentTypeKey` is written by the
+   * lane property picker alongside its own value, and `laneSource` pins a source by alias for
+   * third-party lane sources — the toggle covers the only choice an editor makes.
+   */
+  it('exposes every setting an editor configures', () => {
     const ui = manifests.find((m) => m.type === 'propertyEditorUi') as any;
     const aliases = ui.meta.settings.properties.map((p: { alias: string }) => p.alias).sort();
 
@@ -26,11 +31,25 @@ describe('board property editor manifests', () => {
       'laneOverrides',
       'lanePageSize',
       'laneProperty',
-      'laneSource',
       'manualLanes',
       'tabIcon',
       'tabName',
+      'useManualLanes',
     ]);
+  });
+
+  it('picks the lane property rather than letting an alias be typed', () => {
+    const ui = manifests.find((m) => m.type === 'propertyEditorUi') as any;
+    const laneProperty = ui.meta.settings.properties.find((p: { alias: string }) => p.alias === 'laneProperty');
+
+    expect(laneProperty.propertyEditorUiAlias).toBe('Umb.Community.Kanban.PropertyEditorUi.LaneProperty');
+  });
+
+  it('makes manual lanes a toggle rather than a source alias to type', () => {
+    const ui = manifests.find((m) => m.type === 'propertyEditorUi') as any;
+    const toggle = ui.meta.settings.properties.find((p: { alias: string }) => p.alias === 'useManualLanes');
+
+    expect(toggle.propertyEditorUiAlias).toBe('Umb.PropertyEditorUi.Toggle');
   });
 
   it('defaults the lane page size to 25 and drag to on', () => {

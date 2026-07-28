@@ -4,6 +4,7 @@ export const KANBAN_BOARD_EDITOR_UI_ALIAS = 'Umb.Community.Kanban.PropertyEditor
 export const KANBAN_CALENDAR_EDITOR_UI_ALIAS = 'Umb.Community.Kanban.PropertyEditorUi.Calendar';
 export const KANBAN_LANE_OVERRIDES_UI_ALIAS = 'Umb.Community.Kanban.PropertyEditorUi.LaneOverrides';
 export const KANBAN_MANUAL_LANES_UI_ALIAS = 'Umb.Community.Kanban.PropertyEditorUi.ManualLanes';
+export const KANBAN_LANE_PROPERTY_UI_ALIAS = 'Umb.Community.Kanban.PropertyEditorUi.LaneProperty';
 export const KANBAN_API_PATH = '/umbraco/kanban/api/v1';
 
 export const KANBAN_BOARD_ENDPOINT = `${KANBAN_API_PATH}/board`;
@@ -18,6 +19,13 @@ export const KANBAN_DATA_TYPE_IS_COLLECTION_CONDITION_ALIAS =
 
 /** The extra configuration alias written onto a Collection data type. Must match Constants.BoardConfigIdKey. */
 export const KANBAN_BOARD_CONFIG_ID_KEY = 'kanban.boardConfigId';
+
+/**
+ * The Board configuration key naming the content type the lane property was picked from.
+ * Written by the lane property picker alongside its own value rather than shown as a setting of
+ * its own — an editor picks a property, not a content type and a property.
+ */
+export const KANBAN_LANE_CONTENT_TYPE_KEY = 'laneContentTypeKey';
 
 /** The Collection property editor UI our Data Type workspace tab attaches itself to. */
 export const KANBAN_COLLECTION_PROPERTY_EDITOR_UI_ALIAS = 'Umb.PropertyEditorUi.Collection';

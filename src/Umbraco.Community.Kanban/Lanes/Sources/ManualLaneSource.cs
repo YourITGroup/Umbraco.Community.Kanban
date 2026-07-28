@@ -8,19 +8,19 @@ namespace Umbraco.Community.Kanban.Lanes.Sources;
 /// </summary>
 public sealed class ManualLaneSource : IKanbanLaneSource
 {
-    public const string SourceAlias = "manual";
+    public const string SourceAlias = Constants.ManualLaneSourceAlias;
 
     public string Alias => SourceAlias;
 
     /// <summary>
-    /// This source deliberately claims any context whose configuration pins it via
-    /// <c>LaneSource == "manual"</c>, even when another source (e.g. a core list editor
-    /// source) could also handle the same context by editor alias. That overlap is by
-    /// design: Task 10's resolver arbitrates between candidate sources by preferring
-    /// the one pinned by <see cref="KanbanBoardConfiguration.LaneSource"/>.
+    /// This source deliberately claims any context whose configuration pins it — through the
+    /// "Define lanes manually" toggle or an explicit <c>LaneSource</c> — even when another source
+    /// (e.g. a core list editor source) could also handle the same context by editor alias. That
+    /// overlap is by design: Task 10's resolver arbitrates between candidate sources by preferring
+    /// the one pinned by <see cref="KanbanBoardConfiguration.PinnedLaneSource"/>.
     /// </summary>
     public bool CanHandle(KanbanLaneSourceContext context) =>
-        string.Equals(context.Configuration.LaneSource, SourceAlias, StringComparison.OrdinalIgnoreCase);
+        string.Equals(context.Configuration.PinnedLaneSource, SourceAlias, StringComparison.OrdinalIgnoreCase);
 
     public Task<IReadOnlyList<KanbanLane>> GetLanesAsync(KanbanLaneSourceContext context)
     {

@@ -19,6 +19,15 @@ public class ManualLaneSourceTests
     }
 
     [Fact]
+    public void CanHandle_WhenTheToggleIsOn_WithoutAnExplicitSourceAlias()
+    {
+        // What the "Define lanes manually" toggle actually stores: a boolean, not an alias.
+        var source = new ManualLaneSource();
+
+        source.CanHandle(Context(new KanbanBoardConfiguration { UseManualLanes = true })).Should().BeTrue();
+    }
+
+    [Fact]
     public void CanHandle_IsTrueEvenForACoreListEditor_BecauseThePinWins()
     {
         // Deliberate overlap with CoreListEditorLaneSource: the resolver prefers the pinned source.

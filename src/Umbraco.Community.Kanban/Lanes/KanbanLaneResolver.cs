@@ -67,10 +67,12 @@ public sealed class KanbanLaneResolver(
     {
         // An explicitly pinned source wins, so an editor can force manual lanes
         // over an editor a built-in source would otherwise claim.
-        if (string.IsNullOrWhiteSpace(context.Configuration.LaneSource) == false)
+        var pinnedAlias = context.Configuration.PinnedLaneSource;
+
+        if (string.IsNullOrWhiteSpace(pinnedAlias) == false)
         {
             var pinned = sources.FirstOrDefault(x =>
-                string.Equals(x.Alias, context.Configuration.LaneSource, StringComparison.OrdinalIgnoreCase));
+                string.Equals(x.Alias, pinnedAlias, StringComparison.OrdinalIgnoreCase));
 
             if (pinned is not null && pinned.CanHandle(context))
             {

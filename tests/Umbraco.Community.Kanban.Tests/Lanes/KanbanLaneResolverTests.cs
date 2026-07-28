@@ -42,6 +42,25 @@ public class KanbanLaneResolverTests
     }
 
     [Fact]
+    public async Task Resolve_PrefersManualLanes_WhenTheToggleIsOn()
+    {
+        // The toggle is what the configuration UI writes; "manual" as a source alias is not typed
+        // by hand any more, so the toggle has to reach the same source.
+        var lookup = new FakePropertyDataTypeLookup()
+            .Add("status", "Umbraco.DropDown.Flexible", new Dictionary<string, object> { ["items"] = new[] { "Open" } });
+        var configuration = new KanbanBoardConfiguration
+        {
+            LaneProperty = "status",
+            UseManualLanes = true,
+            ManualLanes = [new KanbanManualLane { Value = "custom", Label = "Custom" }],
+        };
+
+        var result = await Resolver(lookup).ResolveAsync(ContentTypeKey, configuration);
+
+        result.Lanes.Where(x => x.IsUnassigned == false).Select(x => x.Value).Should().Equal("custom");
+    }
+
+    [Fact]
     public async Task Resolve_AlwaysAppendsTheUnassignedLaneLast()
     {
         var lookup = new FakePropertyDataTypeLookup()

@@ -2,6 +2,7 @@ import {
   KANBAN_BOARD_EDITOR_ALIAS,
   KANBAN_BOARD_EDITOR_UI_ALIAS,
   KANBAN_LANE_OVERRIDES_UI_ALIAS,
+  KANBAN_LANE_PROPERTY_UI_ALIAS,
   KANBAN_MANUAL_LANES_UI_ALIAS,
 } from '@/constants.js';
 
@@ -30,18 +31,19 @@ export const manifests: Array<UmbExtensionManifest> = [
             alias: 'laneProperty',
             label: 'Lane property',
             description: 'The child property whose value decides which lane a card sits in.',
-            propertyEditorUiAlias: 'Umb.PropertyEditorUi.TextBox',
+            propertyEditorUiAlias: KANBAN_LANE_PROPERTY_UI_ALIAS,
           },
           {
-            alias: 'laneSource',
-            label: 'Lane source',
-            description: 'Leave empty to detect from the lane property. Set to "manual" to use the lanes below.',
-            propertyEditorUiAlias: 'Umb.PropertyEditorUi.TextBox',
+            alias: 'useManualLanes',
+            label: 'Define lanes manually',
+            description:
+              'Off: lanes come from the lane property’s own options. On: lanes come from the list below.',
+            propertyEditorUiAlias: 'Umb.PropertyEditorUi.Toggle',
           },
           {
             alias: 'manualLanes',
             label: 'Manual lanes',
-            description: 'Used only when the lane source is "manual".',
+            description: 'Used only when lanes are defined manually.',
             propertyEditorUiAlias: KANBAN_MANUAL_LANES_UI_ALIAS,
           },
           {

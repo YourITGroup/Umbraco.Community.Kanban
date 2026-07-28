@@ -19,7 +19,9 @@ public class KanbanBoardPropertyEditorTests
 
         aliases.Should().BeEquivalentTo(
             "laneProperty",
+            "laneContentTypeKey",
             "laneSource",
+            "useManualLanes",
             "manualLanes",
             "laneOverrides",
             "cardProperties",
