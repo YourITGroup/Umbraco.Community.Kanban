@@ -2,5 +2,6 @@
 // declared by the backoffice package (declare global in extension-registry/models/types.ts).
 import type {} from '@umbraco-cms/backoffice/extension-registry';
 import { manifests as boardManifests } from './property-editors/board/manifests.js';
+import { manifests as calendarManifests } from './property-editors/calendar/manifests.js';
 
-export const manifests: Array<UmbExtensionManifest> = [...boardManifests];
+export const manifests: Array<UmbExtensionManifest> = [...boardManifests, ...calendarManifests];
