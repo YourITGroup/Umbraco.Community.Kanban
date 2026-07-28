@@ -1,7 +1,7 @@
 # Contentment Data List lane source
 
 **Date:** 2026-07-28
-**Status:** Approved for planning
+**Status:** Implemented
 **Parent design:** [2026-07-28-umbraco-community-kanban-design.md](2026-07-28-umbraco-community-kanban-design.md) — *Contentment lane source*, milestone 6
 **Priority:** built ahead of milestone 3, per [ENHANCEMENTS.md](../../ENHANCEMENTS.md)
 

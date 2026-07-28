@@ -5,25 +5,18 @@ Design decisions live in `docs/superpowers/specs/`; this file only tracks intent
 
 ---
 
-## Next up: Contentment lane source (milestone 6, pulled ahead of 3)
+## Done: Contentment lane source (milestone 6, built ahead of 3)
 
-**Reprioritised 2026-07-28.** The Contentment Data List lane source was scheduled last. It needs to
-come next instead, because the property boards are actually wanted for — a booking's `status` — is a
-Contentment Data List backed by an enum, and nothing else can read it. Milestone numbering is
-unchanged; only the build order is.
+**Built 2026-07-29**, from
+[its design](superpowers/specs/2026-07-28-contentment-lane-source-design.md). The
+`Umbraco.Community.Kanban.Contentment` package resolves lanes from any Data List data source through
+Contentment's `IContentmentDataSource`, so a board can group by a booking's `status` without the
+"Define lanes manually" toggle duplicating the enum by hand.
 
-Today `CoreListEditorLaneSource` claims only `Umbraco.DropDown.Flexible`,
-`Umbraco.RadioButtonList` and `Umbraco.CheckBoxList`. A Contentment Data List property is claimed by
-no source at all, so a board configured against `status` collapses to the single unassigned lane. The
-only workaround is the "Define lanes manually" toggle, which duplicates the enum by hand and drifts
-from it the moment the enum changes — exactly the failure the resolver was designed to avoid.
-
-Scope is already specified: see *Contentment lane source* in
-[the main design](superpowers/specs/2026-07-28-umbraco-community-kanban-design.md), including the
-separate `Umbraco.Community.Kanban.Contentment` project and NuGet package (so the core package never
-drags Contentment in), resolution through `IContentmentDataSource` rather than any one data source,
-`Disabled` items rendering as lanes that reject drops, and the guard test on Contentment's
-hard-coded editor alias — its alias constants are `internal`.
+One limitation carried forward and documented in the package README: data sources that resolve
+relative to the current node (*Umbraco Content Property Value*, the XPath source) produce no lanes,
+because Contentment's own editor endpoint sets a content context that lane resolution has none of.
+Wiring `IContentmentContentContext` in is possible — it is public — and remains backlog.
 
 ---
 
