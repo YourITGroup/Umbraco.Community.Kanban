@@ -1,9 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import { manifests } from './manifests.js';
-import { KANBAN_DATA_TYPE_WORKSPACE_VIEW_ALIAS } from '@/constants.js';
+import {
+  KANBAN_DATA_TYPE_IS_COLLECTION_CONDITION_ALIAS,
+  KANBAN_DATA_TYPE_WORKSPACE_VIEW_ALIAS,
+} from '@/constants.js';
 
 describe('data type workspace view manifests', () => {
   const view = manifests.find((manifest) => manifest.alias === KANBAN_DATA_TYPE_WORKSPACE_VIEW_ALIAS);
+  const condition = manifests.find(
+    (manifest) => manifest.alias === KANBAN_DATA_TYPE_IS_COLLECTION_CONDITION_ALIAS,
+  );
 
   it('registers a Kanban workspace view', () => {
     expect(view).toBeDefined();
@@ -18,12 +24,20 @@ describe('data type workspace view manifests', () => {
     expect(meta?.icon).toBeTruthy();
   });
 
-  it('is scoped to the data type workspace', () => {
+  it('is scoped to Collection data types in the data type workspace', () => {
     const conditions = (view as { conditions?: Array<{ alias: string; match?: string }> }).conditions;
 
     expect(conditions).toEqual([
       { alias: 'Umb.Condition.WorkspaceAlias', match: 'Umb.Workspace.DataType' },
+      { alias: KANBAN_DATA_TYPE_IS_COLLECTION_CONDITION_ALIAS },
     ]);
+  });
+
+  it('registers the data-type-is-collection condition it depends on', () => {
+    expect(condition).toBeDefined();
+    expect(condition?.type).toBe('condition');
+    // Lazily loaded so the manifests module stays importable outside the browser.
+    expect(typeof (condition as { api?: unknown }).api).toBe('function');
   });
 
   it('loads its element lazily', () => {

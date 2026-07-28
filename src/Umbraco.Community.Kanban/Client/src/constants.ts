@@ -12,6 +12,10 @@ export const KANBAN_CONFIGURATIONS_ENDPOINT = `${KANBAN_API_PATH}/configurations
 export const KANBAN_COLLECTION_VIEW_BOARD_ALIAS = 'Umb.Community.Kanban.CollectionView.Board';
 export const KANBAN_DATA_TYPE_WORKSPACE_VIEW_ALIAS = 'Umb.Community.Kanban.WorkspaceView.DataType.Kanban';
 
+/** Our own condition: the open Data Type workspace edits a Collection data type. */
+export const KANBAN_DATA_TYPE_IS_COLLECTION_CONDITION_ALIAS =
+  'Umb.Community.Kanban.Condition.DataTypeIsCollection';
+
 /** The extra configuration alias written onto a Collection data type. Must match Constants.BoardConfigIdKey. */
 export const KANBAN_BOARD_CONFIG_ID_KEY = 'kanban.boardConfigId';
 

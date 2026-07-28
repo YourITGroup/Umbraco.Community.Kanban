@@ -12,8 +12,9 @@ import { getBoardConfigurations, type KanbanConfigurationModel } from '@/data/ka
  * layout uses, writing it to `kanban.boardConfigId`. That key is what GET /board resolves
  * through, because a collection view cannot be handed custom configuration directly.
  *
- * There is no extension condition for a data type's property editor UI alias, so this
- * registers on every data type workspace and hides itself when the alias does not match.
+ * The tab is gated by our own `Umb.Community.Kanban.Condition.DataTypeIsCollection` condition,
+ * because Umbraco has no built-in condition for a data type's property editor UI alias. The
+ * alias check below is defence-in-depth for the same reason.
  */
 @customElement('umb-community-kanban-data-type-view')
 export class UmbCommunityKanbanDataTypeViewElement extends UmbLitElement {
