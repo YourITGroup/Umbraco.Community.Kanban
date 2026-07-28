@@ -1,0 +1,21 @@
+{
+  "name": "umbraco-community-kanban",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit && vite build",
+    "watch": "vite build --watch",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "engines": { "node": ">=22" },
+  "devDependencies": {
+    "@umbraco-cms/backoffice": "^18.0.0",
+    "@types/node": "^22.0.0",
+    "lit": "^3.3.0",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.0",
+    "vitest": "^3.0.0"
+  }
+}

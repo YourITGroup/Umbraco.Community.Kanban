@@ -1,0 +1,19 @@
+{
+  "id": "Umbraco.Community.Kanban",
+  "name": "Umbraco.Community.Kanban",
+  "version": "1.0.0",
+  "allowPackageTelemetry": true,
+  "importmap": {
+    "imports": {
+      "@umbraco-community/kanban": "/App_Plugins/UmbracoCommunityKanban/umbraco-community-kanban.js"
+    }
+  },
+  "extensions": [
+    {
+      "type": "bundle",
+      "alias": "Umbraco.Community.Kanban.Bundle",
+      "name": "Umbraco Community Kanban Bundle",
+      "js": "/App_Plugins/UmbracoCommunityKanban/umbraco-community-kanban.js"
+    }
+  ]
+}
