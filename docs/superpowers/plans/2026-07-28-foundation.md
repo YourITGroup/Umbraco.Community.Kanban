@@ -2146,10 +2146,20 @@ git commit -m "feat: resolve lanes from configuration, sources, overrides and pa
 
 ### Task 11: Dependency injection and the Management API base
 
+> **Corrected after implementation review (see `.superpowers/sdd/2026-07-28-foundation/task-11-report.md`):**
+> Umbraco 18's Management API generates its OpenAPI documents with the native
+> `Microsoft.AspNetCore.OpenApi` pipeline via `IUmbracoBuilder.AddBackOfficeOpenApiDocument` —
+> there is no Swashbuckle (`Swashbuckle.AspNetCore.SwaggerGen`/`SwaggerGenOptions`) in this
+> dependency graph at all. Every "Swagger" reference below is replaced with the equivalent
+> OpenAPI-document call, matching the pattern `Umbraco.Cms.Api.Management`'s own composition
+> uses. Separately, `Umbraco.Cms.Core.Constants.Web.AttributeRouting.BackOfficeToken` is
+> `"umbracoBackOffice"` (capital "O"), not `"umbracoBackoffice"` — the test literal below is
+> corrected to match.
+
 **Files:**
 - Create: `src/Umbraco.Community.Kanban/Extensions/UmbracoBuilderExtensions.cs`
 - Create: `src/Umbraco.Community.Kanban/Composers/KanbanComposer.cs`
-- Create: `src/Umbraco.Community.Kanban/Configuration/KanbanApiSwaggerGenOptions.cs`
+- Create: `src/Umbraco.Community.Kanban/Configuration/KanbanOpenApiDocument.cs`
 - Create: `src/Umbraco.Community.Kanban/Attributes/KanbanVersionedRouteAttribute.cs`
 - Create: `src/Umbraco.Community.Kanban/Controllers/KanbanControllerBase.cs`
 - Test: `tests/Umbraco.Community.Kanban.Tests/Composing/RegistrationTests.cs`
@@ -2157,16 +2167,31 @@ git commit -m "feat: resolve lanes from configuration, sources, overrides and pa
 **Interfaces:**
 - Consumes: `IKanbanLaneResolver`, `IKanbanPropertyDataTypeLookup`, `KanbanLaneSourceCollectionBuilder` from Task 10.
 - Produces:
-  - `IUmbracoBuilder.AddKanban()` — registers services, the lane source collection with both built-ins, and the Swagger document.
+  - `IUmbracoBuilder.AddKanban()` — registers services, the lane source collection with both built-ins, and the package's own OpenAPI document.
   - `IUmbracoBuilder.KanbanLaneSources()` — the collection builder, for consumers adding their own sources.
-  - `KanbanControllerBase` — the routed, authorised, Swagger-grouped base for every endpoint.
+  - `KanbanControllerBase` — the routed, authorised, `[MapToApi(Constants.ApiName)]`-grouped base for every endpoint.
 
 - [ ] **Step 1: Write the failing test**
+
+The registration order (`ManualLaneSource` before `CoreListEditorLaneSource`) is behavioural,
+not incidental — `KanbanLaneResolver.SelectSource` (Task 10) prefers a pinned source and only
+falls back to the first that can handle the context, so if `AddKanban()` ever registered the two
+in the other order, boards without a pin would resolve against the wrong source. Assert this by
+exercising the real composition path — `builder.AddKanban()` — rather than constructing a
+`KanbanLaneSourceCollection` by hand: a hand-built collection would still pass even if
+`AddKanban()` dropped or reordered its `.Append<>()` calls.
 
 `tests/Umbraco.Community.Kanban.Tests/Composing/RegistrationTests.cs`:
 
 ```csharp
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Umbraco.Cms.Core.Composing;
+using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Community.Kanban.Controllers;
+using Umbraco.Community.Kanban.Extensions;
 using Umbraco.Community.Kanban.Lanes;
 using Umbraco.Community.Kanban.Lanes.Sources;
 
@@ -2175,14 +2200,45 @@ namespace Umbraco.Community.Kanban.Tests.Composing;
 public class RegistrationTests
 {
     [Fact]
-    public void TheBuiltInSources_AreOrderedManualFirst()
+    public void AddKanban_RegistersTheBuiltInSources_ManualFirst()
     {
         // Manual must come first so a pinned manual configuration is found before
         // a built-in source claims the editor.
-        var collection = new KanbanLaneSourceCollection(() =>
-            [new ManualLaneSource(), new CoreListEditorLaneSource()]);
+        IUmbracoBuilder builder = CreateUmbracoBuilder();
 
-        collection.First().Should().BeOfType<ManualLaneSource>();
+        builder.AddKanban();
+        builder.Build();
+
+        using ServiceProvider provider = builder.Services.BuildServiceProvider();
+        var sources = provider.GetRequiredService<KanbanLaneSourceCollection>();
+
+        sources.First().Should().BeOfType<ManualLaneSource>();
+        sources.Should().ContainSingle(x => x is CoreListEditorLaneSource);
+    }
+
+    [Fact]
+    public void AddKanban_RegistersTheLaneResolverAndPropertyDataTypeLookup()
+    {
+        // Asserted via the service descriptors, not by resolving an instance:
+        // KanbanPropertyDataTypeLookup depends on IContentTypeService/IDataTypeService,
+        // whose own dependencies (repositories, scope providers, persistence) are wired
+        // by Umbraco's full composition — infrastructure this test project deliberately
+        // does not stand up (see Fakes/: resolver tests use hand-written fakes instead).
+        // Asserting the registration still fails this test if AddKanban() stops
+        // registering either service.
+        IUmbracoBuilder builder = CreateUmbracoBuilder();
+
+        builder.AddKanban();
+
+        builder.Services.Should().ContainSingle(d =>
+            d.ServiceType == typeof(IKanbanLaneResolver) &&
+            d.ImplementationType == typeof(KanbanLaneResolver) &&
+            d.Lifetime == ServiceLifetime.Singleton);
+
+        builder.Services.Should().ContainSingle(d =>
+            d.ServiceType == typeof(IKanbanPropertyDataTypeLookup) &&
+            d.ImplementationType == typeof(KanbanPropertyDataTypeLookup) &&
+            d.Lifetime == ServiceLifetime.Singleton);
     }
 
     [Fact]
@@ -2194,8 +2250,29 @@ public class RegistrationTests
             .Single();
 
         // BackOfficeRouteAttribute derives from RouteAttribute and prefixes the backoffice token,
-        // which is substituted with the configured Umbraco path at routing time.
-        route.Template.Should().Be("[umbracoBackoffice]/kanban/api/v{version:apiVersion}/");
+        // which is substituted with the configured Umbraco path at routing time. The token
+        // (Umbraco.Cms.Core.Constants.Web.AttributeRouting.BackOfficeToken) is "umbracoBackOffice"
+        // — capital "O" in "Office".
+        route.Template.Should().Be("[umbracoBackOffice]/kanban/api/v{version:apiVersion}/");
+    }
+
+    /// <summary>
+    /// Builds a real <see cref="IUmbracoBuilder"/> using Umbraco's own "primarily for testing"
+    /// constructor, with no fakes or mocks — just enough scaffolding (a real <see cref="TypeLoader"/>
+    /// over this test assembly) to satisfy the constructor. <see cref="UmbracoBuilder"/> registers
+    /// Umbraco's core services itself, so <c>AddKanban()</c> runs against the same DI surface it
+    /// would in production.
+    /// </summary>
+    private static IUmbracoBuilder CreateUmbracoBuilder()
+    {
+        var services = new ServiceCollection();
+        var config = new ConfigurationBuilder().Build();
+
+        var assemblyProvider = new DefaultUmbracoAssemblyProvider(typeof(RegistrationTests).Assembly, NullLoggerFactory.Instance);
+        var typeFinder = new TypeFinder(NullLoggerFactory.Instance.CreateLogger<TypeFinder>(), assemblyProvider, null);
+        var typeLoader = new TypeLoader(typeFinder, NullLoggerFactory.Instance.CreateLogger<TypeLoader>());
+
+        return new UmbracoBuilder(services, config, typeLoader);
     }
 }
 ```
@@ -2242,32 +2319,46 @@ namespace Umbraco.Community.Kanban.Controllers;
 public abstract class KanbanControllerBase : ManagementApiControllerBase;
 ```
 
-- [ ] **Step 4: Write the Swagger document registration**
+- [ ] **Step 4: Write the OpenAPI document registration**
 
-`Configuration/KanbanApiSwaggerGenOptions.cs`:
+Umbraco 18 generates Management API OpenAPI documents with the native
+`Microsoft.AspNetCore.OpenApi` pipeline, via `IUmbracoBuilder.AddBackOfficeOpenApiDocument` —
+there is no Swashbuckle in this dependency graph. `Umbraco.Cms.Api.Management`'s own
+composition (`UmbracoBuilderExtensions.AddManagementApi`) registers its document the same way,
+chaining a title, `.WithBackOfficeAuthentication()` (advertises the backoffice security
+requirement in the generated document — the controller's `[Authorize]` still does the actual
+enforcement), and `.WithJsonOptions(...)` naming the same JSON options the backoffice
+controller pipeline serializes with, so the generated schema matches runtime behaviour. Mirror
+that shape:
+
+`Configuration/KanbanOpenApiDocument.cs`:
 
 ```csharp
-using Microsoft.Extensions.Options;
-using Microsoft.OpenApi.Models;
-using Swashbuckle.AspNetCore.SwaggerGen;
+using Umbraco.Cms.Api.Common.OpenApi;
+using Umbraco.Cms.Api.Management.OpenApi;
+using Umbraco.Cms.Core.DependencyInjection;
 
 namespace Umbraco.Community.Kanban.Configuration;
 
 /// <summary>
-/// Registers the package's own Swagger document, so its endpoints do not clutter
+/// Registers the package's own OpenAPI document, so its endpoints do not clutter
 /// the core Management API document and can generate their own client.
 /// </summary>
-public sealed class KanbanApiSwaggerGenOptions : IConfigureOptions<SwaggerGenOptions>
+public static class KanbanOpenApiDocument
 {
-    public void Configure(SwaggerGenOptions options) =>
-        options.SwaggerDoc(
+    private const string Title = "Kanban Management API";
+
+    /// <summary>
+    /// Adds the Kanban API's own OpenAPI document, scoped to endpoints carrying
+    /// <c>[MapToApi(Constants.ApiName)]</c>.
+    /// </summary>
+    public static IUmbracoBuilder AddKanbanOpenApiDocument(this IUmbracoBuilder builder) =>
+        builder.AddBackOfficeOpenApiDocument(
             Constants.ApiName,
-            new OpenApiInfo
-            {
-                Title = "Kanban Management API",
-                Version = "Latest",
-                Description = "Board and calendar data for the Umbraco.Community.Kanban package.",
-            });
+            document => document
+                .WithTitle(Title)
+                .WithBackOfficeAuthentication()
+                .WithJsonOptions(Umbraco.Cms.Core.Constants.JsonOptionsNames.BackOffice));
 }
 ```
 
@@ -2296,7 +2387,7 @@ public static class UmbracoBuilderExtensions
             return builder;
         }
 
-        builder.Services.ConfigureOptions<KanbanApiSwaggerGenOptions>();
+        builder.AddKanbanOpenApiDocument();
 
         builder.Services.AddSingleton<IKanbanPropertyDataTypeLookup, KanbanPropertyDataTypeLookup>();
         builder.Services.AddSingleton<IKanbanLaneResolver, KanbanLaneResolver>();
@@ -3981,3 +4072,4 @@ These belong to later milestones and must not be built here:
 - The collection view and content app hosts, the data type workspace Kanban tab, real-time sync — milestones 2 and 5
 - The Contentment lane source package — milestone 6
 - Property-alias pickers for `laneProperty`, `dateProperty` and `cardProperties`, which currently use text inputs
+- Wiring `POST /lanes/preview` (Task 13) into the lane override editor's `lanes` input (Task 16): both were built to spec but nothing in this plan specifies the settings-host component that would watch the sibling `laneProperty`/`laneSource`/`manualLanes` fields and call the endpoint. Until milestone 2 builds that host, the lane-appearance settings field on a Kanban Board data type always renders "Choose a lane property first, then lanes will appear here." — a known, deliberately deferred gap, not a bug in either task's implementation.
