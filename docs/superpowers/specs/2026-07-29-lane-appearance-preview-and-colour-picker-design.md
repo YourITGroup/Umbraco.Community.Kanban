@@ -33,7 +33,10 @@ editor's request, in favour of a full picker with an eye dropper.
 **In**
 
 - The lane appearance editor resolves its own lanes through `POST /lanes/preview`.
-- `uui-color-swatches` becomes `uui-color-picker`, storing hex.
+- `uui-color-swatches` becomes `uui-color-picker`, storing hex — in **both** editors that choose a lane
+  colour, via one shared element. Lane appearance is the one that was asked for, but the manual lanes
+  editor picks the same kind of value with the same control, and leaving it behind would put two
+  different colour controls in one settings panel.
 - Lane colour reaches the lane header as a CSS custom property rather than an inline
   `border-top-color`.
 
@@ -112,7 +115,13 @@ already filters it out, since an unassigned lane's appearance is not configurabl
 
 ### 4.3 The colour control
 
-`uui-color-picker`, with the eight palette colours as its `swatches`. Swatch values must be real CSS
+One shared element, `umb-community-kanban-lane-colour`, wrapping `uui-color-picker` with the palette
+swatches and the clear button below. Both the lane appearance rows and the manual lanes rows use it, so
+the two cannot drift and neither repeats the swatch list. It takes a colour and emits a change carrying
+the new one — no knowledge of overrides, lanes or configuration, which is what keeps it shared rather
+than merely copied.
+
+Inside it: `uui-color-picker`, with the eight palette colours as its `swatches`. Swatch values must be real CSS
 for the picker to render them, so the aliases are replaced by their hex equivalents — a new
 `KANBAN_LANE_SWATCHES` list beside `KANBAN_LANE_PALETTE`, which stays as the mirror of the server's
 cycle.
