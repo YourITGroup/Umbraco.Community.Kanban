@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
+    <StaticWebAssetBasePath>/</StaticWebAssetBasePath>
+    <EnableDefaultContentItems>true</EnableDefaultContentItems>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageId>Umbraco.Community.Kanban</PackageId>
+    <Product>Umbraco.Community.Kanban</Product>
+    <Title>Umbraco.Community.Kanban</Title>
+    <Description>Kanban board and calendar views for Umbraco child nodes.</Description>
+    <PackageTags>umbraco plugin package umbraco-marketplace kanban board calendar collection listview</PackageTags>
+    <RootNamespace>Umbraco.Community.Kanban</RootNamespace>
+    <Authors>Your IT Group</Authors>
+    <PackageProjectUrl>https://github.com/YourITGroup/Umbraco.Community.Kanban</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/YourITGroup/Umbraco.Community.Kanban</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Umbraco.Cms.Web.Website" />
+    <PackageReference Include="Umbraco.Cms.Api.Management" />
+    <InternalsVisibleTo Include="Umbraco.Community.Kanban.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The client sources are built by Vite into wwwroot; they are not compiled or packed. -->
+    <Content Remove="Client\**" />
+    <None Include="Client\public\umbraco-package.json" Pack="false" />
+  </ItemGroup>
+</Project>

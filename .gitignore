@@ -1,0 +1,8 @@
+bin/
+obj/
+node_modules/
+.vs/
+.vscode/
+*.user
+src/Umbraco.Community.Kanban/wwwroot/App_Plugins/UmbracoCommunityKanban/
+.superpowers/
