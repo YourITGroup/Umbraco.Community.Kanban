@@ -384,3 +384,10 @@ Each is independently useful:
 6. Contentment Data List lane source package
 
 The section dashboard sits outside v1.
+
+**Build order changed 2026-07-28: 6 comes next, before 3.** The numbering above is left alone so
+existing specs still refer to the same milestones; only the order they are built in changes. The
+property the first real board groups by — a booking's `status` — is a Contentment Data List, which no
+built-in lane source claims, so that board resolves to a single unassigned lane unless its lanes are
+duplicated by hand. Milestone 6 gates useful evaluation of everything after it; 3 only polishes a
+board that already works. See [ENHANCEMENTS.md](../../ENHANCEMENTS.md).
