@@ -52,7 +52,7 @@ A **configuration** is a data type instance. Two property editors:
 |---|---|
 | `laneProperty` | Alias of the child property that determines the lane |
 | `laneSource` | Which `IKanbanLaneSource` resolves the lanes; defaults to auto-detect from the property's editor |
-| `manualLanes` | Value / label / colour rows, used by the `Manual` source |
+| `manualLanes` | Value / label / colour rows, used by the `Manual` source; colour defaults to auto |
 | `cardProperties` | Property aliases shown as summary items on cards |
 | `lanePageSize` | Cards loaded per lane before "Show more"; default 25 |
 | `allowDrag` | Default on |
@@ -93,6 +93,35 @@ Sources in the core package read `items` from `ConfigurationData` for `Umbraco.D
 
 An **(Unassigned)** lane always exists, collecting children whose lane value is empty or matches no
 known lane. It is drag-out-only — cards can leave it but not be dropped into it.
+
+### Lane colours
+
+`KanbanLane.Colour` is optional, and most sources cannot supply one — a dropdown's `items` are bare
+strings, and Contentment's `DataListItem` carries an icon but no colour. Rather than render a wall of
+identical grey columns, lanes without a colour fall back to Umbraco's own icon palette, the one behind
+the content type icon colour picker.
+
+The palette is `umbracoColors` in
+`core/resources/extractUmbColorVariable.function.ts`. Entries marked `legacy` are excluded, as is
+`text`, which is a text colour rather than a hue, leaving eight: **yellow, pink, blue, light-blue,
+red, green, brown, grey**.
+
+Assignment rules:
+
+- Colours are assigned by the lane's **index in the resolved lane order**, wrapping with modulo, so a
+  lane keeps the same colour on every load and appending a lane never reshuffles the existing ones.
+- Assignment happens per-lane, skipping lanes that already carry an explicit colour, so a partially
+  coloured source stays consistent instead of leaving gaps.
+- The **(Unassigned)** lane is always neutral grey and takes no part in the cycle.
+- A lane resolves to a colour **alias**, not a hex value. The client renders it through
+  `extractUmbColorVariable()`, which maps to a `--uui-palette-*` custom property — so lane colours
+  track the backoffice theme and stay correct in light and dark mode.
+- Where a source *does* supply a colour, an Umbraco colour alias is preferred and used as-is. Any
+  other value is passed through as a raw CSS colour, which supports brand colours at the cost of
+  theme awareness.
+
+Manual lanes offer the same eight swatches through `<uui-color-swatches>`, plus a free CSS colour
+field, with "auto" as the default so hand-defined lanes get the cycle unless the editor overrides it.
 
 ### Contentment lane source
 
@@ -230,9 +259,9 @@ Everything a third-party host needs is exported from a public entry module decla
 
 ### Board
 
-Lanes render as columns. Each lane header shows its label, its colour where the lane source supplies
-one, and the **total number of cards in that lane** — the lane's full total, not the number currently
-rendered.
+Lanes render as columns. Each lane header shows its label, its colour — explicit or cycled from the
+Umbraco palette, per *Lane colours* above — and the **total number of cards in that lane**, the lane's
+full total rather than the number currently rendered.
 
 Each lane pages independently. A lane holding more cards than are loaded shows a **Show more** button
 at the foot of the column, appending the next page to that lane alone and leaving every other lane
@@ -304,6 +333,8 @@ Cover the logic that is easy to get wrong and invisible when broken:
 - Permission filtering on read and write
 - The server-event reconciliation reducer
 - Lane source resolution per editor alias
+- Lane colour cycling: stable across reloads, unaffected by appending a lane, skipping explicitly
+  coloured lanes and the unassigned lane
 - Contentment Data List resolution, including a guard test on the hard-coded editor alias
 
 No browser automation in v1.
