@@ -1,8 +1,4 @@
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
-using Umbraco.Cms.Core.Composing;
 using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Community.Kanban.Controllers;
 using Umbraco.Community.Kanban.Extensions;
@@ -21,7 +17,7 @@ public class RegistrationTests
         // reorders or drops the .Append<>() calls in AddKanban() would fail this test.
         // Manual must come first so a pinned manual configuration is found before
         // a built-in source claims the editor.
-        IUmbracoBuilder builder = CreateUmbracoBuilder();
+        IUmbracoBuilder builder = KanbanBuilderFixture.CreateUmbracoBuilder();
 
         builder.AddKanban();
         builder.Build();
@@ -45,7 +41,7 @@ public class RegistrationTests
         // up (see the Fakes/ directory: resolver tests use hand-written fakes for
         // exactly this reason). Asserting the registration still fails the test if
         // AddKanban() stops registering either service.
-        IUmbracoBuilder builder = CreateUmbracoBuilder();
+        IUmbracoBuilder builder = KanbanBuilderFixture.CreateUmbracoBuilder();
 
         builder.AddKanban();
 
@@ -74,24 +70,5 @@ public class RegistrationTests
         // "umbracoBackOffice" (capital "O" in "Office"), not "umbracoBackoffice" as the brief's
         // literal assumed — see task-11 report for the discrepancy.
         route.Template.Should().Be("[umbracoBackOffice]/kanban/api/v{version:apiVersion}/");
-    }
-
-    /// <summary>
-    /// Builds a real <see cref="IUmbracoBuilder"/> using Umbraco's own "primarily for testing"
-    /// constructor, with no fakes or mocks — just enough scaffolding (a real <see cref="TypeLoader"/>
-    /// over this test assembly) to satisfy the constructor. <see cref="UmbracoBuilder"/> registers
-    /// Umbraco's core services itself, so <c>AddKanban()</c> runs against the same DI surface it
-    /// would in production.
-    /// </summary>
-    private static IUmbracoBuilder CreateUmbracoBuilder()
-    {
-        var services = new ServiceCollection();
-        var config = new ConfigurationBuilder().Build();
-
-        var assemblyProvider = new DefaultUmbracoAssemblyProvider(typeof(RegistrationTests).Assembly, NullLoggerFactory.Instance);
-        var typeFinder = new TypeFinder(NullLoggerFactory.Instance.CreateLogger<TypeFinder>(), assemblyProvider, null);
-        var typeLoader = new TypeLoader(typeFinder, NullLoggerFactory.Instance.CreateLogger<TypeLoader>());
-
-        return new UmbracoBuilder(services, config, typeLoader);
     }
 }

@@ -24,6 +24,12 @@ public static class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IKanbanPropertyDataTypeLookup, KanbanPropertyDataTypeLookup>();
         builder.Services.AddSingleton<IKanbanLaneResolver, KanbanLaneResolver>();
         builder.Services.AddSingleton<IKanbanConfigurationService, KanbanConfigurationService>();
+        builder.Services.AddSingleton<IKanbanContentTypeLookup, KanbanContentTypeLookup>();
+        builder.Services.AddSingleton<IKanbanLaneContentTypeResolver, KanbanLaneContentTypeResolver>();
+        builder.Services.AddSingleton<IKanbanDataTypeConfigurationLookup, KanbanDataTypeConfigurationLookup>();
+        builder.Services.AddSingleton<IKanbanBoardConfigurationResolver, KanbanBoardConfigurationResolver>();
+        builder.Services.AddSingleton<IKanbanContentLoader, KanbanContentLoader>();
+        builder.Services.AddSingleton<IKanbanBoardService, KanbanBoardService>();
 
         // Manual is appended first so a configuration that pins it wins over an
         // editor-matching source.
