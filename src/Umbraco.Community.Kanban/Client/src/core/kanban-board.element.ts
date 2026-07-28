@@ -119,9 +119,9 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
 
     return html`
       ${this._board.truncated
-        ? this.#renderMessage(
-            `Showing the first cards of ${this._board.childCount} children. Lane counts are lower bounds.`,
-          )
+        ? // Deliberately no child count: it is the parent's true count, not permission-filtered,
+          // so printing it would disclose the existence of siblings a restricted user cannot see.
+          this.#renderMessage('Showing the first cards only — lane counts shown here are lower bounds.')
         : nothing}
       <div class="lanes" @kanban-load-more=${this.#onLoadMore}>
         ${this._board.lanes.map(

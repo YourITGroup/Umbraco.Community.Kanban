@@ -93,6 +93,10 @@ public sealed class KanbanBoardResponseModel
     /// <summary>True when the parent has more children than the board read.</summary>
     public bool Truncated { get; init; }
 
-    /// <summary>The parent's true child count, exact even when truncated.</summary>
+    /// <summary>
+    /// The parent's true child count, exact even when truncated. Deliberately NOT
+    /// permission-filtered — truncation semantics need the real count — so the client must never
+    /// display it, or it would disclose siblings a restricted user cannot see.
+    /// </summary>
     public int ChildCount { get; init; }
 }
