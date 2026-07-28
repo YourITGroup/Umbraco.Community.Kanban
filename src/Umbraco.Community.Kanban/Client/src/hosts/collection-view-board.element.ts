@@ -38,6 +38,13 @@ export class UmbCommunityKanbanCollectionViewBoardElement extends UmbLitElement 
 
     this.consumeContext(UMB_VARIANT_CONTEXT, (context) => {
       this.observe(context?.displayCulture, (culture) => {
+        // displayCulture emits undefined synchronously on subscribe and only becomes real once
+        // UmbAppLanguageContext has fetched the languages, so a falsy value is "not yet known",
+        // never an answer. Umbraco's own UmbDocumentCollectionContext guards this identically
+        // (`if (!displayCulture) return;`). Loading on the falsy emission would fetch the board
+        // for the invariant culture and then fetch it again for the real one.
+        if (!culture) return;
+
         this._culture = culture;
         this.#cultureResolved = true;
       }, '_kanbanDisplayCulture');
@@ -46,6 +53,19 @@ export class UmbCommunityKanbanCollectionViewBoardElement extends UmbLitElement 
     // items emits on every collection load, which is the reload signal for this milestone.
     this.consumeContext(UMB_COLLECTION_CONTEXT, (context) => {
       this.observe(context?.items, () => {
+        // Before the first load, updated() owns fetching: an emission here is the collection's
+        // initial state and would either fetch with no parent or race the initial fetch.
+        if (!this.#loadedFor) return;
+
+        // The collection finishing its own load emits items once right after we start the
+        // initial fetch for a key; the board is already loading that same data. Worst case
+        // this swallows one genuine emission (if the collection settled first), which costs a
+        // read-only board one refresh — cheaper than a duplicate request per navigation.
+        if (this.#awaitingCollectionSettle) {
+          this.#awaitingCollectionSettle = false;
+          return;
+        }
+
         this.#board?.load();
       }, '_kanbanCollectionItems');
     });
@@ -58,11 +78,15 @@ export class UmbCommunityKanbanCollectionViewBoardElement extends UmbLitElement 
    * Whether the variant context's observe callback has fired at least once. Entity and variant
    * contexts resolve independently and asynchronously; without this, a load can fire on the
    * entity context alone and then fire again moments later once culture arrives — two requests
-   * for one navigation. Set true regardless of the culture value received (including on an
-   * invariant site, where displayCulture may resolve to null/undefined), since what matters is
-   * that the callback has run once, not what it produced.
+   * for one navigation. Only a truthy culture counts as resolved: the variant context emits
+   * undefined synchronously on subscribe, long before the app language request lands. Every
+   * Umbraco install has a default language, so a real culture always arrives — even for
+   * documents that do not vary, where the server ignores it for invariant properties.
    */
   #cultureResolved = false;
+
+  /** Set while the collection's own load is expected to emit items for a fetch already in flight. */
+  #awaitingCollectionSettle = false;
 
   get #board() {
     return this.shadowRoot?.querySelector('umb-community-kanban-board') ?? undefined;
@@ -79,6 +103,7 @@ export class UmbCommunityKanbanCollectionViewBoardElement extends UmbLitElement 
       // otherwise the freshly-created board element never receives a load() call and sits on
       // its own internal 'idle' status forever.
       this.#loadedFor = undefined;
+      this.#awaitingCollectionSettle = false;
       return;
     }
 
@@ -89,6 +114,7 @@ export class UmbCommunityKanbanCollectionViewBoardElement extends UmbLitElement 
     if (key === this.#loadedFor) return;
 
     this.#loadedFor = key;
+    this.#awaitingCollectionSettle = true;
     this.#board?.load();
   }
 
