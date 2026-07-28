@@ -1,0 +1,90 @@
+using Umbraco.Community.Kanban.Lanes;
+using Umbraco.Community.Kanban.Models;
+
+namespace Umbraco.Community.Kanban.Tests.Lanes;
+
+public class KanbanLaneOverrideApplierTests
+{
+    private static List<KanbanLane> Lanes() =>
+    [
+        new KanbanLane { Value = "todo", Name = "To do" },
+        new KanbanLane { Value = "done", Name = "Done", Colour = "green" },
+    ];
+
+    [Fact]
+    public void Apply_SetsColourIconAndLabel()
+    {
+        var lanes = Lanes();
+        KanbanLaneOverride[] overrides =
+        [
+            new() { Value = "todo", Colour = "red", Icon = "icon-alert", Label = "Blocked" },
+        ];
+
+        KanbanLaneOverrideApplier.Apply(lanes, overrides);
+
+        lanes[0].Colour.Should().Be("red");
+        lanes[0].Icon.Should().Be("icon-alert");
+        lanes[0].Name.Should().Be("Blocked");
+    }
+
+    [Fact]
+    public void Apply_BeatsAColourTheSourceSupplied()
+    {
+        var lanes = Lanes();
+        KanbanLaneOverride[] overrides = [new() { Value = "done", Colour = "brown" }];
+
+        KanbanLaneOverrideApplier.Apply(lanes, overrides);
+
+        lanes[1].Colour.Should().Be("brown");
+    }
+
+    [Fact]
+    public void Apply_LeavesFieldsTheOverrideDoesNotSet()
+    {
+        var lanes = Lanes();
+        KanbanLaneOverride[] overrides = [new() { Value = "done", Icon = "icon-check" }];
+
+        KanbanLaneOverrideApplier.Apply(lanes, overrides);
+
+        lanes[1].Colour.Should().Be("green");
+        lanes[1].Name.Should().Be("Done");
+        lanes[1].Icon.Should().Be("icon-check");
+    }
+
+    [Fact]
+    public void Apply_MatchesLaneValuesCaseInsensitively()
+    {
+        var lanes = Lanes();
+        KanbanLaneOverride[] overrides = [new() { Value = "TODO", Colour = "red" }];
+
+        KanbanLaneOverrideApplier.Apply(lanes, overrides);
+
+        lanes[0].Colour.Should().Be("red");
+    }
+
+    [Fact]
+    public void Apply_ReturnsOverridesThatMatchedNothing()
+    {
+        var lanes = Lanes();
+        KanbanLaneOverride[] overrides =
+        [
+            new() { Value = "todo", Colour = "red" },
+            new() { Value = "archived", Colour = "grey" },
+        ];
+
+        var unmatched = KanbanLaneOverrideApplier.Apply(lanes, overrides);
+
+        unmatched.Select(x => x.Value).Should().Equal("archived");
+    }
+
+    [Fact]
+    public void Apply_ToleratesNoOverrides()
+    {
+        var lanes = Lanes();
+
+        var unmatched = KanbanLaneOverrideApplier.Apply(lanes, []);
+
+        unmatched.Should().BeEmpty();
+        lanes[0].Colour.Should().BeNull();
+    }
+}
