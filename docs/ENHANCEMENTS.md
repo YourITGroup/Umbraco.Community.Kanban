@@ -29,6 +29,9 @@ hard-coded editor alias — its alias constants are `internal`.
 
 ## 1. Open a card in the workspace modal
 
+*Related: items 5, 6 and 8 all open the same modal; build 1 and 5 together.*
+
+
 Clicking a card's title should open that document in the infinite editor, rather than the board being
 a dead end that forces a trip through the content tree to edit anything.
 
@@ -96,3 +99,65 @@ consistently in the tree, the layout picker and the data type list:
 
 `tabIcon` defaults are unaffected: they are per-configuration values an editor chooses, and only
 appear as `icon-grid` in test fixtures.
+
+## 5. Creating a child under a card opens it in the workspace modal
+
+The sibling of item 1: creating, rather than editing. A new child of a card should open in the same
+infinite editor instead of navigating away.
+
+No document workspace modal token exists in v18 — the generic `UMB_WORKSPACE_MODAL`
+(`{entityType, preset}`) is what serves this, driven to core's exported
+`UMB_CREATE_DOCUMENT_WORKSPACE_PATH_PATTERN` (`create/parent/:parentEntityType/:parentUnique/:documentTypeUnique`).
+Note the document type is part of the path, so the caller must decide it before opening: with more
+than one allowed child type, that means asking first, the way the tree's create action does.
+
+Build this together with item 1 — they share the registration and differ only in the path.
+
+## 6. Child items listed on a card
+
+A minimal list per card: icon, name, and an edit button opening the child in the workspace modal
+(item 1 again). Enough to see a booking's line items without leaving the board.
+
+Open questions, all of which shape the endpoint rather than the element:
+
+- **Where the children come from.** `GET /board` returns cards for one parent; children of each card
+  are a second level it does not fetch. Either extend the card model with a small, capped child list
+  (one query per board, at the cost of a heavier payload for boards that never show them) or add a
+  per-card fetch (lazier, but N requests for a full lane).
+- **Which children.** All child types, or a configured subset? A booking's children may be a mix.
+- **Whether it is configurable at all.** A card list is noise on boards whose cards have no
+  meaningful children, so this likely wants a board setting rather than being unconditional.
+
+## 7. Board configuration picker: match core's picker styling
+
+The picker built on 2026-07-28 stacks its buttons in a column, which does not look like anything else
+in the backoffice. It should read like the Collection and "Allowed child node types" fields do:
+
+- **Chosen:** a ref row with the name and editor alias, actions (**Choose**, **Remove**) at the right.
+- **Empty:** a **full-width** dashed placeholder **Choose** button, with **Create** appended to its
+  end as a sub-button — one control, not two stacked ones.
+
+`uui-button-group` is the mechanism for the split; the current `.editor` column flex and its
+`--uui-size-space-3` gap go away.
+
+Worth weighing while doing it: `UMB_DATA_TYPE_PICKER_MODAL` accepts a `createAction`
+(`UmbTreePickerModalCreateActionData`) — core's own way of offering *create* from **inside** a picker,
+which the document type picker token uses. That would move the create action into the modal instead of
+appending it to the Choose button. It is more conventional, and it is not what was asked for; whoever
+builds this should pick deliberately rather than discover the option late.
+
+## 8. Add a card from the top of a lane
+
+*Nice to have.* An add panel at the head of each lane, creating a content item with the lane property
+already set to that lane's value — so "add to Confirmed" is one action rather than create-then-edit.
+
+Depends on item 5 (create in the workspace modal) and needs one thing verified first: whether a
+document's property values can be preset. `UMB_WORKSPACE_MODAL` takes a `preset`, and
+`entity-detail-workspace-base` applies it as `{...scaffold, ...preset}` — a **top-level spread**, so a
+preset `values` array replaces the scaffolded one outright rather than merging into it. Presetting one
+property therefore means constructing the whole `values` array, and the culture/segment of the entry
+has to be right for a varying document. Prove that on a real document type before designing the panel.
+
+Also unsettled: the unassigned lane has no value to preset, and a manual lane's value may not be a
+legal value for the property at all (nothing validates manual lanes against the editor's options), so
+this needs to degrade to a plain create rather than write something the property will reject.
