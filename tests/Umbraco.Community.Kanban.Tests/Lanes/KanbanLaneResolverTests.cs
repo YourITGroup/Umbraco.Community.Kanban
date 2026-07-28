@@ -67,8 +67,17 @@ public class KanbanLaneResolverTests
         result.Lanes[1].Colour.Should().Be("pink");
     }
 
+    /// <summary>
+    /// This does not prove that Apply runs before Assign in the pipeline — under their current
+    /// semantics (Apply always overwrites a lane's colour when the override supplies one; Assign
+    /// only ever fills in a colour that is still blank) the two orders are commutative, and no
+    /// fixture built from their public behaviour can distinguish them. It proves only that an
+    /// override colour wins over the palette colour that colour assignment would otherwise have
+    /// given that lane. See the comment on <see cref="KanbanLaneResolver.ResolveAsync"/> for the
+    /// full note on why the pipeline order is chosen for clarity rather than enforced here.
+    /// </summary>
     [Fact]
-    public async Task Resolve_AppliesOverridesBeforeColours()
+    public async Task Resolve_OverrideColourWinsOverPaletteColour()
     {
         var lookup = new FakePropertyDataTypeLookup()
             .Add("status", "Umbraco.DropDown.Flexible", new Dictionary<string, object> { ["items"] = new[] { "Open", "Done" } });
@@ -120,5 +129,24 @@ public class KanbanLaneResolverTests
         var result = await Resolver(lookup).ResolveAsync(ContentTypeKey, configuration);
 
         result.Lanes.Should().ContainSingle().Which.IsUnassigned.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Resolve_FallsBackToManualLanesWhenLanePropertyNoLongerResolves()
+    {
+        // LaneProperty points at a property/data type the lookup no longer knows about
+        // (renamed or deleted since the board was configured), but the board is pinned
+        // to manual lanes, which do not depend on that data type at all.
+        var lookup = new FakePropertyDataTypeLookup();
+        var configuration = new KanbanBoardConfiguration
+        {
+            LaneProperty = "status",
+            LaneSource = "manual",
+            ManualLanes = [new KanbanManualLane { Value = "custom", Label = "Custom" }],
+        };
+
+        var result = await Resolver(lookup).ResolveAsync(ContentTypeKey, configuration);
+
+        result.Lanes.Where(x => x.IsUnassigned == false).Select(x => x.Value).Should().Equal("custom");
     }
 }
