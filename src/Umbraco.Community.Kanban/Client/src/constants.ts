@@ -5,6 +5,7 @@ export const KANBAN_CALENDAR_EDITOR_UI_ALIAS = 'Umb.Community.Kanban.PropertyEdi
 export const KANBAN_LANE_OVERRIDES_UI_ALIAS = 'Umb.Community.Kanban.PropertyEditorUi.LaneOverrides';
 export const KANBAN_MANUAL_LANES_UI_ALIAS = 'Umb.Community.Kanban.PropertyEditorUi.ManualLanes';
 export const KANBAN_LANE_PROPERTY_UI_ALIAS = 'Umb.Community.Kanban.PropertyEditorUi.LaneProperty';
+export const KANBAN_CARD_PROPERTIES_UI_ALIAS = 'Umb.Community.Kanban.PropertyEditorUi.CardProperties';
 export const KANBAN_API_PATH = '/umbraco/kanban/api/v1';
 
 export const KANBAN_BOARD_ENDPOINT = `${KANBAN_API_PATH}/board`;

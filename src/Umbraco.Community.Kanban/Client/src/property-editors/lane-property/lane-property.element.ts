@@ -1,16 +1,10 @@
 import { css, customElement, html, property, state } from '@umbraco-cms/backoffice/external/lit';
 import { UmbLitElement } from '@umbraco-cms/backoffice/lit-element';
 import { UmbChangeEvent } from '@umbraco-cms/backoffice/event';
-import { umbOpenModal, UMB_ITEM_PICKER_MODAL } from '@umbraco-cms/backoffice/modal';
-import {
-  UMB_DOCUMENT_TYPE_PICKER_MODAL,
-  UmbDocumentTypeDetailRepository,
-  UmbDocumentTypeItemRepository,
-  type UmbDocumentTypeDetailModel,
-} from '@umbraco-cms/backoffice/document-type';
+import { UmbDocumentTypeItemRepository } from '@umbraco-cms/backoffice/document-type';
 import { UMB_DATA_TYPE_WORKSPACE_CONTEXT } from '@umbraco-cms/backoffice/data-type';
 import { KANBAN_LANE_CONTENT_TYPE_KEY } from '@/constants.js';
-import { toPropertyPickerItems } from './lane-property.model.js';
+import { pickContentTypeProperty } from '../content-type-property/content-type-property.picker.js';
 
 /**
  * Picks the property whose value decides which lane a card sits in, by browsing to it: choose a
@@ -32,7 +26,6 @@ export class UmbCommunityKanbanLanePropertyElement extends UmbLitElement {
   private _contentTypeName = '';
 
   #workspace?: typeof UMB_DATA_TYPE_WORKSPACE_CONTEXT.TYPE;
-  #documentTypes = new UmbDocumentTypeDetailRepository(this);
   #documentTypeItems = new UmbDocumentTypeItemRepository(this);
 
   constructor() {
@@ -64,48 +57,16 @@ export class UmbCommunityKanbanLanePropertyElement extends UmbLitElement {
   }
 
   async #pick() {
-    const contentType = await this.#pickContentType();
-    if (!contentType) return;
-
-    const picked = await umbOpenModal(this, UMB_ITEM_PICKER_MODAL, {
-      data: {
-        headline: `Select a property from ${contentType.name}`,
-        items: toPropertyPickerItems(contentType.properties),
-      },
-    }).catch(() => undefined);
-
-    if (!picked?.value) return;
+    const picked = await pickContentTypeProperty(this);
+    if (!picked) return;
 
     // Awaited before the change event: the sibling key and this element's own value are two writes
     // into the same configuration value list, and letting them overlap lets the second read the
     // list as it was before the first, dropping one of them.
-    await this.#workspace?.setPropertyValue(KANBAN_LANE_CONTENT_TYPE_KEY, contentType.unique);
+    await this.#workspace?.setPropertyValue(KANBAN_LANE_CONTENT_TYPE_KEY, picked.contentTypeUnique);
 
-    this.value = picked.value;
+    this.value = picked.alias;
     this.dispatchEvent(new UmbChangeEvent());
-  }
-
-  /**
-   * Opens the document type tree, then reads the picked type in full — the tree hands back a
-   * unique, and the property list only exists on the detail model.
-   */
-  async #pickContentType(): Promise<UmbDocumentTypeDetailModel | undefined> {
-    const picked = await umbOpenModal(this, UMB_DOCUMENT_TYPE_PICKER_MODAL, {
-      data: {
-        hideTreeRoot: true,
-        multiple: false,
-        // An element type is never a document in its own right, so it can never be the content
-        // type a board reads children of. Umbraco's own column picker filters it out identically.
-        pickableFilter: (item) => (item as { isElement?: boolean }).isElement !== true,
-      },
-    }).catch(() => undefined);
-
-    const unique = picked?.selection?.[0];
-    if (!unique) return undefined;
-
-    const { data } = await this.#documentTypes.requestByUnique(unique);
-
-    return data ?? undefined;
   }
 
   async #clear() {

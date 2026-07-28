@@ -1,5 +1,6 @@
 import {
   KANBAN_BOARD_EDITOR_ALIAS,
+  KANBAN_CARD_PROPERTIES_UI_ALIAS,
   KANBAN_BOARD_EDITOR_UI_ALIAS,
   KANBAN_LANE_OVERRIDES_UI_ALIAS,
   KANBAN_LANE_PROPERTY_UI_ALIAS,
@@ -55,8 +56,8 @@ export const manifests: Array<UmbExtensionManifest> = [
           {
             alias: 'cardProperties',
             label: 'Card properties',
-            description: 'Properties shown as summary items on each card.',
-            propertyEditorUiAlias: 'Umb.PropertyEditorUi.MultipleTextString',
+            description: 'Properties shown as summary items on each card, in the order listed.',
+            propertyEditorUiAlias: KANBAN_CARD_PROPERTIES_UI_ALIAS,
           },
           {
             alias: 'lanePageSize',

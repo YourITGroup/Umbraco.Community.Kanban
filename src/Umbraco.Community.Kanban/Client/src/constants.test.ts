@@ -3,6 +3,7 @@ import {
   KANBAN_BOARD_EDITOR_ALIAS,
   KANBAN_CALENDAR_EDITOR_ALIAS,
   KANBAN_LANE_OVERRIDES_UI_ALIAS,
+  KANBAN_CARD_PROPERTIES_UI_ALIAS,
   KANBAN_LANE_PROPERTY_UI_ALIAS,
   KANBAN_MANUAL_LANES_UI_ALIAS,
   KANBAN_LANE_CONTENT_TYPE_KEY,
@@ -19,6 +20,7 @@ describe('constants', () => {
     expect(KANBAN_LANE_OVERRIDES_UI_ALIAS).toBe('Umb.Community.Kanban.PropertyEditorUi.LaneOverrides');
     expect(KANBAN_MANUAL_LANES_UI_ALIAS).toBe('Umb.Community.Kanban.PropertyEditorUi.ManualLanes');
     expect(KANBAN_LANE_PROPERTY_UI_ALIAS).toBe('Umb.Community.Kanban.PropertyEditorUi.LaneProperty');
+    expect(KANBAN_CARD_PROPERTIES_UI_ALIAS).toBe('Umb.Community.Kanban.PropertyEditorUi.CardProperties');
   });
 
   it('matches the server-side board configuration field the lane property picker writes', () => {

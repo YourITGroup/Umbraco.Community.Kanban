@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { toPropertyPickerItems } from './lane-property.model.js';
+import { toPropertyPickerItems } from './content-type-property.model.js';
 
 describe('toPropertyPickerItems', () => {
   it('labels by name and describes by alias, because the alias is what gets stored', () => {

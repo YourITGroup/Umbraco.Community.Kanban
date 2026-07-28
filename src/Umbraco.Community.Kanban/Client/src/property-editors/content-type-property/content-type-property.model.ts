@@ -1,4 +1,4 @@
-/** The subset of a content type property this picker needs. */
+/** The subset of a content type property a picker needs. */
 export interface KanbanPickablePropertyType {
   alias: string;
   name: string;
@@ -12,6 +12,13 @@ export interface KanbanPropertyPickerItem {
   icon: string;
 }
 
+/** A property an editor picked, with the content type it was browsed to through. */
+export interface KanbanPickedProperty {
+  alias: string;
+  contentTypeUnique: string;
+  contentTypeName: string;
+}
+
 /** The icon shown beside every property in the picker, matching core's column picker. */
 const PROPERTY_ICON = 'icon-document';
 
@@ -20,9 +27,9 @@ const PROPERTY_ICON = 'icon-document';
  * alias — the alias is what gets stored, so it has to be visible when two properties read alike.
  *
  * Umbraco's own collection column picker also offers system properties (createDate, sortOrder…).
- * This one deliberately does not: lanes are resolved by looking up the data type behind a
+ * This one deliberately does not: a Kanban property is read by looking up the data type behind a
  * *content type property*, and a system property has none, so offering them would let an editor
- * configure a board that silently produces no lanes.
+ * configure a board that silently shows nothing.
  */
 export function toPropertyPickerItems(
   properties: readonly KanbanPickablePropertyType[] | undefined | null,

@@ -19,6 +19,8 @@ Three settings asked an editor to know something they cannot see:
    unassigned lane. Nothing in the UI listed the aliases that would work.
 3. **Lane source** was a text box whose only meaningful value was the literal string `manual`,
    documented in the field's own description. Every other value was either empty or wrong.
+4. **Card properties** was a text-per-line box of property aliases — the same problem as the lane
+   property, once per line, and silently showing nothing for each alias that does not exist.
 
 Umbraco already answers (2) for its own Collection columns: choose a content type, then choose one of
 its properties. That sequence is the model here.
@@ -29,6 +31,7 @@ its properties. That sequence is the model here.
 
 - The board configuration becomes a picker with edit and remove, alongside the existing create.
 - The lane property becomes a content-type-then-property pick, storing the property alias.
+- Card properties become the same pick, repeated, storing the same list of aliases as before.
 - The lane source text box is replaced by a "Define lanes manually" toggle.
 - A new `laneContentTypeKey` configuration field recording the content type browsed to.
 
@@ -71,23 +74,40 @@ the chosen configuration does not mark the Collection data type dirty for no rea
 A configuration key that no longer resolves renders as "Unknown configuration / This data type no
 longer exists" rather than an empty picker, so the editor can see there is something to remove.
 
-### 3.2 Lane property picker
+### 3.2 Property pickers
 
-A new property editor UI, `Umb.Community.Kanban.PropertyEditorUi.LaneProperty`, reproducing core's
-column sequence: document type tree picker → "Select a property from *X*" item picker. Umbraco's own
+One shared flow, `pickContentTypeProperty(host)`, reproduces core's column sequence: document type
+tree picker → "Select a property from *X*" item picker. Umbraco's own
 `umb-input-collection-content-type-property` is not a public export, so this is built from the parts
 that are (`UMB_DOCUMENT_TYPE_PICKER_MODAL`, `UmbDocumentTypeDetailRepository`, `UMB_ITEM_PICKER_MODAL`).
+It is a function taking a host rather than an element, because the two editors that use it render
+their results completely differently and share nothing but the asking.
 
-Two deliberate differences from core's version:
+Two property editor UIs consume it:
+
+- `…PropertyEditorUi.LaneProperty` — one property, stored as an alias, shown as a ref-node with the
+  content type it came from and a **Remove**.
+- `…PropertyEditorUi.CardProperties` — a list, stored as the same array of aliases the text-per-line
+  editor stored, so existing boards keep working. Rows carry ↑ ↓ ✕ matching the manual lanes editor,
+  because order is the order the summary items appear on a card. A repeat is dropped rather than
+  added — the same property twice on a card is never intended, and two content types can offer the
+  same alias — matched without regard to case, since "status" and "Status" would read as two
+  properties while resolving to one.
+
+The content type is asked for on **every** card property added, rather than remembered from the last
+one: a board's cards can be of more than one type, so the previous answer is not necessarily the next.
+Umbraco's own column configuration asks every time for the same reason.
+
+Two deliberate differences from core's sequence:
 
 - **Document types only.** A board reads a document's children, so media and member types are not
   candidates; element types are filtered out for the same reason. Only one content type kind means
   core's first modal — the Document Type / Media Type choice — has nothing to ask, so it is skipped.
-- **No system properties.** Core offers `createDate`, `sortOrder` and friends for columns. Lanes are
-  resolved by looking up the data type behind a content type property, and a system property has
-  none, so offering them would let an editor configure a board that silently produces no lanes.
+- **No system properties.** Core offers `createDate`, `sortOrder` and friends for columns. A Kanban
+  property is read by looking up the data type behind a content type property, and a system property
+  has none, so offering them would let an editor configure a board that silently shows nothing.
 
-The stored value stays the property alias alone. A board resolves lanes against the content type of
+The stored value stays the property alias alone. A board resolves against the content type of
 whichever document is being viewed, which may legitimately differ from the one browsed here — so the
 browsed content type is *not* what the alias is scoped to.
 
@@ -137,6 +157,10 @@ server-side, where the semantics actually live.
 
 - `toPropertyPickerItems` — labels by name, describes by alias, keeps declaration order, falls back
   to the alias when unnamed, drops alias-less properties.
+- `addCardProperty` / `removeCardPropertyAt` / `moveCardProperty` — appends, drops repeats including
+  differently-cased ones, trims, ignores blanks, never mutates its input.
+- `moveItem` — the index arithmetic both the card property and manual lane editors reorder through,
+  including every out-of-range case returning an unchanged *copy*.
 - `KanbanBoardConfiguration.PinnedLaneSource` — nothing by default, `manual` from the toggle, an
   explicit alias wins, a blank alias is ignored.
 - `ManualLaneSource.CanHandle` — true for the toggle, not only for the literal alias.
@@ -151,8 +175,9 @@ server-side, where the semantics actually live.
 
 **Manual verification** (not done — needs a running site): pick a lane property and confirm the
 document type picker then property picker appear as in the Collection column flow, that the alias and
-"from *X*" persist across a reload, that the manual toggle switches lane resolution, and that the
-board configuration picker's Choose / Edit / Remove all behave, including Edit reflecting a rename.
+"from *X*" persist across a reload, that the manual toggle switches lane resolution, that card
+properties add, reorder and remove and still render on cards, and that the board configuration
+picker's Choose / Edit / Remove all behave, including Edit reflecting a rename.
 
 ## 5. What could go wrong
 
@@ -160,10 +185,12 @@ board configuration picker's Choose / Edit / Remove all behave, including Edit r
   Kanban tab already writes `kanban.boardConfigId` onto a Collection data type the same way, and
   that is how milestone 2 works at all. If Umbraco ever filtered configuration values against the
   declared settings, both would break together.
-- **The lane property list is the content type's own.** `UmbDocumentTypeDetailModel.properties` does
-  not include composed or inherited properties, so a property inherited from a composition cannot be
-  picked. Core's column picker has the same limitation; typing such an alias is no longer possible,
-  which is a real (if narrow) regression in reach.
+- **The property list is the content type's own.** `UmbDocumentTypeDetailModel.properties` does not
+  include composed or inherited properties, so a property inherited from a composition cannot be
+  picked — for the lane property or for a card property. Core's column picker has the same
+  limitation; typing such an alias is no longer possible, which is a real (if narrow) regression in
+  reach, and one that affects card properties more than the lane property, since a card often shows
+  fields that came from a composition.
 - **`laneSource` is now settable only in code or by hand-editing a data type.** Intended — it exists
   for third-party sources — but a board configured with it before this change keeps working and
   shows an unticked toggle, which reads as "automatic" when it is not.
@@ -171,5 +198,5 @@ board configuration picker's Choose / Edit / Remove all behave, including Edit r
 ## 6. Definition of done
 
 Neither a data type key nor a property alias nor a lane source alias has to be known by heart: each
-is chosen from what exists, the choice can be seen, edited and removed in place, and the one lane
-source decision an editor actually makes is a toggle.
+is chosen from what exists, every choice can be seen, reordered where order matters, and removed in
+place, and the one lane source decision an editor actually makes is a toggle.

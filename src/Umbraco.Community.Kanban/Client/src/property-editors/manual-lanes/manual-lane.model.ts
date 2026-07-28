@@ -1,3 +1,5 @@
+import { moveItem } from '../move-item.js';
+
 /** Mirrors KanbanManualLane on the server. */
 export interface KanbanManualLaneValue {
   value: string;
@@ -26,13 +28,5 @@ export function moveLane(
   from: number,
   to: number,
 ): KanbanManualLaneValue[] {
-  if (from === to) return [...lanes];
-  if (from < 0 || from >= lanes.length) return [...lanes];
-  if (to < 0 || to >= lanes.length) return [...lanes];
-
-  const next = [...lanes];
-  const [moved] = next.splice(from, 1);
-  next.splice(to, 0, moved);
-
-  return next;
+  return moveItem(lanes, from, to);
 }

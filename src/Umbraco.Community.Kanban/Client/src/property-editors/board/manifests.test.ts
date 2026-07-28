@@ -45,6 +45,13 @@ describe('board property editor manifests', () => {
     expect(laneProperty.propertyEditorUiAlias).toBe('Umb.Community.Kanban.PropertyEditorUi.LaneProperty');
   });
 
+  it('picks card properties the same way as the lane property', () => {
+    const ui = manifests.find((m) => m.type === 'propertyEditorUi') as any;
+    const cardProperties = ui.meta.settings.properties.find((p: { alias: string }) => p.alias === 'cardProperties');
+
+    expect(cardProperties.propertyEditorUiAlias).toBe('Umb.Community.Kanban.PropertyEditorUi.CardProperties');
+  });
+
   it('makes manual lanes a toggle rather than a source alias to type', () => {
     const ui = manifests.find((m) => m.type === 'propertyEditorUi') as any;
     const toggle = ui.meta.settings.properties.find((p: { alias: string }) => p.alias === 'useManualLanes');
