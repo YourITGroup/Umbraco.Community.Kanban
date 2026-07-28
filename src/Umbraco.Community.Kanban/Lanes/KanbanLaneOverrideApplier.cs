@@ -18,7 +18,15 @@ public static class KanbanLaneOverrideApplier
         IReadOnlyList<KanbanLane> lanes,
         IReadOnlyList<KanbanLaneOverride> overrides)
     {
-        var byValue = lanes.ToDictionary(lane => lane.Value, StringComparer.OrdinalIgnoreCase);
+        // Built via a loop rather than ToDictionary: editor-authored lane values can be
+        // case-insensitively duplicated (e.g. a dropdown with both "Todo" and "todo" as
+        // distinct options), and ToDictionary would throw. The first lane with a given
+        // case-insensitive value wins.
+        var byValue = new Dictionary<string, KanbanLane>(StringComparer.OrdinalIgnoreCase);
+        foreach (var lane in lanes)
+        {
+            byValue.TryAdd(lane.Value, lane);
+        }
         var unmatched = new List<KanbanLaneOverride>();
 
         foreach (var laneOverride in overrides)

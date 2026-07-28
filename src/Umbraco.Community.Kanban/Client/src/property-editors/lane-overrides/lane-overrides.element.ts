@@ -19,8 +19,21 @@ import {
  */
 @customElement('umb-community-kanban-lane-overrides')
 export class UmbCommunityKanbanLaneOverridesElement extends UmbLitElement {
+  /**
+   * The stored overrides. Given a custom setter (matching `lanes` below) because
+   * Umbraco's ordinary property-editor sequence often sets `value` after `lanes` -
+   * stored values commonly arrive asynchronously - and `_rows` must be recomputed
+   * whichever one changes, not only when `lanes` changes.
+   */
   @property({ type: Array })
-  value: KanbanLaneOverrideValue[] = [];
+  set value(value: KanbanLaneOverrideValue[]) {
+    this._value = value;
+    this._rows = mergeOverridesWithLanes(this._lanes, value ?? []);
+  }
+  get value(): KanbanLaneOverrideValue[] {
+    return this._value;
+  }
+  private _value: KanbanLaneOverrideValue[] = [];
 
   @state()
   private _rows: KanbanLaneOverrideRow[] = [];

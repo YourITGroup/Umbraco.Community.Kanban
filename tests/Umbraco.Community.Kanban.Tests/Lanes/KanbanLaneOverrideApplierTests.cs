@@ -87,4 +87,26 @@ public class KanbanLaneOverrideApplierTests
         unmatched.Should().BeEmpty();
         lanes[0].Colour.Should().BeNull();
     }
+
+    [Fact]
+    public void Apply_ToleratesCaseInsensitivelyDuplicateLaneValues()
+    {
+        // A dropdown with both "Todo" and "todo" as distinct options is plausible,
+        // editor-authorable data. Nothing upstream prevents it, so Apply must not throw
+        // when two lanes collide once compared case-insensitively - the first lane wins.
+        List<KanbanLane> lanes =
+        [
+            new KanbanLane { Value = "Todo", Name = "Todo", Colour = "blue", Icon = "icon-alert" },
+            new KanbanLane { Value = "todo", Name = "todo (duplicate)" },
+        ];
+        KanbanLaneOverride[] overrides = [new() { Value = "TODO", Colour = "red" }];
+
+        Action act = () => KanbanLaneOverrideApplier.Apply(lanes, overrides);
+
+        act.Should().NotThrow();
+        lanes[0].Colour.Should().Be("red");
+        lanes[0].Icon.Should().Be("icon-alert");
+        lanes[0].Name.Should().Be("Todo");
+        lanes[1].Colour.Should().BeNull();
+    }
 }

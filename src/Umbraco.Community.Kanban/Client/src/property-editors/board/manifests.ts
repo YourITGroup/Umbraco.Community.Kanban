@@ -1,4 +1,9 @@
-import { KANBAN_BOARD_EDITOR_ALIAS, KANBAN_BOARD_EDITOR_UI_ALIAS } from '@/constants.js';
+import {
+  KANBAN_BOARD_EDITOR_ALIAS,
+  KANBAN_BOARD_EDITOR_UI_ALIAS,
+  KANBAN_LANE_OVERRIDES_UI_ALIAS,
+  KANBAN_MANUAL_LANES_UI_ALIAS,
+} from '@/constants.js';
 
 export const manifests: Array<UmbExtensionManifest> = [
   {
@@ -37,13 +42,13 @@ export const manifests: Array<UmbExtensionManifest> = [
             alias: 'manualLanes',
             label: 'Manual lanes',
             description: 'Used only when the lane source is "manual".',
-            propertyEditorUiAlias: 'Umb.Community.Kanban.PropertyEditorUi.ManualLanes',
+            propertyEditorUiAlias: KANBAN_MANUAL_LANES_UI_ALIAS,
           },
           {
             alias: 'laneOverrides',
             label: 'Lane appearance',
             description: 'Override the colour, icon or label of individual lanes.',
-            propertyEditorUiAlias: 'Umb.Community.Kanban.PropertyEditorUi.LaneOverrides',
+            propertyEditorUiAlias: KANBAN_LANE_OVERRIDES_UI_ALIAS,
           },
           {
             alias: 'cardProperties',
