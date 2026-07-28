@@ -3,6 +3,7 @@ using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Community.Kanban.Configuration;
 using Umbraco.Community.Kanban.Lanes;
 using Umbraco.Community.Kanban.Lanes.Sources;
+using Umbraco.Community.Kanban.Services;
 
 namespace Umbraco.Community.Kanban.Extensions;
 
@@ -22,6 +23,7 @@ public static class UmbracoBuilderExtensions
 
         builder.Services.AddSingleton<IKanbanPropertyDataTypeLookup, KanbanPropertyDataTypeLookup>();
         builder.Services.AddSingleton<IKanbanLaneResolver, KanbanLaneResolver>();
+        builder.Services.AddSingleton<IKanbanConfigurationService, KanbanConfigurationService>();
 
         // Manual is appended first so a configuration that pins it wins over an
         // editor-matching source.
