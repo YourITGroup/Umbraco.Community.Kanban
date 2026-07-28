@@ -13,4 +13,13 @@ public static class Constants
 
     public const string BoardEditorUiAlias = "Umb.Community.Kanban.PropertyEditorUi.Board";
     public const string CalendarEditorUiAlias = "Umb.Community.Kanban.PropertyEditorUi.Calendar";
+
+    /// <summary>
+    /// The extra configuration key written onto a Collection data type naming which
+    /// Kanban Board configuration its board layout uses.
+    /// </summary>
+    public const string BoardConfigIdKey = "kanban.boardConfigId";
+
+    /// <summary>How many children a board reads before it reports itself truncated.</summary>
+    public const int DefaultChildCap = 1000;
 }
