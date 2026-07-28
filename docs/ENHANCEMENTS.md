@@ -154,3 +154,32 @@ has to be right for a varying document. Prove that on a real document type befor
 Also unsettled: the unassigned lane has no value to preset, and a manual lane's value may not be a
 legal value for the property at all (nothing validates manual lanes against the editor's options), so
 this needs to degrade to a plain create rather than write something the property will reject.
+
+## 9. Grab the board to pan it sideways
+
+Click-and-hold on the board background, drag, and the board scrolls sideways with the pointer — so a
+board with more lanes than fit is navigable without hunting for a scrollbar or shift-scrolling.
+
+The container is already right: `.lanes` in
+[core/kanban-board.element.ts:143-149](../src/Umbraco.Community.Kanban/Client/src/core/kanban-board.element.ts#L143-L149)
+is a flex row with `overflow-x: auto`, so panning is `scrollLeft` arithmetic on pointer moves. Use
+Pointer Events with `setPointerCapture`, not mouse events — a capture keeps the drag alive when the
+pointer leaves the element, and it makes trackpads and touch work without a second code path.
+
+**The whole difficulty is telling a pan from the interactions already on the board**, and it gets
+harder with every item above:
+
+- **Cards are `role="button" tabindex="0"` with a click handler**
+  ([kanban-card.element.ts:61](../src/Umbraco.Community.Kanban/Client/src/core/kanban-card.element.ts#L61)),
+  and item 1 makes that click open the workspace modal. A pan that starts on a card must not open it.
+  The usual resolution is a movement threshold — a few pixels before the gesture becomes a pan, and
+  suppressing the click only once it does.
+- **Milestone 3 gives cards their own drag**, which is a direct conflict: the same gesture on the same
+  pixel means two things. The clean split is that a pan starts only on the background — lane gutters,
+  the space below the cards — and never on a card. Worth deciding before milestone 3 rather than
+  retrofitting afterwards, since it constrains where a card's drag handle can live.
+- **Lane headers and load-more buttons** are also interactive and want the same threshold treatment.
+
+Two smaller things to get right: leave keyboard and scrollbar scrolling alone (this is additive, not a
+replacement), and set `cursor: grabbing` plus `user-select: none` only for the duration of a live pan,
+or text selection fights the drag on every board.
