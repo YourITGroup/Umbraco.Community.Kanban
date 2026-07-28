@@ -84,10 +84,19 @@ migrations and no custom connectors.
 public interface IKanbanLaneSource
 {
     string Alias { get; }
-    bool CanHandle(IDataType dataType);
-    Task<IReadOnlyList<KanbanLane>> GetLanesAsync(IDataType dataType, KanbanBoardConfiguration config);
+    bool CanHandle(KanbanLaneSourceContext context);
+    Task<IReadOnlyList<KanbanLane>> GetLanesAsync(KanbanLaneSourceContext context);
 }
+
+public sealed record KanbanLaneSourceContext(
+    string EditorAlias,
+    IDictionary<string, object> ConfigurationData,
+    KanbanBoardConfiguration Configuration);
 ```
+
+Sources take a context record rather than an `IDataType`, so they can be tested with a literal
+dictionary and no mocking framework. Resolving the lane property's data type is the resolver's job,
+not the source's.
 
 Sources in the core package read `items` from `ConfigurationData` for `Umbraco.DropDown.Flexible`,
 `Umbraco.RadioButtonList` and `Umbraco.CheckBoxList`, plus a `Manual` source driven by `manualLanes`.
@@ -156,7 +165,7 @@ lanes exactly the way Contentment's own value converter does
 (`DataEditors/DataList/DataListValueConverter.cs:80-95`):
 
 ```csharp
-// ConfigurationData["dataSource"] is [ { key: "<type name with assembly>", value: { … } } ]
+// context.ConfigurationData["dataSource"] is [ { key: "<type name with assembly>", value: { … } } ]
 var source = utility.GetConfigurationEditor<IContentmentDataSource>(key);
 var config = jsonSerializer.Deserialize<Dictionary<string, object>>(entry["value"]?.ToString() ?? "{}");
 IEnumerable<DataListItem> items = source.GetItems(config);
