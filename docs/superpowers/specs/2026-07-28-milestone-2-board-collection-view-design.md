@@ -37,6 +37,11 @@ Everything here is read-only. No drag, no write-back, no publish action.
 - Contentment lane source — milestone 6.
 - Inline (unsaved) configuration on `GET /board`. The endpoint takes a saved configuration only.
   The injected host that needs inline config does not exist yet.
+- **Media picker thumbnails on cards.** Verified against the installed backoffice: no built-in
+  `valueSummary` extension is registered for any media picker editor alias, so a thumbnail means
+  authoring our own `valueSummary` extension plus media-URL resolution. Until then a media property
+  configured as a card property renders through the default value summary. Documented as a known
+  limitation, deferred to a later milestone.
 - Wiring `POST /lanes/preview` into the lane override editor's `lanes` input — the gap deliberately
   left by milestone 1. It belongs to the *data type settings* surface, not the board surface, and is
   tracked separately; see §8.
@@ -55,10 +60,14 @@ What the collection view element *does* know is the parent document it is render
 That is enough, because the chain from there is deterministic:
 
 ```
-parentId → the parent's content type → its `collection` data type key
+parentId → the parent's content type → its `ListView` (collection) data type key
          → that data type's configuration → kanban.boardConfigId
          → the Kanban Board data type → KanbanBoardConfiguration
 ```
+
+The first hop is cheaper than it looks: `IContent.ContentType` is an `ISimpleContentType`, which
+carries `ListView` as a `Guid?` directly, so no content-type lookup is needed to find the collection
+data type.
 
 **Decision: the server walks that chain.** `GET /board` takes `parentId` and an *optional*
 `configId`. When `configId` is absent the server resolves it from the parent as above. The client
@@ -114,7 +123,7 @@ The unassigned lane is addressed by the empty string.
 KanbanBoardResponseModel
     IReadOnlyList<KanbanBoardLaneModel> Lanes
     bool Truncated          // the child cap was hit
-    int ChildCount          // exact when !Truncated, otherwise the cap
+    int ChildCount          // always exact — GetPagedChildren reports the true total
 
 KanbanBoardLaneModel        // superset of KanbanLane, which it is projected from
     string Value
@@ -133,7 +142,7 @@ KanbanCardModel
     string Name
     string ContentTypeAlias
     string? Icon            // content type icon, verbatim, colour suffix and all
-    string State            // Umbraco's document state for the requested culture
+    string State            // "published" | "publishedPendingChanges" | "draft", for the requested culture
     bool CanUpdate          // always populated; nothing reads it until milestone 3
     IReadOnlyList<KanbanCardPropertyModel> Properties
 
@@ -144,8 +153,9 @@ KanbanCardPropertyModel
     object? Value           // the draft value for the requested culture
 ```
 
-`Icon` is passed through unmodified. Umbraco's icon picker can store `"icon-x color-y"`, and the
-client splits on the space — noted as a deferred minor in milestone 1's ledger and settled here.
+`Icon` is passed through unmodified, including any `"icon-x color-y"` suffix: `<umb-icon>` splits and
+resolves the colour itself, so nothing on our side parses it. This closes milestone 1's deferred
+minor about the suffix.
 
 ### 3.3 Grouping, paging and totals
 
@@ -156,8 +166,9 @@ memory, on the resolved lane value, case-insensitively.
 A cap of 1000 children (configurable) bounds the work:
 
 - Under the cap, every `Total` is exact and `TotalIsExact` is `true`.
-- At or over the cap, only the first 1000 children are read. Every lane's `Total` becomes a lower
-  bound with `TotalIsExact` `false`, and the response sets `Truncated`.
+- Over the cap, only the first 1000 children are read. Every lane's `Total` becomes a lower bound
+  with `TotalIsExact` `false`, and the response sets `Truncated`. `ChildCount` stays exact — the
+  paged read reports the true total regardless of how many rows it returned.
 
 Lane totals are counted **after** the permission filter, so a lane never advertises cards the user
 cannot see.
@@ -166,14 +177,30 @@ Lane order is whatever `IKanbanLaneResolver` returns, unchanged — it is also w
 assignment, so the board must not re-sort it. Cards within a lane keep Umbraco's default child
 ordering (sort order), matching what the table layout shows.
 
-### 3.4 Permissions
+### 3.4 Which content type the lanes resolve against
+
+`IKanbanLaneResolver.ResolveAsync` takes a content type key, because a dropdown-backed lane source
+reads its options from the lane property's data type. Milestone 1 never had to decide *whose* content
+type that is; a board does.
+
+It is the **child** content type, not the parent's — the lane property lives on the cards. A parent
+may allow several child types, so the choice is: the first of the parent's allowed child content
+types that declares a property with the configured `laneProperty` alias. If none declares it (or the
+configuration uses manual lanes and has no `laneProperty`), the resolver is called with
+`Guid.Empty`, which yields manual lanes plus unassigned and no dropdown-derived lanes.
+
+Deliberately not "the content type of the first child" — that makes the lane set depend on which
+documents happen to exist, so an empty parent would render no columns and adding the first card
+would change the board's shape.
+
+### 3.5 Permissions
 
 Reads filter by browse permission on each child. `CanUpdate` is computed per card from the update
 permission and returned, but nothing in this milestone consumes it. It is here because computing it
 alongside the browse filter costs one extra check on data already loaded, and because milestone 3's
 drag-disabled rendering needs a flag it can trust from day one rather than a shape change later.
 
-### 3.5 Variants
+### 3.6 Variants
 
 Cards show values for the `culture` the request names, falling back to the site's default. Property
 values come from the requested culture where the property varies, and from the invariant value where
@@ -217,23 +244,21 @@ it is pure and directly tested.
 ### 4.2 Cards
 
 - Node name as the title.
-- Content type icon, split from any `color-` suffix.
-- Summary properties from `cardProperties`, rendered through Umbraco's value-summary/UFM pipeline so
-  custom editors format the way they do in the table layout, with media pickers rendered as
-  thumbnails instead of text.
-- Publish-state badge in the same visual language the content tree uses.
-- The standard entity actions menu, for `Umb.Document`.
+- Content type icon via `<umb-icon>`, which resolves any colour suffix itself.
+- Summary properties from `cardProperties`, rendered through `<umb-value-summary-extension>` — the
+  same element the built-in document table collection view uses for arbitrary property values. It
+  takes the property's **schema** editor alias as `valueType` plus the raw value, dispatches to a
+  registered `valueSummary` extension, and falls back to rendering the value directly when none
+  matches. It is a plain global custom element, usable outside a property-editor context.
+- Publish-state badge: a `<uui-tag>` whose colour and label come from the card's state, copying the
+  document table collection view's state column. There is no packaged badge element to reuse.
+- `<umb-entity-actions-bundle>` for the standard entity actions, given `entityType: 'document'`, the
+  card's key as `unique`, and the card name as `label`.
 
-The badge and the actions menu both come off Umbraco's existing Management API and UI conventions —
-the card supplies an entity key and an entity type, and Umbraco's own elements do the rest. No new
-plumbing on our side.
-
-**The UFM/value-summary integration is the one genuinely unknown piece of this milestone.** Its
-exact element and the data shape it expects must be verified against the installed
-`@umbraco-cms/backoffice` 18.0.2 before the card element is written — the same class of assumption
-that broke on `UmbPropertyValueChangeEvent` in milestone 1. The implementation plan's first client
-task is a verification task, and the card falls back to rendering the value as text if the pipeline
-turns out not to be reachable from outside a property context.
+The card's state string is our own three-value vocabulary (§3.2), not Umbraco's
+`UmbDocumentVariantState` enum, so the badge switch has no dependency on an enum whose serialised
+values we would otherwise have to match exactly. `notCreated` is deliberately absent: every card on
+a board is a document that exists.
 
 ### 4.3 `data/`
 
@@ -293,7 +318,6 @@ Same conventions as milestone 1: xUnit with FluentAssertions and hand-written fa
 - The page-merge reducer: appending a lane page, appending twice, appending an empty page, and a
   response for a lane not currently in state.
 - Lane total formatting: exact vs. `"120+"`.
-- Icon splitting: `"icon-box color-blue"` → icon and colour; a bare `"icon-box"` → icon only.
 - Manifest shape tests for the new `collectionView` and `workspaceView`, matching the pattern the
   milestone-1 manifests already use.
 
@@ -310,11 +334,13 @@ children render in the right lanes with correct totals and working "Show more".
 
 ## 6. What could go wrong
 
-- **The UFM/value-summary pipeline may not be usable outside a property-editor context.** Handled by
-  the verification-first task and the text fallback in §4.2.
-- **The collection context may not expose the parent's unique id as cleanly as assumed.** The
-  element needs `parentId` and a culture and nothing else; if the collection context does not carry
-  them, the workspace context does. Verified in the same first client task.
+- **Card property values may render poorly for editors with no `valueSummary` extension.** Only
+  Slider, ColorPicker and DateTimeWithTimeZone ship one; everything else falls back to the raw value.
+  Acceptable for text, numbers and dropdowns — which is what a card summary is realistically for —
+  and honestly bad for pickers. Hence the media thumbnail deferral in §1.
+- **`UMB_COLLECTION_CONTEXT` does not expose the parent document's GUID.** Confirmed. The parent
+  comes from `UMB_ENTITY_CONTEXT` instead — which is exactly how the collection context itself
+  resolves its own parent — and the culture from `UMB_VARIANT_CONTEXT.displayCulture`.
 - **A board on a doc type with thousands of children is slow before it is truncated.** The cap
   bounds it, and the truncation message is honest. A search-index-backed source stays a v2 concern.
 
