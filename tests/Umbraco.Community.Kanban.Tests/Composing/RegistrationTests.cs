@@ -1,4 +1,11 @@
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Umbraco.Cms.Core.Composing;
+using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Community.Kanban.Controllers;
+using Umbraco.Community.Kanban.Extensions;
 using Umbraco.Community.Kanban.Lanes;
 using Umbraco.Community.Kanban.Lanes.Sources;
 
@@ -7,14 +14,50 @@ namespace Umbraco.Community.Kanban.Tests.Composing;
 public class RegistrationTests
 {
     [Fact]
-    public void TheBuiltInSources_AreOrderedManualFirst()
+    public void AddKanban_RegistersTheBuiltInSources_ManualFirst()
     {
+        // Exercises the real composition path — builder.AddKanban() — rather than
+        // constructing a KanbanLaneSourceCollection by hand, so a regression that
+        // reorders or drops the .Append<>() calls in AddKanban() would fail this test.
         // Manual must come first so a pinned manual configuration is found before
         // a built-in source claims the editor.
-        var collection = new KanbanLaneSourceCollection(() =>
-            [new ManualLaneSource(), new CoreListEditorLaneSource()]);
+        IUmbracoBuilder builder = CreateUmbracoBuilder();
 
-        collection.First().Should().BeOfType<ManualLaneSource>();
+        builder.AddKanban();
+        builder.Build();
+
+        using ServiceProvider provider = builder.Services.BuildServiceProvider();
+        var sources = provider.GetRequiredService<KanbanLaneSourceCollection>();
+
+        sources.First().Should().BeOfType<ManualLaneSource>();
+        sources.Should().ContainSingle(x => x is CoreListEditorLaneSource);
+    }
+
+    [Fact]
+    public void AddKanban_RegistersTheLaneResolverAndPropertyDataTypeLookup()
+    {
+        // AddKanban() registers IKanbanLaneResolver -> KanbanLaneResolver and
+        // IKanbanPropertyDataTypeLookup -> KanbanPropertyDataTypeLookup. We assert the
+        // registrations rather than resolving instances: KanbanPropertyDataTypeLookup
+        // depends on IContentTypeService/IDataTypeService, whose own dependencies
+        // (repositories, scope providers, persistence) are wired by Umbraco's full
+        // composition — infrastructure this test project deliberately does not stand
+        // up (see the Fakes/ directory: resolver tests use hand-written fakes for
+        // exactly this reason). Asserting the registration still fails the test if
+        // AddKanban() stops registering either service.
+        IUmbracoBuilder builder = CreateUmbracoBuilder();
+
+        builder.AddKanban();
+
+        builder.Services.Should().ContainSingle(d =>
+            d.ServiceType == typeof(IKanbanLaneResolver) &&
+            d.ImplementationType == typeof(KanbanLaneResolver) &&
+            d.Lifetime == ServiceLifetime.Singleton);
+
+        builder.Services.Should().ContainSingle(d =>
+            d.ServiceType == typeof(IKanbanPropertyDataTypeLookup) &&
+            d.ImplementationType == typeof(KanbanPropertyDataTypeLookup) &&
+            d.Lifetime == ServiceLifetime.Singleton);
     }
 
     [Fact]
@@ -31,5 +74,24 @@ public class RegistrationTests
         // "umbracoBackOffice" (capital "O" in "Office"), not "umbracoBackoffice" as the brief's
         // literal assumed — see task-11 report for the discrepancy.
         route.Template.Should().Be("[umbracoBackOffice]/kanban/api/v{version:apiVersion}/");
+    }
+
+    /// <summary>
+    /// Builds a real <see cref="IUmbracoBuilder"/> using Umbraco's own "primarily for testing"
+    /// constructor, with no fakes or mocks — just enough scaffolding (a real <see cref="TypeLoader"/>
+    /// over this test assembly) to satisfy the constructor. <see cref="UmbracoBuilder"/> registers
+    /// Umbraco's core services itself, so <c>AddKanban()</c> runs against the same DI surface it
+    /// would in production.
+    /// </summary>
+    private static IUmbracoBuilder CreateUmbracoBuilder()
+    {
+        var services = new ServiceCollection();
+        var config = new ConfigurationBuilder().Build();
+
+        var assemblyProvider = new DefaultUmbracoAssemblyProvider(typeof(RegistrationTests).Assembly, NullLoggerFactory.Instance);
+        var typeFinder = new TypeFinder(NullLoggerFactory.Instance.CreateLogger<TypeFinder>(), assemblyProvider, null);
+        var typeLoader = new TypeLoader(typeFinder, NullLoggerFactory.Instance.CreateLogger<TypeLoader>());
+
+        return new UmbracoBuilder(services, config, typeLoader);
     }
 }

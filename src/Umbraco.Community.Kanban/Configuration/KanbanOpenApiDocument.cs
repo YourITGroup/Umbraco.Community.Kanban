@@ -1,4 +1,5 @@
 using Umbraco.Cms.Api.Common.OpenApi;
+using Umbraco.Cms.Api.Management.OpenApi;
 using Umbraco.Cms.Core.DependencyInjection;
 
 namespace Umbraco.Community.Kanban.Configuration;
@@ -19,8 +20,17 @@ public static class KanbanOpenApiDocument
 
     /// <summary>
     /// Adds the Kanban API's own OpenAPI document, scoped to endpoints carrying
-    /// <c>[MapToApi(Constants.ApiName)]</c>.
+    /// <c>[MapToApi(Constants.ApiName)]</c>. Mirrors the defaults the core Management API
+    /// applies to its own document (<c>Umbraco.Cms.Api.Management.DependencyInjection.UmbracoBuilderExtensions</c>):
+    /// a title, the back-office security requirement advertised in the generated document, and the
+    /// same named JSON options the back-office controller pipeline actually serializes with, so the
+    /// generated schema matches runtime behaviour.
     /// </summary>
     public static IUmbracoBuilder AddKanbanOpenApiDocument(this IUmbracoBuilder builder) =>
-        builder.AddBackOfficeOpenApiDocument(Constants.ApiName, options => options.WithTitle(Title));
+        builder.AddBackOfficeOpenApiDocument(
+            Constants.ApiName,
+            document => document
+                .WithTitle(Title)
+                .WithBackOfficeAuthentication()
+                .WithJsonOptions(Umbraco.Cms.Core.Constants.JsonOptionsNames.BackOffice));
 }
