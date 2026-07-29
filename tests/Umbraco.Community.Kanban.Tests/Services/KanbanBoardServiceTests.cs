@@ -91,7 +91,8 @@ public class KanbanBoardServiceTests
             new KanbanBoardConfigurationResolver(dataTypes, configurations),
             new KanbanLaneContentTypeResolver(contentTypes),
             laneResolver,
-            permissions);
+            permissions,
+            FakePropertyValueReader.Stored());
 
         return new Harness(service, loader, permissions, laneResolver, contentTypes, dataTypes, configurations, ChildType());
     }

@@ -14,7 +14,8 @@ public sealed class KanbanBoardService(
     IKanbanBoardConfigurationResolver configurationResolver,
     IKanbanLaneContentTypeResolver laneContentTypeResolver,
     IKanbanLaneResolver laneResolver,
-    IContentPermissionAuthorizer permissionAuthorizer) : IKanbanBoardService
+    IContentPermissionAuthorizer permissionAuthorizer,
+    IKanbanPropertyValueReader propertyValueReader) : IKanbanBoardService
 {
     private static readonly ISet<string> BrowsePermission = new HashSet<string> { ActionBrowse.ActionLetter };
     private static readonly ISet<string> UpdatePermission = new HashSet<string> { ActionUpdate.ActionLetter };
@@ -80,7 +81,8 @@ public sealed class KanbanBoardService(
                     child,
                     configuration.CardProperties,
                     request.Culture,
-                    updatable.Contains(child.Key))))
+                    updatable.Contains(child.Key),
+                    propertyValueReader)))
             .ToList();
 
         var truncated = page.TotalChildCount > page.Children.Count;

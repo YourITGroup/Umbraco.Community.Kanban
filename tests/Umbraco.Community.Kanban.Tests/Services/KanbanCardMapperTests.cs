@@ -39,7 +39,7 @@ public class KanbanCardMapperTests
         ContentType contentType = ContentTypeWith(ContentVariation.Nothing);
         var content = new Content("Write the spec", -1, contentType);
 
-        KanbanCardModel card = KanbanCardMapper.Map(content, [], culture: null, canUpdate: true);
+        KanbanCardModel card = KanbanCardMapper.Map(content, [], culture: null, canUpdate: true, valueReader: FakePropertyValueReader.Stored());
 
         card.Key.Should().Be(content.Key);
         card.Name.Should().Be("Write the spec");
@@ -52,7 +52,7 @@ public class KanbanCardMapperTests
     {
         var content = new Content("A", -1, ContentTypeWith(ContentVariation.Nothing));
 
-        KanbanCardMapper.Map(content, [], null, false).Icon
+        KanbanCardMapper.Map(content, [], null, false, FakePropertyValueReader.Stored()).Icon
             .Should().Be("icon-checkbox color-green");
     }
 
@@ -65,7 +65,7 @@ public class KanbanCardMapperTests
             Edited = true,
         };
 
-        KanbanCardMapper.Map(content, [], null, false).State
+        KanbanCardMapper.Map(content, [], null, false, FakePropertyValueReader.Stored()).State
             .Should().Be(KanbanCardStates.PublishedPendingChanges);
     }
 
@@ -80,7 +80,7 @@ public class KanbanCardMapperTests
         content.SetValue("status", "doing");
         content.SetValue("owner", "robert");
 
-        KanbanCardModel card = KanbanCardMapper.Map(content, CardPropertyList.Of("owner", "status"), null, false);
+        KanbanCardModel card = KanbanCardMapper.Map(content, CardPropertyList.Of("owner", "status"), null, false, FakePropertyValueReader.Stored());
 
         card.Properties.Select(p => p.Alias).Should().Equal("owner", "status");
         card.Properties.Select(p => p.Value).Should().Equal("robert", "doing");
@@ -93,7 +93,7 @@ public class KanbanCardMapperTests
         var content = new Content("A", -1, contentType);
         content.SetValue("status", "doing");
 
-        KanbanCardPropertyModel property = KanbanCardMapper.Map(content, CardPropertyList.Of("status"), null, false).Properties.Single();
+        KanbanCardPropertyModel property = KanbanCardMapper.Map(content, CardPropertyList.Of("status"), null, false, FakePropertyValueReader.Stored()).Properties.Single();
 
         property.EditorAlias.Should().Be("Umbraco.TextBox");
         property.Name.Should().Be("status");
@@ -105,7 +105,7 @@ public class KanbanCardMapperTests
         ContentType contentType = ContentTypeWith(ContentVariation.Nothing, ("status", ContentVariation.Nothing));
         var content = new Content("A", -1, contentType);
 
-        KanbanCardMapper.Map(content, CardPropertyList.Of("status", "nope"), null, false).Properties
+        KanbanCardMapper.Map(content, CardPropertyList.Of("status", "nope"), null, false, FakePropertyValueReader.Stored()).Properties
             .Select(p => p.Alias).Should().Equal("status");
     }
 
@@ -119,7 +119,7 @@ public class KanbanCardMapperTests
         content.SetValue("status", "doing", "en-US");
         content.SetValue("status", "i gang", "da-DK");
 
-        KanbanCardMapper.Map(content, CardPropertyList.Of("status"), "da-DK", false).Properties.Single().Value
+        KanbanCardMapper.Map(content, CardPropertyList.Of("status"), "da-DK", false, FakePropertyValueReader.Stored()).Properties.Single().Value
             .Should().Be("i gang");
     }
 
@@ -131,8 +131,50 @@ public class KanbanCardMapperTests
         content.SetCultureName("A", "en-US");
         content.SetValue("status", "doing");
 
-        KanbanCardMapper.Map(content, CardPropertyList.Of("status"), "en-US", false).Properties.Single().Value
+        KanbanCardMapper.Map(content, CardPropertyList.Of("status"), "en-US", false, FakePropertyValueReader.Stored()).Properties.Single().Value
             .Should().Be("doing");
+    }
+
+    [Fact]
+    public void Sends_the_editor_value_rather_than_the_stored_one()
+    {
+        // The client renders a card property through umb-value-summary-extension, which picks a
+        // renderer by editor alias and hands it the value. Those renderers expect the *editor* value:
+        // Umbraco.DateTimeWithTimeZone stores JSON and its summary reads value.date, so sending the
+        // stored string rendered nothing at all.
+        ContentType contentType = ContentTypeWith(ContentVariation.Nothing, ("startDate", ContentVariation.Nothing));
+        var content = new Content("A", -1, contentType);
+        content.SetValue("startDate", """{"date":"2026-08-26T10:30:00+10:00","timeZone":"Australia/Sydney"}""");
+
+        var editorValue = new Dictionary<string, object?>
+        {
+            ["date"] = "2026-08-26T10:30:00+10:00",
+            ["timeZone"] = "Australia/Sydney",
+        };
+
+        KanbanCardPropertyModel property = KanbanCardMapper.Map(
+            content,
+            CardPropertyList.Of("startDate"),
+            null,
+            false,
+            FakePropertyValueReader.Stored().Returning("startDate", editorValue)).Properties.Single();
+
+        property.Value.Should().BeSameAs(editorValue);
+    }
+
+    [Fact]
+    public void Reads_the_editor_value_for_the_culture_the_property_varies_by()
+    {
+        ContentType contentType = ContentTypeWith(ContentVariation.Culture, ("status", ContentVariation.Culture));
+        var content = new Content("A", -1, contentType);
+        content.SetCultureName("A", "da-DK");
+        content.SetValue("status", "i gang", "da-DK");
+
+        var reader = FakePropertyValueReader.Stored();
+
+        KanbanCardMapper.Map(content, CardPropertyList.Of("status"), "da-DK", false, reader);
+
+        reader.RequestedCulture.Should().Be("da-DK");
     }
 
     [Fact]
@@ -144,8 +186,7 @@ public class KanbanCardMapperTests
         KanbanCardPropertyModel property = KanbanCardMapper.Map(
             content,
             [new KanbanCardProperty { Alias = "bookingOwner", Header = "Owner" }],
-            null,
-            false).Properties.Single();
+            null, false, FakePropertyValueReader.Stored()).Properties.Single();
 
         property.Name.Should().Be("Owner");
     }
@@ -159,8 +200,7 @@ public class KanbanCardMapperTests
         KanbanCardMapper.Map(
             content,
             [new KanbanCardProperty { Alias = "bookingOwner", Header = "   " }],
-            null,
-            false).Properties.Single().Name.Should().Be("bookingOwner");
+            null, false, FakePropertyValueReader.Stored()).Properties.Single().Name.Should().Be("bookingOwner");
     }
 
     [Fact]
@@ -173,8 +213,7 @@ public class KanbanCardMapperTests
         KanbanCardMapper.Map(
             content,
             [new KanbanCardProperty { Alias = "recurring", NameTemplate = "${ value ? 'Yes' : 'No' }" }],
-            null,
-            false).Properties.Single().NameTemplate.Should().Be("${ value ? 'Yes' : 'No' }");
+            null, false, FakePropertyValueReader.Stored()).Properties.Single().NameTemplate.Should().Be("${ value ? 'Yes' : 'No' }");
     }
 
     [Fact]
@@ -188,8 +227,7 @@ public class KanbanCardMapperTests
         KanbanCardPropertyModel property = KanbanCardMapper.Map(
             content,
             [CardPropertyList.System("updateDate")],
-            null,
-            false).Properties.Single();
+            null, false, FakePropertyValueReader.Stored()).Properties.Single();
 
         property.Value.Should().Be(content.UpdateDate);
         property.Name.Should().Be("Last edited");
@@ -212,8 +250,7 @@ public class KanbanCardMapperTests
         KanbanCardPropertyModel property = KanbanCardMapper.Map(
             content,
             [CardPropertyList.System(alias)],
-            null,
-            false).Properties.Single();
+            null, false, FakePropertyValueReader.Stored()).Properties.Single();
 
         property.Alias.Should().Be(alias);
         property.Name.Should().Be(header);
@@ -228,8 +265,7 @@ public class KanbanCardMapperTests
         KanbanCardMapper.Map(
             content,
             [CardPropertyList.System("updateDate", "Touched")],
-            null,
-            false).Properties.Single().Name.Should().Be("Touched");
+            null, false, FakePropertyValueReader.Stored()).Properties.Single().Name.Should().Be("Touched");
     }
 
     [Fact]
@@ -241,10 +277,10 @@ public class KanbanCardMapperTests
         var content = new Content("A", -1, contentType);
         content.SetValue("published", "the property, not the flag");
 
-        KanbanCardMapper.Map(content, [CardPropertyList.System("published")], null, false)
+        KanbanCardMapper.Map(content, [CardPropertyList.System("published")], null, false, FakePropertyValueReader.Stored())
             .Properties.Single().Value.Should().Be(false);
 
-        KanbanCardMapper.Map(content, CardPropertyList.Of("published"), null, false)
+        KanbanCardMapper.Map(content, CardPropertyList.Of("published"), null, false, FakePropertyValueReader.Stored())
             .Properties.Single().Value.Should().Be("the property, not the flag");
     }
 
@@ -255,7 +291,7 @@ public class KanbanCardMapperTests
         // failed board.
         var content = new Content("A", -1, ContentTypeWith(ContentVariation.Nothing));
 
-        KanbanCardMapper.Map(content, [CardPropertyList.System("nonsense")], null, false)
+        KanbanCardMapper.Map(content, [CardPropertyList.System("nonsense")], null, false, FakePropertyValueReader.Stored())
             .Properties.Should().BeEmpty();
     }
 }

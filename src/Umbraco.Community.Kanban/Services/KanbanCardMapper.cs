@@ -14,7 +14,8 @@ public static class KanbanCardMapper
         IContent content,
         IReadOnlyList<KanbanCardProperty> cardProperties,
         string? culture,
-        bool canUpdate)
+        bool canUpdate,
+        IKanbanPropertyValueReader valueReader)
     {
         var variesByCulture = content.ContentType.Variations.HasFlag(ContentVariation.Culture);
         var effectiveCulture = variesByCulture ? culture : null;
@@ -27,7 +28,7 @@ public static class KanbanCardMapper
             Icon = content.ContentType.Icon,
             State = ResolveState(content, effectiveCulture),
             CanUpdate = canUpdate,
-            Properties = MapProperties(content, cardProperties, effectiveCulture),
+            Properties = MapProperties(content, cardProperties, effectiveCulture, valueReader),
         };
     }
 
@@ -46,7 +47,8 @@ public static class KanbanCardMapper
     private static List<KanbanCardPropertyModel> MapProperties(
         IContent content,
         IReadOnlyList<KanbanCardProperty> cardProperties,
-        string? culture)
+        string? culture,
+        IKanbanPropertyValueReader valueReader)
     {
         var properties = new List<KanbanCardPropertyModel>(cardProperties.Count);
 
@@ -54,7 +56,7 @@ public static class KanbanCardMapper
         {
             var mapped = cardProperty.IsSystem != 0
                 ? MapSystemProperty(content, cardProperty)
-                : MapContentProperty(content, cardProperty, culture);
+                : MapContentProperty(content, cardProperty, culture, valueReader);
 
             if (mapped is not null)
             {
@@ -87,7 +89,8 @@ public static class KanbanCardMapper
     private static KanbanCardPropertyModel? MapContentProperty(
         IContent content,
         KanbanCardProperty cardProperty,
-        string? culture)
+        string? culture,
+        IKanbanPropertyValueReader valueReader)
     {
         if (content.Properties.TryGetValue(cardProperty.Alias, out IProperty? property) == false)
         {
@@ -106,7 +109,10 @@ public static class KanbanCardMapper
             Name = Header(cardProperty) ?? property.PropertyType.Name,
             EditorAlias = property.PropertyType.PropertyEditorAlias,
             NameTemplate = cardProperty.NameTemplate,
-            Value = content.GetValue(cardProperty.Alias, propertyCulture),
+
+            // The editor value rather than the stored one: the client picks a renderer by editor alias,
+            // and those renderers expect what the editor would hand them.
+            Value = valueReader.ReadEditorValue(property, propertyCulture),
         };
     }
 

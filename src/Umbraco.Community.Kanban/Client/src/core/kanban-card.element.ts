@@ -91,7 +91,13 @@ export class UmbCommunityKanbanCardElement extends UmbLitElement {
         ${item.nameTemplate
           ? // The backoffice's own UFM renderer, and the same syntax a List View column template uses,
             // so a template copied from one behaves identically here.
-            html`<umb-ufm-render inline .markdown=${item.nameTemplate} .value=${item.value}></umb-ufm-render>`
+            //
+            // The value is wrapped in an object rather than passed raw, which is what core's own
+            // document collection card and table column do. `umb-ufm-js-expression` builds its
+            // evaluation scope by *spreading* this value — `{...model, ...filters}` — so a template
+            // referring to `value` only resolves if the model has a `value` property. Passing the raw
+            // value spread its characters instead, leaving `value` undefined and every template empty.
+            html`<umb-ufm-render inline .markdown=${item.nameTemplate} .value=${{ value: item.value }}></umb-ufm-render>`
           : // No template: the summary extension is what makes a picker or a dropdown render sensibly
             // with no configuration at all, which is why both paths are kept.
             html`<umb-value-summary-extension
