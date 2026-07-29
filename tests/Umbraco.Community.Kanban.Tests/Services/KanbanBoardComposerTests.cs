@@ -176,4 +176,19 @@ public class KanbanBoardComposerTests
 
         board.Lanes.Single().Cards.Should().BeEmpty();
     }
+
+    [Fact]
+    public void Echoes_allow_drag_off_by_default_so_a_caller_that_does_not_set_it_cannot_enable_dragging()
+    {
+        KanbanBoardComposer.Compose(Request([])).AllowDrag.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Echoes_allow_drag_when_the_request_carries_it()
+    {
+        KanbanBoardResponseModel board = KanbanBoardComposer.Compose(
+            new KanbanBoardComposerRequest(Lanes(), [], 0, false, 25, null, 0, false, AllowDrag: true));
+
+        board.AllowDrag.Should().BeTrue();
+    }
 }
