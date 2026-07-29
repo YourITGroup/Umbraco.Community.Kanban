@@ -60,6 +60,44 @@ export const manifests: Array<UmbExtensionManifest> = [
             propertyEditorUiAlias: KANBAN_CARD_PROPERTIES_UI_ALIAS,
           },
           {
+            alias: 'showChildItems',
+            label: 'Show child items',
+            description: 'List each card’s own children on the card, with an edit button and an add button.',
+            propertyEditorUiAlias: 'Umb.PropertyEditorUi.Toggle',
+          },
+          {
+            alias: 'childItemsSortBy',
+            label: 'Sort child items by',
+            description: 'Used only when child items are shown.',
+            propertyEditorUiAlias: 'Umb.PropertyEditorUi.Dropdown',
+            config: [
+              {
+                alias: 'items',
+                value: [
+                  { name: 'Sort order', value: 'sortOrder' },
+                  { name: 'Name', value: 'name' },
+                  { name: 'Last edited', value: 'updateDate' },
+                  { name: 'Created', value: 'createDate' },
+                ],
+              },
+            ],
+          },
+          {
+            alias: 'childItemsSortDirection',
+            label: 'Sort child items',
+            description: 'Used only when child items are shown.',
+            propertyEditorUiAlias: 'Umb.PropertyEditorUi.Dropdown',
+            config: [
+              {
+                alias: 'items',
+                value: [
+                  { name: 'Ascending', value: 'asc' },
+                  { name: 'Descending', value: 'desc' },
+                ],
+              },
+            ],
+          },
+          {
             alias: 'lanePageSize',
             label: 'Cards per lane',
             description: 'How many cards load in a lane before "Show more".',
@@ -92,6 +130,8 @@ export const manifests: Array<UmbExtensionManifest> = [
         defaultData: [
           { alias: 'lanePageSize', value: 25 },
           { alias: 'allowDrag', value: true },
+          { alias: 'childItemsSortBy', value: 'sortOrder' },
+          { alias: 'childItemsSortDirection', value: 'asc' },
           {
             // What a fresh List View shows, and without it a new board's cards carry nothing but a
             // title. Defaults apply to newly created data types only, so no existing board gains

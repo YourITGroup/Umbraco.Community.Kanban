@@ -28,10 +28,13 @@ describe('board property editor manifests', () => {
       'allowDrag',
       'appliesTo',
       'cardProperties',
+      'childItemsSortBy',
+      'childItemsSortDirection',
       'laneOverrides',
       'lanePageSize',
       'laneProperty',
       'manualLanes',
+      'showChildItems',
       'tabIcon',
       'tabName',
       'useManualLanes',
@@ -67,6 +70,18 @@ describe('board property editor manifests', () => {
 
     expect(defaults.lanePageSize).toBe(25);
     expect(defaults.allowDrag).toBe(true);
+  });
+
+  it('defaults child items to sort order ascending, and leaves showChildItems unset', () => {
+    // showChildItems has no default: absent means off, and a default of false would be noise.
+    const ui = manifests.find((m) => m.type === 'propertyEditorUi') as any;
+    const defaults = Object.fromEntries(
+      ui.meta.settings.defaultData.map((d: { alias: string; value: unknown }) => [d.alias, d.value]),
+    );
+
+    expect(defaults.childItemsSortBy).toBe('sortOrder');
+    expect(defaults.childItemsSortDirection).toBe('asc');
+    expect('showChildItems' in defaults).toBe(false);
   });
 
   it('defaults card properties to the created and updated dates, in that order', () => {

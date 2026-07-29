@@ -29,4 +29,16 @@ public static class Constants
 
     /// <summary>How many children a board reads before it reports itself truncated.</summary>
     public const int DefaultChildCap = 1000;
+
+    /// <summary>
+    /// How many grandchildren a board reads to fill its cards' child lists. Deliberately larger than
+    /// <see cref="DefaultChildCap" />: it covers every card's children at once, in one query.
+    /// </summary>
+    public const int DefaultGrandchildCap = 2000;
+
+    /// <summary>
+    /// How many children a card lists. A card is a summary, so there is no "show more" — the rest are
+    /// reported as a count and seen by opening the card.
+    /// </summary>
+    public const int CardChildDisplayCap = 5;
 }

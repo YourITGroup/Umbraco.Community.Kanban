@@ -83,6 +83,27 @@ public class KanbanBoardConfiguration
     [JsonConverter(typeof(KanbanCardPropertyArrayJsonConverter))]
     public KanbanCardProperty[] CardProperties { get; set; } = [];
 
+    /// <summary>
+    /// Whether each card lists its own children. Off by default, and the board skips the query that
+    /// reads them entirely when it is off — so a board whose cards have no meaningful children pays
+    /// nothing for the feature.
+    /// </summary>
+    [ConfigurationField("showChildItems")]
+    public bool ShowChildItems { get; set; }
+
+    /// <summary>
+    /// Which field child items are ordered by: one of the fields
+    /// <see cref="Services.KanbanChildOrdering" /> understands. Null means sort order.
+    /// </summary>
+    [ConfigurationField("childItemsSortBy")]
+    [JsonConverter(typeof(SingleSelectDropdownJsonConverter))]
+    public string? ChildItemsSortBy { get; set; }
+
+    /// <summary>"asc" or "desc". Null means ascending.</summary>
+    [ConfigurationField("childItemsSortDirection")]
+    [JsonConverter(typeof(SingleSelectDropdownJsonConverter))]
+    public string? ChildItemsSortDirection { get; set; }
+
     [ConfigurationField("lanePageSize")]
     public int LanePageSize { get; set; } = 25;
 

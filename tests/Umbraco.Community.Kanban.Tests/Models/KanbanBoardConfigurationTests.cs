@@ -30,4 +30,14 @@ public class KanbanBoardConfigurationTests
         new KanbanBoardConfiguration { LaneSource = "   " }.PinnedLaneSource.Should().BeNull();
         new KanbanBoardConfiguration { LaneSource = "  ", UseManualLanes = true }.PinnedLaneSource.Should().Be("manual");
     }
+
+    [Fact]
+    public void ChildItems_AreOffAndUnsortedByDefault_SoAnExistingBoardIsUnchanged()
+    {
+        var configuration = new KanbanBoardConfiguration();
+
+        configuration.ShowChildItems.Should().BeFalse();
+        configuration.ChildItemsSortBy.Should().BeNull();
+        configuration.ChildItemsSortDirection.Should().BeNull();
+    }
 }
