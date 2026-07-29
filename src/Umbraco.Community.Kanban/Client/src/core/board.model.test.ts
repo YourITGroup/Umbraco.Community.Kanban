@@ -39,6 +39,7 @@ const board = (lanes: KanbanBoardLaneModel[], overrides: Partial<KanbanBoardMode
   truncated: false,
   childCount: lanes.reduce((sum, l) => sum + l.total, 0),
   showChildItems: false,
+  allowDrag: false,
   ...overrides,
 });
 

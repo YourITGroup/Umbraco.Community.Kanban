@@ -1,4 +1,4 @@
-import type { KanbanBoardModel } from './kanban-board.types.js';
+import type { KanbanBoardModel, KanbanCardState } from './kanban-board.types.js';
 
 export interface KanbanBoardQuery {
   parentId: string;
@@ -20,8 +20,26 @@ export type KanbanBoardOutcome =
   | { kind: 'not-configured' }
   | { kind: 'error' };
 
+/** A request to move one card to one lane. */
+export interface KanbanCardLaneCommand {
+  cardKey: string;
+  /** The empty string clears the lane property, putting the card in the unassigned lane. */
+  laneValue: string;
+  culture?: string | null;
+}
+
+/**
+ * Why the status is carried on failure: the board distinguishes 403 (permission changed mid-session) and
+ * 404 (card deleted concurrently) in the message it shows, and nothing else can tell them apart once the
+ * response has been discarded.
+ */
+export type KanbanSetLaneOutcome =
+  | { kind: 'success'; state: KanbanCardState }
+  | { kind: 'error'; status?: number };
+
 export interface KanbanDataSource {
   getBoard(query: KanbanBoardQuery): Promise<KanbanBoardOutcome>;
+  setLane(command: KanbanCardLaneCommand): Promise<KanbanSetLaneOutcome>;
 }
 
 /**
@@ -39,4 +57,17 @@ export function buildBoardQuery(query: KanbanBoardQuery): Record<string, string 
   if (query.take !== undefined) built.take = query.take;
 
   return built;
+}
+
+/**
+ * Builds the body for PUT /card/{key}/lane. Pure and tested for the same reason buildBoardQuery is: the
+ * empty-string cases are load-bearing in opposite directions — an empty lane value must survive, because
+ * it clears the property, while an empty culture must not be sent at all.
+ */
+export function buildLaneBody(command: KanbanCardLaneCommand): { laneValue: string; culture?: string } {
+  const body: { laneValue: string; culture?: string } = { laneValue: command.laneValue };
+
+  if (command.culture) body.culture = command.culture;
+
+  return body;
 }
