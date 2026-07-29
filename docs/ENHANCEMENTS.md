@@ -111,3 +111,11 @@ The enhancement anticipated needing a movement threshold to avoid swallowing a c
 header's click. That did not turn out to be necessary: nothing is ever bound to a background click, so
 there was never a click to protect, and nothing in `kanban-lane.element.ts` or `kanban-card.element.ts`
 changed for this at all.
+
+Extended the same day to pan vertically too, from
+[a follow-up design](superpowers/specs/2026-07-29-board-pan-vertical-design.md): `.lanes` has no
+vertical overflow of its own, so the drag also drives whatever ancestor already owns vertical
+scrolling — found by walking up through parent elements and, crossing shadow boundaries via
+`shadowRoot.host`, to Umbraco's own `<uui-scroll-container>` in the live Collection View host. A board
+that fits entirely within the viewport is unaffected: nothing is found to scroll, and the drag pans
+sideways exactly as it always has.
