@@ -3,7 +3,7 @@ import { UmbLitElement } from '@umbraco-cms/backoffice/lit-element';
 import { mergeLanePage, toBoardState, type KanbanBoardState } from './board.model.js';
 import './kanban-lane.element.js';
 import type { KanbanBoardQuery, KanbanDataSource } from '../data/kanban-data-source.js';
-import { panScrollLeft, shouldStartPan } from './pan.model.js';
+import { panScrollOffset, shouldStartPan } from './pan.model.js';
 
 type KanbanBoardStatus = 'idle' | 'loading' | 'ready' | 'not-configured' | 'error';
 
@@ -151,7 +151,7 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
 
     const lanes = event.currentTarget as HTMLDivElement;
 
-    lanes.scrollLeft = panScrollLeft(this.#pan.startScrollLeft, this.#pan.startX, event.clientX);
+    lanes.scrollLeft = panScrollOffset(this.#pan.startScrollLeft, this.#pan.startX, event.clientX);
   }
 
   /**

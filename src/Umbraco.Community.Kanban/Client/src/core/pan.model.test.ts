@@ -1,18 +1,19 @@
 import { describe, it, expect } from 'vitest';
-import { panScrollLeft, shouldStartPan } from './pan.model.js';
+import { panScrollOffset, shouldStartPan } from './pan.model.js';
 
-describe('panScrollLeft', () => {
-  it('decreases scrollLeft when the pointer moves right', () => {
-    // Dragging right reveals content to the left, which is a smaller scrollLeft.
-    expect(panScrollLeft(100, 50, 80)).toBe(70);
+describe('panScrollOffset', () => {
+  it('decreases the offset when the pointer moves in the positive direction', () => {
+    // Dragging right reveals content to the left, which is a smaller scrollLeft — the same
+    // formula applies to scrollTop when dragging down reveals content above.
+    expect(panScrollOffset(100, 50, 80)).toBe(70);
   });
 
-  it('increases scrollLeft when the pointer moves left', () => {
-    expect(panScrollLeft(100, 80, 50)).toBe(130);
+  it('increases the offset when the pointer moves in the negative direction', () => {
+    expect(panScrollOffset(100, 80, 50)).toBe(130);
   });
 
-  it('leaves scrollLeft unchanged when the pointer has not moved', () => {
-    expect(panScrollLeft(100, 50, 50)).toBe(100);
+  it('leaves the offset unchanged when the pointer has not moved', () => {
+    expect(panScrollOffset(100, 50, 50)).toBe(100);
   });
 });
 

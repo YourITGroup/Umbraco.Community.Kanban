@@ -1,10 +1,12 @@
 /**
- * The next scrollLeft for a pointer-drag pan: dragging right (the pointer moves toward larger X)
- * reveals content to the left, so scrollLeft decreases by exactly the distance dragged, and vice
- * versa. Pure, so the direction of the scroll is tested without a DOM.
+ * The next scroll offset for a pointer-drag pan on one axis: dragging in the positive direction
+ * (the pointer moves toward larger X, or larger Y) reveals content on the negative side, so the
+ * offset decreases by exactly the distance dragged, and vice versa. Pure, so the direction of the
+ * scroll is tested without a DOM. Used for both scrollLeft (with clientX) and scrollTop (with
+ * clientY) — the formula doesn't care which axis it's driving.
  */
-export function panScrollLeft(startScrollLeft: number, startX: number, currentX: number): number {
-  return startScrollLeft - (currentX - startX);
+export function panScrollOffset(startOffset: number, startAt: number, currentAt: number): number {
+  return startOffset - (currentAt - startAt);
 }
 
 /**
