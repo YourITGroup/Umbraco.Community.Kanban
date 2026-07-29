@@ -3,7 +3,7 @@ import { UmbLitElement } from '@umbraco-cms/backoffice/lit-element';
 import { mergeLanePage, toBoardState, type KanbanBoardState } from './board.model.js';
 import './kanban-lane.element.js';
 import type { KanbanBoardQuery, KanbanDataSource } from '../data/kanban-data-source.js';
-import { panScrollLeft } from './pan.model.js';
+import { panScrollLeft, shouldStartPan } from './pan.model.js';
 
 type KanbanBoardStatus = 'idle' | 'loading' | 'ready' | 'not-configured' | 'error';
 
@@ -54,6 +54,10 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
   /** Reloads the whole board. Hosts call this when their own data changes. */
   async load() {
     if (!this.parentId || !this.datasource) return;
+
+    // A reload swaps out `.lanes` for a loader, not a re-render in place — any in-progress pan
+    // would otherwise be stranded on the discarded div (see #endPan for why that's unsafe).
+    this.#endPan();
 
     const token = ++this.#loadToken;
 
@@ -109,11 +113,24 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
    * `.lanes` already scrolls horizontally on a touch swipe, with native momentum, for free.
    */
   #onLanesPointerDown(event: PointerEvent) {
-    if (event.target !== event.currentTarget) return;
-    if (event.pointerType === 'touch') return;
     if (this.#pan) return; // a pan is already in progress for another pointer
 
     const lanes = event.currentTarget as HTMLDivElement;
+
+    if (
+      !shouldStartPan({
+        isSelfTarget: event.target === event.currentTarget,
+        pointerType: event.pointerType,
+        button: event.button,
+        isPrimary: event.isPrimary,
+        offsetX: event.offsetX,
+        offsetY: event.offsetY,
+        clientWidth: lanes.clientWidth,
+        clientHeight: lanes.clientHeight,
+      })
+    ) {
+      return;
+    }
 
     lanes.setPointerCapture(event.pointerId);
     this.#pan = { pointerId: event.pointerId, startX: event.clientX, startScrollLeft: lanes.scrollLeft };
@@ -151,6 +168,17 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
       lanes.releasePointerCapture(event.pointerId);
     }
 
+    this.#endPan();
+  }
+
+  /**
+   * Clears in-progress pan state. Split out from `#onLanesPointerEnd` so `load()` can also call
+   * it: a reload swaps `.lanes` out for a loader rather than re-rendering it in place, so a pan
+   * left live across that swap would either go permanently dead (no pointerup ever reaches the
+   * new div) or, worse, survive with a `startScrollLeft` captured from the discarded element and
+   * jump the board on the next pointermove.
+   */
+  #endPan() {
     this.#pan = undefined;
     this._isPanning = false;
   }
@@ -216,6 +244,10 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
         overflow-x: auto;
         padding-bottom: var(--uui-size-space-3);
         cursor: grab;
+      }
+
+      .lanes > * {
+        cursor: auto;
       }
 
       .lanes.panning {
