@@ -119,8 +119,17 @@ follows the same shape rather than inventing a `/publish-pending` controller:
   This is a real, named scope line (not silently discovered later): a very large board's "Publish
   pending changes" is convenience-scoped to what's on screen, matching the rest of the backoffice's own
   convention rather than being exhaustive.
-- The toolbar button's count and its confirmation dialog (via `umbConfirmModal`, the same helper the
-  core bulk action uses) both come from `pendingCards`, listing the card names about to be published.
+- The toolbar itself is not a custom-styled bar: it is a plain `uui-button` (`look="primary"
+  color="positive" icon="icon-globe"`, the same icon Umbraco's own publish entity action and bulk
+  action both use) with a `uui-badge` for the count — the identical component the lane header already
+  uses for its total. No bespoke button styling, no reinvented publish iconography. It is **not** the
+  same component as `umb-collection-selection-actions` (core's selection-driven bulk-action bar) —
+  that component is keyed to the collection's checkbox selection, which this board has none of; ours
+  is a standalone board-level action, rendered by the board element itself above `.lanes`, in the same
+  place the existing truncation message already renders.
+- The count and the confirmation dialog's card list (via `umbConfirmModal`, the same helper the core
+  bulk action uses — `color: 'positive'`, `confirmLabel: this.localize.term('actions_publish')`) both
+  come from `pendingCards`.
 - On confirm: loop `UmbDocumentPublishingRepository.publish(card.key, [{ variantId }])`, one call per
   pending card, `variantId` built from the board's own `culture` (or the invariant variant when the
   content type doesn't vary) — mirroring `publish.bulk-action.js` exactly. Track success/failure per
