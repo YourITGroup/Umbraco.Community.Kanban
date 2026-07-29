@@ -20,28 +20,32 @@ Wiring `IContentmentContentContext` in is possible — it is public — and rema
 
 ---
 
-## 1. Open a card in the workspace modal
+## 1, 4, 5 & 6. Cards open, list their children, and create them — **done 2026-07-29**
 
-*Related: items 5, 6 and 8 all open the same modal; build 1 and 5 together.*
+Built from
+[their design](superpowers/specs/2026-07-29-card-workspace-modal-and-child-items-design.md). A card's
+title opens its document in the workspace modal; each card lists its children with an edit button that
+opens the same modal; an **Add** button creates a child there too, replicating the create action's own
+type-then-blueprint choice; and the package's icon is `icon-columns` everywhere.
 
+Items 1, 5 and 6 turned out to be one feature: all three end in the same modal, opened from one
+`UmbModalRouteRegistrationController` on the board host, and item 5's create control lives inside item
+6's child list.
 
-Clicking a card's title should open that document in the infinite editor, rather than the board being
-a dead end that forces a trip through the content tree to edit anything.
+Three things these entries recorded turned out to be wrong or undecided, and are settled in the design:
 
-Most of the wiring exists. `UmbCommunityKanbanCardElement` already dispatches
-`kanban-card-clicked` with the card's key on click — nothing listens to it yet. The host
-(`hosts/collection-view-board.element.ts`) is where it should be handled, using the same
-`UmbModalRouteRegistrationController` pattern this package now uses twice for the data type workspace,
-with the document workspace modal token and core's exported edit path pattern instead of the data
-type ones.
-
-Two things to settle when it is built:
-
-- **The click target.** The whole card is currently `role="button"`; a card that opens on any click
-  will fight drag-and-drop once milestone 3 lands. The title alone is the safer target.
-- **Refresh on close.** A card edited in the modal needs its lane and summary properties re-read. The
-  collection's `items` observable already drives reloads, so a save may cover this for free — worth
-  checking rather than assuming.
+- Item 1 hoped a save might refresh the card "for free" through the collection's `items` observable. It
+  does not — the collection context is never told a document was saved in our modal — so the host
+  reloads the board from the modal's `onSubmit`.
+- Item 6's three open questions are answered: children come from **one** level-filtered
+  `GetPagedDescendants` per board rather than a per-card fetch, all child types are listed, and the
+  whole section is gated on a `showChildItems` board setting — with a configurable sort property
+  (sort order, name, last edited, created) and direction.
+- Item 5 was right that v18 ships no document workspace modal token and that `UMB_WORKSPACE_MODAL`
+  serves it. Blueprints proved reachable as well, through
+  `UMB_CREATE_FROM_BLUEPRINT_DOCUMENT_WORKSPACE_PATH_PATTERN`, so they are supported rather than
+  skipped. Core's own `UMB_DOCUMENT_CREATE_OPTIONS_MODAL` is not used: it finishes by navigating to the
+  absolute workspace path, which is the behaviour item 5 existed to avoid.
 
 ## 2 & 3. Card properties as List View columns — **done 2026-07-29**
 
@@ -59,48 +63,6 @@ Two things recorded here turned out to be wrong and are corrected in the design:
 - Item 3 called itself "blocked on system property support". It was — that support is what this work
   added, reading the five fields off `IContent` rather than through `IKanbanPropertyDataTypeLookup`,
   which is deliberately not involved.
-
-## 4. Default to `icon-columns`, not `icon-grid`
-
-A Kanban board is columns, not a grid, and `icon-grid` is already the visual language of Block Grid
-and the Grid layout. Four places carry it, and they should change together so the package reads
-consistently in the tree, the layout picker and the data type list:
-
-- `property-editors/board/manifests.ts` — the property editor UI's `meta.icon`
-- `hosts/manifests.ts` — the collection view's icon, the one in the layout switcher
-- `workspace-views/manifests.ts` — the Kanban tab's icon
-- `workspace-views/data-type-kanban.element.ts` — the chosen configuration's ref-node icon
-
-`tabIcon` defaults are unaffected: they are per-configuration values an editor chooses, and only
-appear as `icon-grid` in test fixtures.
-
-## 5. Creating a child under a card opens it in the workspace modal
-
-The sibling of item 1: creating, rather than editing. A new child of a card should open in the same
-infinite editor instead of navigating away.
-
-No document workspace modal token exists in v18 — the generic `UMB_WORKSPACE_MODAL`
-(`{entityType, preset}`) is what serves this, driven to core's exported
-`UMB_CREATE_DOCUMENT_WORKSPACE_PATH_PATTERN` (`create/parent/:parentEntityType/:parentUnique/:documentTypeUnique`).
-Note the document type is part of the path, so the caller must decide it before opening: with more
-than one allowed child type, that means asking first, the way the tree's create action does.
-
-Build this together with item 1 — they share the registration and differ only in the path.
-
-## 6. Child items listed on a card
-
-A minimal list per card: icon, name, and an edit button opening the child in the workspace modal
-(item 1 again). Enough to see a booking's line items without leaving the board.
-
-Open questions, all of which shape the endpoint rather than the element:
-
-- **Where the children come from.** `GET /board` returns cards for one parent; children of each card
-  are a second level it does not fetch. Either extend the card model with a small, capped child list
-  (one query per board, at the cost of a heavier payload for boards that never show them) or add a
-  per-card fetch (lazier, but N requests for a full lane).
-- **Which children.** All child types, or a configured subset? A booking's children may be a mix.
-- **Whether it is configurable at all.** A card list is noise on boards whose cards have no
-  meaningful children, so this likely wants a board setting rather than being unconditional.
 
 ## 7. Board configuration picker: match core's picker styling
 
@@ -125,7 +87,7 @@ builds this should pick deliberately rather than discover the option late.
 *Nice to have.* An add panel at the head of each lane, creating a content item with the lane property
 already set to that lane's value — so "add to Confirmed" is one action rather than create-then-edit.
 
-Depends on item 5 (create in the workspace modal) and needs one thing verified first: whether a
+Builds on item 5, now done (create in the workspace modal), and needs one thing verified first: whether a
 document's property values can be preset. `UMB_WORKSPACE_MODAL` takes a `preset`, and
 `entity-detail-workspace-base` applies it as `{...scaffold, ...preset}` — a **top-level spread**, so a
 preset `values` array replaces the scaffolded one outright rather than merging into it. Presetting one
@@ -142,7 +104,7 @@ Click-and-hold on the board background, drag, and the board scrolls sideways wit
 board with more lanes than fit is navigable without hunting for a scrollbar or shift-scrolling.
 
 The container is already right: `.lanes` in
-[core/kanban-board.element.ts:143-149](../src/Umbraco.Community.Kanban/Client/src/core/kanban-board.element.ts#L143-L149)
+[core/kanban-board.element.ts:144-150](../src/Umbraco.Community.Kanban/Client/src/core/kanban-board.element.ts#L144-L150)
 is a flex row with `overflow-x: auto`, so panning is `scrollLeft` arithmetic on pointer moves. Use
 Pointer Events with `setPointerCapture`, not mouse events — a capture keeps the drag alive when the
 pointer leaves the element, and it makes trackpads and touch work without a second code path.
@@ -150,11 +112,10 @@ pointer leaves the element, and it makes trackpads and touch work without a seco
 **The whole difficulty is telling a pan from the interactions already on the board**, and it gets
 harder with every item above:
 
-- **Cards are `role="button" tabindex="0"` with a click handler**
-  ([kanban-card.element.ts:61](../src/Umbraco.Community.Kanban/Client/src/core/kanban-card.element.ts#L61)),
-  and item 1 makes that click open the workspace modal. A pan that starts on a card must not open it.
-  The usual resolution is a movement threshold — a few pixels before the gesture becomes a pan, and
-  suppressing the click only once it does.
+- **A card's title is a real button** that opens the workspace modal, done as part of item 1 — the
+  title, not the whole card, was chosen deliberately so a pan starting anywhere else on a card has
+  nothing to suppress. A pan that starts on the title itself still needs a movement threshold: a few
+  pixels before the gesture becomes a pan, suppressing the click only once it does.
 - **Milestone 3 gives cards their own drag**, which is a direct conflict: the same gesture on the same
   pixel means two things. The clean split is that a pan starts only on the background — lane gutters,
   the space below the cards — and never on a card. Worth deciding before milestone 3 rather than
