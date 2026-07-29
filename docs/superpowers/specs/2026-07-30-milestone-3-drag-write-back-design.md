@@ -184,13 +184,25 @@ milestone and needs no change.
 `kanban-lane.element` gains two boolean properties driven by the board's hit-test result:
 `is-drop-target` (this lane is the one currently under the pointer) and `accepts-drop` (whether it
 would take the card if released now — mirrors the lane model's own `acceptsDrops`). Styling is a
-`classMap` on the existing `.lane` container, layered on top of the lane's own colour accent rather
-than replacing it:
+`classMap` on the existing `.lane` container.
 
-- **Drop target, accepts:** a visible background tint and a solid border in a positive/accent colour.
-- **Drop target, rejects:** a muted/dashed border, no tint — reads as "you're over this lane, but it
-  won't take the card."
+The highlight is a **variant of the lane's own colour**, not a generic accent — a lane already
+resolves to a colour today (override, source, or the cycled palette; see the parent design's *Lane
+colours* section) and exposes it as the `--kanban-lane-colour` custom property, currently set on the
+`.header` div only. This milestone moves that variable one level up, onto `.lane` itself, so both the
+header and the new highlight can read the same value without threading it through twice:
+
+- **Drop target, accepts:** background uses `color-mix(in srgb, var(--kanban-lane-colour, var(--uui-color-border)) 15%, transparent)`
+  and the border switches to a solid 2px `var(--kanban-lane-colour, var(--uui-color-border))` — a
+  tinted version of the lane's own colour, so a red "Blocked" lane highlights red and a green "Done"
+  lane highlights green, rather than every lane flashing the same generic positive colour.
+- **Drop target, rejects:** no tint; a muted dashed border in `--uui-color-border`, independent of the
+  lane's own colour — rejection reads as neutral/disabled, not as a variant of the lane's identity.
 - **Not the drop target:** unchanged from today, regardless of drag state.
+- **Fallback:** the `var(--kanban-lane-colour, var(--uui-color-border))` fallback chain is what covers
+  a lane with no resolved colour — reachable today only via the (Unassigned) lane, which the parent
+  design already pins to neutral grey and takes no part in the colour cycle, so this fallback is a
+  safety net rather than a common case.
 
 Because `dropTarget` lives on the board (the only element hit-testing every lane), the board passes
 `is-drop-target`/`accepts-drop` down per lane on each `pointermove` re-render — the same top-down data
