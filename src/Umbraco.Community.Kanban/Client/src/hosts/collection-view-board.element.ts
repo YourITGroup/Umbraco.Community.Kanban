@@ -3,6 +3,14 @@ import { UmbLitElement } from '@umbraco-cms/backoffice/lit-element';
 import { UMB_COLLECTION_CONTEXT } from '@umbraco-cms/backoffice/collection';
 import { UMB_ENTITY_CONTEXT } from '@umbraco-cms/backoffice/entity';
 import { UMB_VARIANT_CONTEXT } from '@umbraco-cms/backoffice/variant';
+import { UmbModalRouteRegistrationController } from '@umbraco-cms/backoffice/router';
+import { UMB_WORKSPACE_MODAL } from '@umbraco-cms/backoffice/workspace';
+import {
+  UMB_CREATE_DOCUMENT_WORKSPACE_PATH_PATTERN,
+  UMB_CREATE_FROM_BLUEPRINT_DOCUMENT_WORKSPACE_PATH_PATTERN,
+  UMB_DOCUMENT_ENTITY_TYPE,
+  UMB_EDIT_DOCUMENT_WORKSPACE_PATH_PATTERN,
+} from '@umbraco-cms/backoffice/document';
 import { KanbanServerDataSource } from '@/data/kanban-server-data-source.js';
 import type { KanbanDataSource } from '@/data/kanban-data-source.js';
 import '@/core/kanban-board.element.js';
@@ -24,6 +32,29 @@ export class UmbCommunityKanbanCollectionViewBoardElement extends UmbLitElement 
 
   @state()
   private _culture?: string | null;
+
+  /**
+   * Opens a card's document in Umbraco's own document workspace as a sidebar modal, so editing a card
+   * never means leaving the board.
+   *
+   * A modal *route* registration rather than `UMB_MODAL_MANAGER_CONTEXT.open()` because the document
+   * workspace is route-driven: edit, create and create-from-blueprint are three routes into it, and
+   * opening the modal directly would render a workspace with no route to resolve. One registration
+   * serves all three — the path passed to `open()` decides which. This is the same pattern, and the
+   * same reasoning, as the data type workspace view's.
+   */
+  #documentModal: UmbModalRouteRegistrationController<
+    typeof UMB_WORKSPACE_MODAL.DATA,
+    typeof UMB_WORKSPACE_MODAL.VALUE
+  >;
+
+  /**
+   * Whether the router has handed over a route builder yet. `open()` silently does nothing until it
+   * has, so an event arriving first is dropped rather than looking like a broken button. Kept here
+   * rather than gating the controls: the registration completes long before the board's first response
+   * renders a card, so threading a flag down to every card would buy nothing.
+   */
+  #modalReady = false;
 
   constructor() {
     super();
@@ -69,6 +100,21 @@ export class UmbCommunityKanbanCollectionViewBoardElement extends UmbLitElement 
         this.#board?.load();
       }, '_kanbanCollectionItems');
     });
+
+    this.#documentModal = new UmbModalRouteRegistrationController(this, UMB_WORKSPACE_MODAL)
+      // The token's alias is the generic `Umb.Modal.Workspace`, so a distinct segment is what keeps
+      // our route unambiguous among any other workspace modal in the same routing scope.
+      .addAdditionalPath('kanban-document')
+      .onSetup(() => ({ data: { entityType: UMB_DOCUMENT_ENTITY_TYPE, preset: {} } }))
+      .onSubmit(() => {
+        // The collection context has no idea a document was saved inside our modal, so its `items`
+        // observable will not fire; the board has to reload itself. The board's own load token makes a
+        // redundant load harmless if that ever changes.
+        this.#board?.load();
+      })
+      .observeRouteBuilder(() => {
+        this.#modalReady = true;
+      });
   }
 
   /** The parent/culture pair the board was last loaded for, so a re-render is not a re-fetch. */
@@ -118,6 +164,42 @@ export class UmbCommunityKanbanCollectionViewBoardElement extends UmbLitElement 
     this.#board?.load();
   }
 
+  #onOpenDocument(event: CustomEvent<{ key: string }>) {
+    if (!this.#modalReady) return;
+
+    // The second argument is the inner workspace's own route, appended to the modal path. Without it
+    // the modal opens on no route at all and renders nothing.
+    this.#documentModal.open(
+      {},
+      UMB_EDIT_DOCUMENT_WORKSPACE_PATH_PATTERN.generateLocal({ unique: event.detail.key }),
+    );
+  }
+
+  #onCreateChild(
+    event: CustomEvent<{ parentKey: string; documentTypeUnique: string; blueprintUnique?: string }>,
+  ) {
+    if (!this.#modalReady) return;
+
+    const { parentKey, documentTypeUnique, blueprintUnique } = event.detail;
+
+    // The document type is part of the path, which is why the card resolves it before asking: a
+    // create route cannot be generated without knowing what is being created.
+    const path = blueprintUnique
+      ? UMB_CREATE_FROM_BLUEPRINT_DOCUMENT_WORKSPACE_PATH_PATTERN.generateLocal({
+          parentEntityType: UMB_DOCUMENT_ENTITY_TYPE,
+          parentUnique: parentKey,
+          documentTypeUnique,
+          blueprintUnique,
+        })
+      : UMB_CREATE_DOCUMENT_WORKSPACE_PATH_PATTERN.generateLocal({
+          parentEntityType: UMB_DOCUMENT_ENTITY_TYPE,
+          parentUnique: parentKey,
+          documentTypeUnique,
+        });
+
+    this.#documentModal.open({}, path);
+  }
+
   override render() {
     if (!this._parentId) return html`<uui-loader></uui-loader>`;
 
@@ -126,7 +208,9 @@ export class UmbCommunityKanbanCollectionViewBoardElement extends UmbLitElement 
         parent-id=${this._parentId}
         .culture=${this._culture}
         .datasource=${this.#datasource}
-        ?readonly=${true}></umb-community-kanban-board>
+        ?readonly=${true}
+        @kanban-open-document=${this.#onOpenDocument}
+        @kanban-create-child=${this.#onCreateChild}></umb-community-kanban-board>
     `;
   }
 }

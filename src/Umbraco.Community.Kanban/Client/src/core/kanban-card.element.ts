@@ -7,7 +7,8 @@ import { cardStateTag } from './card.model.js';
 import type { KanbanCardModel, KanbanCardPropertyModel } from '../data/kanban-board.types.js';
 
 /**
- * One card on a board. Read-only in this milestone: it reports a click and nothing else.
+ * One card on a board. Read-only in this milestone: it reports its title being clicked and nothing
+ * else — the host decides what "open this document" means.
  *
  * umb-icon, umb-value-summary-extension and umb-entity-actions-bundle are global elements
  * the backoffice shell registers, so they are used without import — reaching into
@@ -41,11 +42,11 @@ export class UmbCommunityKanbanCardElement extends UmbLitElement {
     }
   }
 
-  #onClick() {
+  #onOpen() {
     if (!this.card) return;
 
     this.dispatchEvent(
-      new CustomEvent('kanban-card-clicked', {
+      new CustomEvent('kanban-open-document', {
         detail: { key: this.card.key },
         bubbles: true,
         composed: true,
@@ -59,14 +60,11 @@ export class UmbCommunityKanbanCardElement extends UmbLitElement {
     const tag = cardStateTag(this.card.state);
 
     return html`
-      <div class="card" role="button" tabindex="0" @click=${this.#onClick}>
+      <div class="card">
         <div class="header">
           ${this.card.icon ? html`<umb-icon name=${this.card.icon}></umb-icon>` : nothing}
-          <span class="name">${this.card.name}</span>
-          <umb-entity-actions-bundle
-            .label=${this.card.name}
-            @click=${(event: Event) => event.stopPropagation()}>
-          </umb-entity-actions-bundle>
+          <button type="button" class="name" @click=${this.#onOpen}>${this.card.name}</button>
+          <umb-entity-actions-bundle .label=${this.card.name}></umb-entity-actions-bundle>
         </div>
         ${this.card.properties.length
           ? html`<div class="properties">
@@ -117,7 +115,6 @@ export class UmbCommunityKanbanCardElement extends UmbLitElement {
         background: var(--uui-color-surface);
         border: 1px solid var(--uui-color-border);
         border-radius: var(--uui-border-radius);
-        cursor: pointer;
       }
 
       .card:hover {
@@ -134,6 +131,22 @@ export class UmbCommunityKanbanCardElement extends UmbLitElement {
         flex: 1;
         font-weight: bold;
         overflow-wrap: anywhere;
+        /* A real button, so it is keyboard-reachable without hand-rolled key handling — styled back
+           down to the text it replaced. */
+        appearance: none;
+        background: none;
+        border: none;
+        padding: 0;
+        margin: 0;
+        font: inherit;
+        font-weight: bold;
+        color: inherit;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .name:hover {
+        text-decoration: underline;
       }
 
       .properties {
