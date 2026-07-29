@@ -3,8 +3,16 @@ import { UmbLitElement } from '@umbraco-cms/backoffice/lit-element';
 import { UmbChangeEvent } from '@umbraco-cms/backoffice/event';
 import { umbOpenModal } from '@umbraco-cms/backoffice/modal';
 import { UMB_ICON_PICKER_MODAL } from '@umbraco-cms/backoffice/icon';
+import { UMB_DATA_TYPE_WORKSPACE_CONTEXT } from '@umbraco-cms/backoffice/data-type';
+import { KANBAN_LANE_CONTENT_TYPE_KEY } from '@/constants.js';
+import '@/core/lane-colour/lane-colour.element.js';
+import type { UmbCommunityKanbanLaneColourElement } from '@/core/lane-colour/lane-colour.element.js';
 import {
-  KANBAN_LANE_PALETTE,
+  buildLanePreviewRequest,
+  type KanbanLanePreviewInput,
+} from '@/data/kanban-lane-preview-data-source.js';
+import { previewLanes } from '@/data/kanban-lane-preview-server-data-source.js';
+import {
   mergeOverridesWithLanes,
   type KanbanLaneOverrideRow,
   type KanbanLaneOverrideValue,
@@ -38,10 +46,97 @@ export class UmbCommunityKanbanLaneOverridesElement extends UmbLitElement {
   @state()
   private _rows: KanbanLaneOverrideRow[] = [];
 
+  /** Distinguishes "not configured" from "configured but resolves to nothing" and from a failure. */
+  @state()
+  private _laneStatus: 'unconfigured' | 'resolved' | 'empty' | 'error' = 'unconfigured';
+
+  #workspace?: typeof UMB_DATA_TYPE_WORKSPACE_CONTEXT.TYPE;
+  #observed: KanbanLanePreviewInput = {};
+  #debounce?: ReturnType<typeof setTimeout>;
+
   /**
-   * Resolved lanes, set by the host once it has called POST /lanes/preview.
-   * Kept as an input rather than fetched here so this element stays testable
-   * and has no opinion about how the configuration is assembled.
+   * Only the newest request may apply its result. Five observed values means one edit can produce a
+   * burst of requests, and a slower earlier one landing last would show the previous property's lanes.
+   */
+  #requestId = 0;
+
+  constructor() {
+    super();
+
+    this.consumeContext(UMB_DATA_TYPE_WORKSPACE_CONTEXT, async (context) => {
+      this.#workspace = context;
+
+      if (!context) return;
+
+      // Observed rather than read once: stored configuration arrives asynchronously, and every one
+      // of these can change while this editor is on screen.
+      await this.#observeValue<string>('laneProperty', (value) => (this.#observed.laneProperty = value));
+      await this.#observeValue<string>(
+        KANBAN_LANE_CONTENT_TYPE_KEY,
+        (value) => (this.#observed.laneContentTypeKey = value),
+      );
+      await this.#observeValue<boolean>('useManualLanes', (value) => (this.#observed.useManualLanes = value));
+      await this.#observeValue<unknown[]>('manualLanes', (value) => (this.#observed.manualLanes = value));
+      await this.#observeValue<string>('laneSource', (value) => (this.#observed.laneSource = value));
+    });
+  }
+
+  async #observeValue<T>(alias: string, apply: (value: T | undefined) => void) {
+    const observable = await this.#workspace!.propertyValueByAlias<T>(alias);
+
+    this.observe(
+      observable,
+      (value) => {
+        apply(value);
+        this.#scheduleReload();
+      },
+      `_kanbanLanePreview_${alias}`,
+    );
+  }
+
+  /**
+   * Debounced because the observers above fire in a burst — Umbraco sets stored values one at a time
+   * — and each resolution can hit the database.
+   */
+  #scheduleReload() {
+    clearTimeout(this.#debounce);
+    this.#debounce = setTimeout(() => this.#reloadLanes(), 250);
+  }
+
+  async #reloadLanes() {
+    const request = buildLanePreviewRequest(this.#observed);
+
+    if (!request) {
+      this._laneStatus = 'unconfigured';
+      this.lanes = [];
+      return;
+    }
+
+    const id = ++this.#requestId;
+    const lanes = await previewLanes(this, request);
+
+    if (id !== this.#requestId) return;
+
+    if (lanes === undefined) {
+      this._laneStatus = 'error';
+      this.lanes = [];
+      return;
+    }
+
+    this.lanes = lanes;
+    // mergeOverridesWithLanes drops the unassigned lane, whose appearance is not configurable, so a
+    // board resolving only that one has nothing to show here.
+    this._laneStatus = this._rows.length > 0 ? 'resolved' : 'empty';
+  }
+
+  override disconnectedCallback() {
+    super.disconnectedCallback();
+    clearTimeout(this.#debounce);
+  }
+
+  /**
+   * Resolved lanes. Normally fetched by this element from POST /lanes/preview; settable so a future
+   * host that has already resolved them can supply them, and so the merge is testable in isolation.
    */
   @property({ type: Array, attribute: false })
   set lanes(lanes: KanbanResolvedLane[]) {
@@ -90,17 +185,29 @@ export class UmbCommunityKanbanLaneOverridesElement extends UmbLitElement {
   }
 
   override render() {
-    if (this._rows.length === 0) {
-      return html`<uui-box>
-        <p>Choose a lane property first, then lanes will appear here.</p>
-      </uui-box>`;
+    // _rows is checked first so an orphaned override still renders its row when the configuration
+    // currently resolves nothing — that row is the only way to remove it.
+    if (this._rows.length > 0) {
+      return html`${repeat(
+        this._rows,
+        (row) => row.value,
+        (row) => this.#renderRow(row),
+      )}`;
     }
 
-    return html`${repeat(
-      this._rows,
-      (row) => row.value,
-      (row) => this.#renderRow(row),
-    )}`;
+    return html`<uui-box><p>${this.#emptyMessage()}</p></uui-box>`;
+  }
+
+  #emptyMessage() {
+    switch (this._laneStatus) {
+      case 'empty':
+        return `This configuration resolves no lanes. The lane property's editor may have no options
+          this package can read, or "Define lanes manually" is on with no lanes defined yet.`;
+      case 'error':
+        return 'The lanes could not be loaded. Appearance can be edited once they load.';
+      default:
+        return 'Choose a lane property first, then lanes will appear here.';
+    }
   }
 
   #renderRow(row: KanbanLaneOverrideRow) {
@@ -127,14 +234,15 @@ export class UmbCommunityKanbanLaneOverridesElement extends UmbLitElement {
             ? html`<uui-icon name=${row.override.icon}></uui-icon>`
             : html`<uui-icon name="icon-add" style="opacity:.35"></uui-icon>`}
         </uui-button>
-        <uui-color-swatches
+        <umb-community-kanban-lane-colour
           .value=${row.override?.colour ?? ''}
+          label=${`Colour for ${row.name}`}
           @change=${(e: Event) =>
-            this.#onFieldChange(row, 'colour', (e.target as HTMLInputElement).value)}>
-          ${KANBAN_LANE_PALETTE.map(
-            (colour) => html`<uui-color-swatch label=${colour} value=${colour}></uui-color-swatch>`,
-          )}
-        </uui-color-swatches>
+            this.#onFieldChange(
+              row,
+              'colour',
+              (e.target as UmbCommunityKanbanLaneColourElement).value,
+            )}></umb-community-kanban-lane-colour>
       </div>
     `;
   }

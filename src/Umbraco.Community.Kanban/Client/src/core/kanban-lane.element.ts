@@ -34,7 +34,7 @@ export class UmbCommunityKanbanLaneElement extends UmbLitElement {
 
     return html`
       <div class="lane">
-        <div class="header" style=${colour ? `border-top-color: ${colour}` : ''}>
+        <div class="header" style=${colour ? `--kanban-lane-colour: ${colour}` : ''}>
           ${this.lane.icon ? html`<umb-icon name=${this.lane.icon}></umb-icon>` : nothing}
           <span class="name">${this.lane.name}</span>
           <uui-badge look="secondary">${formatLaneTotal(this.lane)}</uui-badge>
@@ -74,7 +74,11 @@ export class UmbCommunityKanbanLaneElement extends UmbLitElement {
         gap: var(--uui-size-space-2);
         padding: var(--uui-size-space-2) var(--uui-size-space-3);
         background: var(--uui-color-surface-alt);
-        border-top: 3px solid var(--uui-color-border);
+        /* The fallback replaces the conditional the render used to carry: a lane with no colour
+           simply does not set the variable. Anything else wanting to follow the lane's colour — a
+           tinted background, a coloured badge — can read the same variable rather than having the
+           value threaded through again. */
+        border-top: 3px solid var(--kanban-lane-colour, var(--uui-color-border));
         border-radius: var(--uui-border-radius);
       }
 

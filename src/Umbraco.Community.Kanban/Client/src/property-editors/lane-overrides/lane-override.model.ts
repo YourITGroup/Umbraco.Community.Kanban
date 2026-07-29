@@ -1,15 +1,3 @@
-/** Mirrors KanbanLanePalette.Cycle on the server. Keep the two in step. */
-export const KANBAN_LANE_PALETTE = [
-  'yellow',
-  'pink',
-  'blue',
-  'light-blue',
-  'red',
-  'green',
-  'brown',
-  'grey',
-] as const;
-
 export interface KanbanLaneOverrideValue {
   value: string;
   colour?: string;

@@ -8,6 +8,7 @@ import {
   KANBAN_MANUAL_LANES_UI_ALIAS,
   KANBAN_LANE_CONTENT_TYPE_KEY,
   KANBAN_API_PATH,
+  KANBAN_LANES_PREVIEW_ENDPOINT,
 } from './constants.js';
 
 describe('constants', () => {
@@ -30,5 +31,9 @@ describe('constants', () => {
 
   it('points at the kanban management api', () => {
     expect(KANBAN_API_PATH).toBe('/umbraco/kanban/api/v1');
+  });
+
+  it('addresses the lane preview endpoint the LanesController exposes', () => {
+    expect(KANBAN_LANES_PREVIEW_ENDPOINT).toBe('/umbraco/kanban/api/v1/lanes/preview');
   });
 });

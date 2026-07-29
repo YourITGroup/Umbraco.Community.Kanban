@@ -1,7 +1,8 @@
 import { html, css, customElement, property, repeat } from '@umbraco-cms/backoffice/external/lit';
 import { UmbLitElement } from '@umbraco-cms/backoffice/lit-element';
 import { UmbChangeEvent } from '@umbraco-cms/backoffice/event';
-import { KANBAN_LANE_PALETTE } from '../lane-overrides/lane-override.model.js';
+import '@/core/lane-colour/lane-colour.element.js';
+import type { UmbCommunityKanbanLaneColourElement } from '@/core/lane-colour/lane-colour.element.js';
 import {
   addLane,
   moveLane,
@@ -62,14 +63,15 @@ export class UmbCommunityKanbanManualLanesElement extends UmbLitElement {
           .value=${lane.label ?? ''}
           @change=${(e: Event) =>
             this.#onFieldChange(index, 'label', (e.target as HTMLInputElement).value)}></uui-input>
-        <uui-color-swatches
+        <umb-community-kanban-lane-colour
           .value=${lane.colour ?? ''}
+          label=${`Colour for ${lane.label || lane.value || 'this lane'}`}
           @change=${(e: Event) =>
-            this.#onFieldChange(index, 'colour', (e.target as HTMLInputElement).value)}>
-          ${KANBAN_LANE_PALETTE.map(
-            (colour) => html`<uui-color-swatch label=${colour} value=${colour}></uui-color-swatch>`,
-          )}
-        </uui-color-swatches>
+            this.#onFieldChange(
+              index,
+              'colour',
+              (e.target as UmbCommunityKanbanLaneColourElement).value,
+            )}></umb-community-kanban-lane-colour>
         <uui-button
           compact
           look="outline"

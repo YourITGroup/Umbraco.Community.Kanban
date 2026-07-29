@@ -1,20 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { KANBAN_LANE_PALETTE, mergeOverridesWithLanes } from './lane-override.model.js';
+import { mergeOverridesWithLanes } from './lane-override.model.js';
 
 describe('lane override model', () => {
-  it('matches the server palette exactly', () => {
-    expect(KANBAN_LANE_PALETTE).toEqual([
-      'yellow',
-      'pink',
-      'blue',
-      'light-blue',
-      'red',
-      'green',
-      'brown',
-      'grey',
-    ]);
-  });
-
   it('pairs each resolved lane with its override', () => {
     const rows = mergeOverridesWithLanes(
       [
