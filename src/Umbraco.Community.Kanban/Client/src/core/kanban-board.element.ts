@@ -1,8 +1,9 @@
-import { css, customElement, html, nothing, property, state } from '@umbraco-cms/backoffice/external/lit';
+import { classMap, css, customElement, html, nothing, property, state } from '@umbraco-cms/backoffice/external/lit';
 import { UmbLitElement } from '@umbraco-cms/backoffice/lit-element';
 import { mergeLanePage, toBoardState, type KanbanBoardState } from './board.model.js';
 import './kanban-lane.element.js';
 import type { KanbanBoardQuery, KanbanDataSource } from '../data/kanban-data-source.js';
+import { panScrollLeft } from './pan.model.js';
 
 type KanbanBoardStatus = 'idle' | 'loading' | 'ready' | 'not-configured' | 'error';
 
@@ -34,6 +35,13 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
 
   @state()
   private _board?: KanbanBoardState;
+
+  /** True only while a background pan is live — drives the grabbing cursor and disables text selection. */
+  @state()
+  private _isPanning = false;
+
+  /** The in-progress pan, or undefined between drags. Keyed by pointerId so a second pointer is ignored. */
+  #pan?: { pointerId: number; startX: number; startScrollLeft: number };
 
   /**
    * Monotonically increasing token identifying the most recently started load. Hosts trigger
@@ -94,6 +102,59 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
     }
   }
 
+  /**
+   * Starts a background pan. Gated on `event.target === event.currentTarget`: the listener is bound
+   * directly on `.lanes`, so `currentTarget` is always that div, and the two are equal only when the
+   * pointer went down on the div itself — never a lane or a card inside it. Touch is excluded because
+   * `.lanes` already scrolls horizontally on a touch swipe, with native momentum, for free.
+   */
+  #onLanesPointerDown(event: PointerEvent) {
+    if (event.target !== event.currentTarget) return;
+    if (event.pointerType === 'touch') return;
+    if (this.#pan) return; // a pan is already in progress for another pointer
+
+    const lanes = event.currentTarget as HTMLDivElement;
+
+    lanes.setPointerCapture(event.pointerId);
+    this.#pan = { pointerId: event.pointerId, startX: event.clientX, startScrollLeft: lanes.scrollLeft };
+    this._isPanning = true;
+
+    // Stops the browser's native drag-select from starting before the _isPanning re-render lands —
+    // Lit's re-render is a microtask, not synchronous with this event.
+    event.preventDefault();
+  }
+
+  /**
+   * Once `.lanes` has captured the pointer, every subsequent event for it is retargeted here by the
+   * Pointer Events spec regardless of what is visually underneath — so a drag that passes back over a
+   * lane or a card mid-gesture never reaches that lane's or card's own handlers.
+   */
+  #onLanesPointerMove(event: PointerEvent) {
+    if (!this.#pan || event.pointerId !== this.#pan.pointerId) return;
+
+    const lanes = event.currentTarget as HTMLDivElement;
+
+    lanes.scrollLeft = panScrollLeft(this.#pan.startScrollLeft, this.#pan.startX, event.clientX);
+  }
+
+  /**
+   * Ends a pan. Shared by pointerup, pointercancel and lostpointercapture — the last of which the
+   * browser can fire without a pointerup ever arriving (losing window focus, an OS gesture
+   * intercepting the drag), and without this the cursor could get stuck on "grabbing" forever.
+   */
+  #onLanesPointerEnd(event: PointerEvent) {
+    if (!this.#pan || event.pointerId !== this.#pan.pointerId) return;
+
+    const lanes = event.currentTarget as HTMLDivElement;
+
+    if (lanes.hasPointerCapture(event.pointerId)) {
+      lanes.releasePointerCapture(event.pointerId);
+    }
+
+    this.#pan = undefined;
+    this._isPanning = false;
+  }
+
   override render() {
     switch (this._status) {
       case 'idle':
@@ -123,7 +184,14 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
           // so printing it would disclose the existence of siblings a restricted user cannot see.
           this.#renderMessage('Showing the first cards only — lane counts shown here are lower bounds.')
         : nothing}
-      <div class="lanes" @kanban-load-more=${this.#onLoadMore}>
+      <div
+        class=${classMap({ lanes: true, panning: this._isPanning })}
+        @kanban-load-more=${this.#onLoadMore}
+        @pointerdown=${this.#onLanesPointerDown}
+        @pointermove=${this.#onLanesPointerMove}
+        @pointerup=${this.#onLanesPointerEnd}
+        @pointercancel=${this.#onLanesPointerEnd}
+        @lostpointercapture=${this.#onLanesPointerEnd}>
         ${this._board.lanes.map(
           (lane) => html`<umb-community-kanban-lane
             .lane=${lane}
@@ -147,6 +215,12 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
         align-items: flex-start;
         overflow-x: auto;
         padding-bottom: var(--uui-size-space-3);
+        cursor: grab;
+      }
+
+      .lanes.panning {
+        cursor: grabbing;
+        user-select: none;
       }
 
       .message {
