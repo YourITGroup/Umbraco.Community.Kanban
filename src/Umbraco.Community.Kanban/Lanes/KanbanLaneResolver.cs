@@ -19,10 +19,21 @@ public sealed class KanbanLaneResolver(
         // overwrite semantics change — e.g. Assign starts overwriting non-blank colours, or
         // Apply starts respecting an existing colour — this ordering becomes load-bearing again.
         var unmatched = KanbanLaneOverrideApplier.Apply(lanes, configuration.LaneOverrides);
-        lanes.Add(KanbanLane.Unassigned());
+
+        // Colours are assigned in source order, before the display order is applied, so dragging a
+        // lane changes which column it is in and nothing else.
         KanbanLaneColourAssigner.Assign(lanes);
 
-        return new KanbanLaneResolution(lanes, unmatched);
+        var ordered = KanbanLaneOrderApplier.Apply(lanes, configuration.LaneOrder).ToList();
+
+        // The unassigned lane leads: cards with no value are usually the ones needing attention, and
+        // it is never part of the configured order, having no stored value to order by.
+        ordered.Insert(0, KanbanLane.Unassigned());
+
+        // Only the unassigned lane still needs a colour, and Assign is what knows it is neutral.
+        KanbanLaneColourAssigner.Assign(ordered);
+
+        return new KanbanLaneResolution(ordered, unmatched);
     }
 
     private async Task<List<KanbanLane>> GetLanesAsync(Guid contentTypeKey, KanbanBoardConfiguration configuration)

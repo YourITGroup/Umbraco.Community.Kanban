@@ -61,16 +61,55 @@ public class KanbanLaneResolverTests
     }
 
     [Fact]
-    public async Task Resolve_AlwaysAppendsTheUnassignedLaneLast()
+    public async Task Resolve_AlwaysPutsTheUnassignedLaneFirst()
     {
+        // Cards with no value are usually the ones needing attention, so they lead.
         var lookup = new FakePropertyDataTypeLookup()
             .Add("status", "Umbraco.DropDown.Flexible", new Dictionary<string, object> { ["items"] = new[] { "Open" } });
         var configuration = new KanbanBoardConfiguration { LaneProperty = "status" };
 
         var result = await Resolver(lookup).ResolveAsync(ContentTypeKey, configuration);
 
-        result.Lanes.Last().IsUnassigned.Should().BeTrue();
+        result.Lanes.First().IsUnassigned.Should().BeTrue();
         result.Lanes.Should().ContainSingle(x => x.IsUnassigned);
+    }
+
+    [Fact]
+    public async Task Resolve_AppliesTheConfiguredLaneOrderWithoutMovingTheUnassignedLane()
+    {
+        var lookup = new FakePropertyDataTypeLookup()
+            .Add("status", "Umbraco.DropDown.Flexible", new Dictionary<string, object> { ["items"] = new[] { "Open", "Done" } });
+        var configuration = new KanbanBoardConfiguration
+        {
+            LaneProperty = "status",
+            LaneOrder = ["Done", "Open"],
+        };
+
+        var result = await Resolver(lookup).ResolveAsync(ContentTypeKey, configuration);
+
+        result.Lanes.Select(lane => lane.Value).Should().Equal(string.Empty, "Done", "Open");
+        result.Lanes.First().IsUnassigned.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Resolve_KeepsEachLanesColourWhenTheOrderChanges()
+    {
+        // Colours are assigned in source order, before the display order is applied, so dragging a
+        // lane moves a column without recolouring it or anything after it.
+        var lookup = new FakePropertyDataTypeLookup()
+            .Add("status", "Umbraco.DropDown.Flexible", new Dictionary<string, object> { ["items"] = new[] { "Open", "Done" } });
+
+        var natural = await Resolver(lookup).ResolveAsync(
+            ContentTypeKey,
+            new KanbanBoardConfiguration { LaneProperty = "status" });
+
+        var reordered = await Resolver(lookup).ResolveAsync(
+            ContentTypeKey,
+            new KanbanBoardConfiguration { LaneProperty = "status", LaneOrder = ["Done", "Open"] });
+
+        var naturalColours = natural.Lanes.ToDictionary(lane => lane.Value, lane => lane.Colour);
+
+        reordered.Lanes.Should().OnlyContain(lane => lane.Colour == naturalColours[lane.Value]);
     }
 
     [Fact]
@@ -82,8 +121,11 @@ public class KanbanLaneResolverTests
 
         var result = await Resolver(lookup).ResolveAsync(ContentTypeKey, configuration);
 
-        result.Lanes[0].Colour.Should().Be("yellow");
-        result.Lanes[1].Colour.Should().Be("pink");
+        // The leading unassigned lane is neutral and does not consume a palette position, so the
+        // first real lane still gets the first palette colour.
+        result.Lanes[0].Colour.Should().Be("grey");
+        result.Lanes[1].Colour.Should().Be("yellow");
+        result.Lanes[2].Colour.Should().Be("pink");
     }
 
     /// <summary>
@@ -108,9 +150,9 @@ public class KanbanLaneResolverTests
 
         var result = await Resolver(lookup).ResolveAsync(ContentTypeKey, configuration);
 
-        result.Lanes[0].Colour.Should().Be("red");
-        result.Lanes[0].Name.Should().Be("Blocked");
-        result.Lanes[1].Colour.Should().Be("pink");
+        result.Lanes[1].Colour.Should().Be("red");
+        result.Lanes[1].Name.Should().Be("Blocked");
+        result.Lanes[2].Colour.Should().Be("pink");
     }
 
     [Fact]

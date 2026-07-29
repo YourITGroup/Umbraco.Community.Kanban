@@ -6,6 +6,9 @@ export interface KanbanLanePreviewInput {
   manualLanes?: unknown[];
   laneSource?: string;
 
+  /** Sent so the editor previews lanes in the order the board will render them. */
+  laneOrder?: readonly string[];
+
   /**
    * Accepted and deliberately ignored, so a caller holding a whole board configuration can pass it
    * straight in. Overrides restyle lanes; they cannot change which lanes exist.
@@ -47,6 +50,7 @@ export function buildLanePreviewRequest(input: KanbanLanePreviewInput): KanbanLa
   if (useManualLanes) configuration.useManualLanes = true;
   if (input.manualLanes?.length) configuration.manualLanes = input.manualLanes;
   if (input.laneSource) configuration.laneSource = input.laneSource;
+  if (input.laneOrder?.length) configuration.laneOrder = input.laneOrder;
 
   return { configuration };
 }

@@ -4,7 +4,8 @@ import { UmbChangeEvent } from '@umbraco-cms/backoffice/event';
 import { umbOpenModal } from '@umbraco-cms/backoffice/modal';
 import { UMB_ICON_PICKER_MODAL } from '@umbraco-cms/backoffice/icon';
 import { UMB_DATA_TYPE_WORKSPACE_CONTEXT } from '@umbraco-cms/backoffice/data-type';
-import { KANBAN_LANE_CONTENT_TYPE_KEY } from '@/constants.js';
+import { UmbSorterController } from '@umbraco-cms/backoffice/sorter';
+import { KANBAN_LANE_CONTENT_TYPE_KEY, KANBAN_LANE_ORDER_KEY } from '@/constants.js';
 import '@/core/lane-colour/lane-colour.element.js';
 import type { UmbCommunityKanbanLaneColourElement } from '@/core/lane-colour/lane-colour.element.js';
 import {
@@ -12,6 +13,7 @@ import {
   type KanbanLanePreviewInput,
 } from '@/data/kanban-lane-preview-data-source.js';
 import { previewLanes } from '@/data/kanban-lane-preview-server-data-source.js';
+import { orderLaneRows, toLaneOrder } from './lane-order.model.js';
 import {
   mergeOverridesWithLanes,
   type KanbanLaneOverrideRow,
@@ -36,7 +38,7 @@ export class UmbCommunityKanbanLaneOverridesElement extends UmbLitElement {
   @property({ type: Array })
   set value(value: KanbanLaneOverrideValue[]) {
     this._value = value;
-    this._rows = mergeOverridesWithLanes(this._lanes, value ?? []);
+    this.#recomputeRows();
   }
   get value(): KanbanLaneOverrideValue[] {
     return this._value;
@@ -53,6 +55,23 @@ export class UmbCommunityKanbanLaneOverridesElement extends UmbLitElement {
   #workspace?: typeof UMB_DATA_TYPE_WORKSPACE_CONTEXT.TYPE;
   #observed: KanbanLanePreviewInput = {};
   #debounce?: ReturnType<typeof setTimeout>;
+
+  /**
+   * Umbraco's own drag helper, the one its List View column configuration uses, so lanes reorder the
+   * way everything else in the backoffice does. The element implements no dragging itself.
+   *
+   * The unique comes from a data attribute rather than `id`, which is what core's column editor uses:
+   * a lane value is editor-authored and may contain spaces, which an id may not.
+   */
+  #sorter = new UmbSorterController<KanbanLaneOverrideRow, HTMLElement>(this, {
+    getUniqueOfElement: (element) => element.dataset.laneValue,
+    getUniqueOfModel: (row) => row.value,
+    identifier: 'Umb.Community.Kanban.LaneOrder',
+    itemSelector: '.row',
+    containerSelector: '#lane-wrapper',
+    handleSelector: '.drag-handle',
+    onChange: ({ model }) => this.#onSorted(model),
+  });
 
   /**
    * Only the newest request may apply its result. Five observed values means one edit can produce a
@@ -78,6 +97,13 @@ export class UmbCommunityKanbanLaneOverridesElement extends UmbLitElement {
       await this.#observeValue<boolean>('useManualLanes', (value) => (this.#observed.useManualLanes = value));
       await this.#observeValue<unknown[]>('manualLanes', (value) => (this.#observed.manualLanes = value));
       await this.#observeValue<string>('laneSource', (value) => (this.#observed.laneSource = value));
+
+      // Also recomputes the rows directly: unlike the values above, the order changes what the editor
+      // shows without changing which lanes exist, so it must not wait for a round trip to take effect.
+      await this.#observeValue<string[]>('laneOrder', (value) => {
+        this.#observed.laneOrder = value;
+        this.#recomputeRows();
+      });
     });
   }
 
@@ -141,12 +167,26 @@ export class UmbCommunityKanbanLaneOverridesElement extends UmbLitElement {
   @property({ type: Array, attribute: false })
   set lanes(lanes: KanbanResolvedLane[]) {
     this._lanes = lanes;
-    this._rows = mergeOverridesWithLanes(lanes, this.value ?? []);
+    this.#recomputeRows();
   }
   get lanes(): KanbanResolvedLane[] {
     return this._lanes;
   }
   private _lanes: KanbanResolvedLane[] = [];
+
+  /**
+   * The one place rows are built, because three inputs feed them — the resolved lanes, the stored
+   * overrides and the stored order — and any of the three can arrive last.
+   */
+  #recomputeRows() {
+    this._rows = orderLaneRows(
+      mergeOverridesWithLanes(this._lanes, this._value ?? []),
+      this.#observed.laneOrder,
+    );
+
+    // The sorter reorders the array it was given, so it needs the current one on every rebuild.
+    this.#sorter.setModel(this._rows);
+  }
 
   /**
    * Writes one field of one lane's override, dropping the override entirely once
@@ -164,7 +204,6 @@ export class UmbCommunityKanbanLaneOverridesElement extends UmbLitElement {
     const next = isEmpty ? rest : [...rest, updated];
 
     this.value = next;
-    this._rows = mergeOverridesWithLanes(this._lanes, next);
     this.dispatchEvent(new UmbChangeEvent());
   }
 
@@ -184,15 +223,33 @@ export class UmbCommunityKanbanLaneOverridesElement extends UmbLitElement {
     this.#onFieldChange(row, 'icon', (result.icon as string) ?? '');
   }
 
+  /**
+   * Stores the dragged order. The sorter hands back the whole reordered model, so there is no index
+   * arithmetic here — which is why `moveItem` is no longer used for lanes.
+   */
+  async #onSorted(rows: KanbanLaneOverrideRow[]) {
+    this._rows = rows;
+
+    // Awaited before the change event for the same reason the lane property picker awaits its sibling
+    // write: laneOrder and laneOverrides land in the same configuration value list, and overlapping
+    // them lets one read the list as it was before the other.
+    this.#observed.laneOrder = toLaneOrder(rows);
+    await this.#workspace?.setPropertyValue(KANBAN_LANE_ORDER_KEY, this.#observed.laneOrder);
+
+    this.dispatchEvent(new UmbChangeEvent());
+  }
+
   override render() {
     // _rows is checked first so an orphaned override still renders its row when the configuration
     // currently resolves nothing — that row is the only way to remove it.
     if (this._rows.length > 0) {
-      return html`${repeat(
-        this._rows,
-        (row) => row.value,
-        (row) => this.#renderRow(row),
-      )}`;
+      return html`<div id="lane-wrapper">
+        ${repeat(
+          this._rows,
+          (row) => row.value,
+          (row) => this.#renderRow(row),
+        )}
+      </div>`;
     }
 
     return html`<uui-box><p>${this.#emptyMessage()}</p></uui-box>`;
@@ -212,7 +269,8 @@ export class UmbCommunityKanbanLaneOverridesElement extends UmbLitElement {
 
   #renderRow(row: KanbanLaneOverrideRow) {
     return html`
-      <div class="row" ?data-orphaned=${row.orphaned}>
+      <div class="row" data-lane-value=${row.value} ?data-orphaned=${row.orphaned}>
+        <uui-icon class="drag-handle" name="icon-grip" title="Drag to reorder"></uui-icon>
         <span class="name">
           ${row.name}
           ${row.orphaned
@@ -255,6 +313,10 @@ export class UmbCommunityKanbanLaneOverridesElement extends UmbLitElement {
         gap: var(--uui-size-space-4);
         padding: var(--uui-size-space-2) 0;
         border-bottom: 1px solid var(--uui-color-divider);
+      }
+      .drag-handle {
+        cursor: grab;
+        color: var(--uui-color-text-alt);
       }
       .row[data-orphaned] .name {
         color: var(--uui-color-warning-emphasis);

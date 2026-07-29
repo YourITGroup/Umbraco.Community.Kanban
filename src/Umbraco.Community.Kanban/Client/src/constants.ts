@@ -29,6 +29,13 @@ export const KANBAN_BOARD_CONFIG_ID_KEY = 'kanban.boardConfigId';
  */
 export const KANBAN_LANE_CONTENT_TYPE_KEY = 'laneContentTypeKey';
 
+/**
+ * The Board configuration key holding lane values in display order. Written by dragging lanes in the
+ * lane appearance editor rather than shown as a setting of its own, so like the key above it is not
+ * declared in the settings list. Must match the server's ConfigurationField key.
+ */
+export const KANBAN_LANE_ORDER_KEY = 'laneOrder';
+
 /** The Collection property editor UI our Data Type workspace tab attaches itself to. */
 export const KANBAN_COLLECTION_PROPERTY_EDITOR_UI_ALIAS = 'Umb.PropertyEditorUi.Collection';
 

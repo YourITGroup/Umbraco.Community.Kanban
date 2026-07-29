@@ -66,6 +66,18 @@ describe('buildLanePreviewRequest', () => {
     });
   });
 
+  it('carries the lane order, so the editor previews the order the board will render', () => {
+    const request = buildLanePreviewRequest({ laneProperty: 'status', laneOrder: ['confirmed', 'pending'] });
+
+    expect(request?.configuration.laneOrder).toEqual(['confirmed', 'pending']);
+  });
+
+  it('omits an empty lane order rather than sending one, which means source order', () => {
+    const request = buildLanePreviewRequest({ laneProperty: 'status', laneOrder: [] });
+
+    expect('laneOrder' in request!.configuration).toBe(false);
+  });
+
   it('does not send the overrides being edited, which cannot change which lanes exist', () => {
     const request = buildLanePreviewRequest({
       laneProperty: 'status',

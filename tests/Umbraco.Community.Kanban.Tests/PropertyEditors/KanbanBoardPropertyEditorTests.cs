@@ -23,6 +23,7 @@ public class KanbanBoardPropertyEditorTests
             "laneSource",
             "useManualLanes",
             "manualLanes",
+            "laneOrder",
             "laneOverrides",
             "cardProperties",
             "lanePageSize",

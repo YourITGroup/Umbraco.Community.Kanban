@@ -49,8 +49,8 @@ public class ContentmentLaneResolutionTests
         result.Lanes.Where(lane => lane.IsUnassigned == false).Select(lane => lane.Value)
             .Should().Equal("pending", "confirmed");
 
-        // The resolver always appends the unassigned lane last.
-        result.Lanes.Last().IsUnassigned.Should().BeTrue();
+        // The resolver always puts the unassigned lane first.
+        result.Lanes.First().IsUnassigned.Should().BeTrue();
     }
 
     [Fact]

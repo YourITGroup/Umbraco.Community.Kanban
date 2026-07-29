@@ -75,6 +75,40 @@ public class KanbanConfigurationRoundTripTests
     }
 
     [Fact]
+    public void BoardEditor_DeserializesTheLaneOrderTheSortableListWrites()
+    {
+        var editor = new KanbanBoardConfigurationEditor(new FakeIOHelper());
+
+        IDictionary<string, object> clientConfiguration = new Dictionary<string, object>
+        {
+            ["laneOrder"] = new[] { "confirmed", "pending" },
+        };
+
+        var configurationObject = editor.ToConfigurationObject(clientConfiguration, Serializer);
+
+        var configuration = configurationObject.Should().BeOfType<KanbanBoardConfiguration>().Subject;
+        configuration.LaneOrder.Should().Equal("confirmed", "pending");
+    }
+
+    [Fact]
+    public void BoardEditor_ReadsAnAbsentLaneOrderAsEmpty()
+    {
+        // Every board configured before laneOrder existed. It must read as "source order", not fail
+        // the whole configuration object.
+        var editor = new KanbanBoardConfigurationEditor(new FakeIOHelper());
+
+        IDictionary<string, object> clientConfiguration = new Dictionary<string, object>
+        {
+            ["laneProperty"] = "status",
+        };
+
+        var configurationObject = editor.ToConfigurationObject(clientConfiguration, Serializer);
+
+        var configuration = configurationObject.Should().BeOfType<KanbanBoardConfiguration>().Subject;
+        configuration.LaneOrder.Should().BeEmpty();
+    }
+
+    [Fact]
     public void BoardEditor_TreatsAnEmptiedLaneContentTypePickerAsUnset()
     {
         // What the lane property picker stores when its selection is cleared. Without the

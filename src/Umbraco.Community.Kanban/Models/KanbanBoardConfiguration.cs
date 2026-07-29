@@ -57,6 +57,18 @@ public class KanbanBoardConfiguration
     [ConfigurationField("manualLanes")]
     public KanbanManualLane[] ManualLanes { get; set; } = [];
 
+    /// <summary>
+    /// Lane values in display order. Not exposed in the configuration UI as a setting of its own: it
+    /// is written by dragging lanes in the lane appearance editor, not typed.
+    /// </summary>
+    /// <remarks>
+    /// A lane whose value is absent keeps its source order and sorts after every listed lane, so a
+    /// dropdown option added after the board was configured appears rather than being dropped. A
+    /// listed value matching no lane is ignored.
+    /// </remarks>
+    [ConfigurationField("laneOrder")]
+    public string[] LaneOrder { get; set; } = [];
+
     [ConfigurationField("laneOverrides")]
     public KanbanLaneOverride[] LaneOverrides { get; set; } = [];
 
