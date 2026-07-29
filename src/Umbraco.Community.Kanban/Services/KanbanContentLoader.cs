@@ -12,6 +12,8 @@ public sealed class KanbanContentLoader(
 {
     public IContent? GetById(Guid key) => contentService.GetById(key);
 
+    public IContent? GetById(int id) => contentService.GetById(id);
+
     public KanbanChildPage GetChildren(int parentId, int cap)
     {
         // A null ordering falls back to sortOrder ascending, which is what the table layout

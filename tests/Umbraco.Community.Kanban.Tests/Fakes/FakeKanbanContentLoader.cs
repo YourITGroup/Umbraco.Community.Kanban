@@ -8,6 +8,9 @@ internal sealed class FakeKanbanContentLoader : IKanbanContentLoader
 {
     public Dictionary<Guid, IContent> Content { get; } = [];
 
+    /// <summary>Documents addressable by integer id — a card's parent, which IContent.ParentId names.</summary>
+    public Dictionary<int, IContent> ContentById { get; } = [];
+
     public List<IContent> Children { get; } = [];
 
     /// <summary>Overrides the reported total, to simulate more children than were read.</summary>
@@ -25,6 +28,8 @@ internal sealed class FakeKanbanContentLoader : IKanbanContentLoader
     public List<(int ParentId, int Level, int Cap, Ordering Ordering)> GrandchildRequests { get; } = [];
 
     public IContent? GetById(Guid key) => Content.TryGetValue(key, out IContent? content) ? content : null;
+
+    public IContent? GetById(int id) => ContentById.TryGetValue(id, out IContent? content) ? content : null;
 
     public KanbanChildPage GetChildren(int parentId, int cap)
     {
