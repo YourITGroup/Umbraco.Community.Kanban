@@ -35,6 +35,17 @@ public sealed class KanbanCardPropertyModel
     public object? Value { get; init; }
 }
 
+/// <summary>One child of a card — enough to list it and open it, and nothing more.</summary>
+public sealed class KanbanCardChildModel
+{
+    public required Guid Key { get; init; }
+
+    public required string Name { get; init; }
+
+    /// <summary>The content type icon verbatim, colour suffix and all, as a card's own icon is.</summary>
+    public string? Icon { get; init; }
+}
+
 /// <summary>One card on a board — a child document.</summary>
 public sealed class KanbanCardModel
 {
@@ -58,6 +69,38 @@ public sealed class KanbanCardModel
     /// but nothing reads it until drag arrives in milestone 3.
     /// </summary>
     public bool CanUpdate { get; init; }
+
+    /// <summary>
+    /// Whether the current user may create under this card. Gates the card's add button, so the
+    /// button never appears for a user the workspace would then refuse.
+    /// </summary>
+    public bool CanCreate { get; init; }
+
+    /// <summary>
+    /// The card's content type key. Carried alongside the alias because resolving which types may be
+    /// created under this card needs the key: the client asks Umbraco's own document type structure
+    /// repository, which is keyed by GUID.
+    /// </summary>
+    public required Guid ContentTypeKey { get; init; }
+
+    /// <summary>
+    /// The first few children of this card, in the board's configured child order. Empty unless the
+    /// board's <c>showChildItems</c> setting is on.
+    /// </summary>
+    public IReadOnlyList<KanbanCardChildModel> Children { get; init; } = [];
+
+    /// <summary>
+    /// How many children of this card the board read and the user may browse. Unlike
+    /// <see cref="KanbanBoardResponseModel.ChildCount" /> this IS permission-filtered and is meant to
+    /// be displayed.
+    /// </summary>
+    public int ChildTotal { get; init; }
+
+    /// <summary>
+    /// False when the board hit its grandchild cap, making <see cref="ChildTotal" /> a lower bound —
+    /// the same distinction <see cref="KanbanBoardLaneModel.TotalIsExact" /> draws for a lane.
+    /// </summary>
+    public bool ChildTotalIsExact { get; init; } = true;
 
     public IReadOnlyList<KanbanCardPropertyModel> Properties { get; init; } = [];
 }
@@ -105,4 +148,11 @@ public sealed class KanbanBoardResponseModel
     /// display it, or it would disclose siblings a restricted user cannot see.
     /// </summary>
     public int ChildCount { get; init; }
+
+    /// <summary>
+    /// Whether this board lists each card's children. Board-wide state rather than per-card data, and
+    /// stated explicitly because a card with no children is otherwise indistinguishable from a board
+    /// that does not show them.
+    /// </summary>
+    public bool ShowChildItems { get; init; }
 }

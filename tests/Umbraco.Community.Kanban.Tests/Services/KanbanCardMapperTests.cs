@@ -285,6 +285,47 @@ public class KanbanCardMapperTests
     }
 
     [Fact]
+    public void Maps_the_content_type_key_so_the_client_can_resolve_allowed_child_types()
+    {
+        ContentType contentType = ContentTypeWith(ContentVariation.Nothing);
+        var content = new Content("A", -1, contentType);
+
+        KanbanCardMapper.Map(content, [], null, false, FakePropertyValueReader.Stored()).ContentTypeKey
+            .Should().Be(contentType.Key);
+    }
+
+    [Fact]
+    public void Reports_no_create_permission_and_no_children_by_default()
+    {
+        var content = new Content("A", -1, ContentTypeWith(ContentVariation.Nothing));
+
+        KanbanCardModel card = KanbanCardMapper.Map(content, [], null, false, FakePropertyValueReader.Stored());
+
+        card.CanCreate.Should().BeFalse();
+        card.Children.Should().BeEmpty();
+        card.ChildTotal.Should().Be(0);
+        card.ChildTotalIsExact.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Carries_create_permission_and_children_when_given_them()
+    {
+        var content = new Content("A", -1, ContentTypeWith(ContentVariation.Nothing));
+        var children = new KanbanCardChildren(
+            [new KanbanCardChildModel { Key = Guid.NewGuid(), Name = "Line 1", Icon = "icon-receipt" }],
+            Total: 4,
+            TotalIsExact: false);
+
+        KanbanCardModel card = KanbanCardMapper.Map(
+            content, [], null, false, FakePropertyValueReader.Stored(), canCreate: true, children: children);
+
+        card.CanCreate.Should().BeTrue();
+        card.Children.Single().Name.Should().Be("Line 1");
+        card.ChildTotal.Should().Be(4);
+        card.ChildTotalIsExact.Should().BeFalse();
+    }
+
+    [Fact]
     public void Skips_a_system_flagged_alias_that_names_no_system_field()
     {
         // A hand-edited configuration, or one whose alias was renamed. A missing summary item beats a

@@ -16,6 +16,7 @@ public class KanbanBoardComposerTests
         Key = Guid.NewGuid(),
         Name = name,
         ContentTypeAlias = "task",
+        ContentTypeKey = Guid.NewGuid(),
         State = KanbanCardStates.Draft,
     };
 

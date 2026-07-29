@@ -15,27 +15,43 @@ public static class KanbanCardMapper
         IReadOnlyList<KanbanCardProperty> cardProperties,
         string? culture,
         bool canUpdate,
-        IKanbanPropertyValueReader valueReader)
+        IKanbanPropertyValueReader valueReader,
+        bool canCreate = false,
+        KanbanCardChildren? children = null)
     {
         var variesByCulture = content.ContentType.Variations.HasFlag(ContentVariation.Culture);
         var effectiveCulture = variesByCulture ? culture : null;
+        KanbanCardChildren childItems = children ?? KanbanCardChildren.None;
 
         return new KanbanCardModel
         {
             Key = content.Key,
-            Name = ResolveName(content, effectiveCulture),
+            Name = ResolveName(content, culture),
             ContentTypeAlias = content.ContentType.Alias,
+            ContentTypeKey = content.ContentType.Key,
             Icon = content.ContentType.Icon,
             State = ResolveState(content, effectiveCulture),
             CanUpdate = canUpdate,
+            CanCreate = canCreate,
+            Children = childItems.Children,
+            ChildTotal = childItems.Total,
+            ChildTotalIsExact = childItems.TotalIsExact,
             Properties = MapProperties(content, cardProperties, effectiveCulture, valueReader),
         };
     }
 
-    private static string ResolveName(IContent content, string? culture) =>
-        culture is null
+    /// <summary>
+    /// The document's name for a culture, or its invariant name where the document does not vary.
+    /// Public because a card's children resolve their names by exactly the same rule.
+    /// </summary>
+    public static string ResolveName(IContent content, string? culture)
+    {
+        var effective = content.ContentType.Variations.HasFlag(ContentVariation.Culture) ? culture : null;
+
+        return effective is null
             ? content.Name ?? string.Empty
-            : content.GetCultureName(culture) ?? content.Name ?? string.Empty;
+            : content.GetCultureName(effective) ?? content.Name ?? string.Empty;
+    }
 
     private static string ResolveState(IContent content, string? culture) =>
         culture is null
