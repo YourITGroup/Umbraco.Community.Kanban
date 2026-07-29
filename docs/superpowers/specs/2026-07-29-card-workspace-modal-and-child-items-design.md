@@ -21,7 +21,7 @@ this.#documentModal = new UmbModalRouteRegistrationController(this, UMB_WORKSPAC
   .addAdditionalPath('kanban-document')
   .onSetup(() => ({ data: { entityType: UMB_DOCUMENT_ENTITY_TYPE, preset: {} } }))
   .onSubmit(() => this.#board?.load())
-  .observeRouteBuilder(() => { this._modalReady = true; });
+  .observeRouteBuilder(() => { this.#modalReady = true; });
 ```
 
 This mirrors `workspace-views/data-type-kanban.element.ts` exactly, which already runs this pattern for
@@ -40,9 +40,11 @@ the generic `Umb.Modal.Workspace` token — v18 ships no document-specific one �
 segment is what keeps our route distinct from any other workspace modal in the same routing scope,
 for the same reason the data type view adds `kanban-board`.
 
-`_modalReady` gates every control that opens the modal, because `open()` silently does nothing until
-the router hands over a builder. A card whose title is not yet clickable renders as plain text rather
-than a dead button.
+`open()` silently does nothing until the router hands over a builder, so the host tracks readiness from
+`observeRouteBuilder` and ignores an event that arrives before then. The readiness flag stays *in the
+host*: gating the controls themselves would mean threading a boolean through board → lane → card →
+child list to buy nothing, since the registration completes long before the board's first HTTP
+response renders a card. Cards stay ignorant of modals.
 
 ### Refresh on close
 
@@ -80,7 +82,7 @@ without hand-rolling key handling, and the `@click` `stopPropagation` currently 
 `cursor: pointer` moves from `.card` to the button. The card keeps its hover border: it is still the
 thing you are pointing at.
 
-When the modal is not ready the title renders as a `<span>`, unchanged in appearance.
+The title is always a button; the host decides whether the click does anything.
 
 ## Item 4: `icon-columns`
 
@@ -123,7 +125,7 @@ the query and is not worth a second query shape.
 board service exactly as it is today:
 
 ```csharp
-KanbanGrandchildPage GetGrandchildren(int parentId, int level, int cap, KanbanChildOrdering ordering);
+KanbanGrandchildPage GetGrandchildren(int parentId, int level, int cap, Ordering ordering);
 ```
 
 `KanbanGrandchildPage(IReadOnlyList<IContent> Grandchildren, bool Capped)` — `Capped` is
@@ -246,7 +248,7 @@ The overflow line renders from a pure function so it can be tested without an el
 
 ## Item 5: creating a child
 
-An **Add** button at the foot of the child section, rendered when `canCreate` and the modal is ready.
+An **Add** button at the foot of the child section, rendered when the card reports `canCreate`.
 It replicates the create action's own behaviour rather than inventing a shorter one, because an editor
 who has learnt "create asks which type, then which blueprint" should not meet a different rule here:
 
