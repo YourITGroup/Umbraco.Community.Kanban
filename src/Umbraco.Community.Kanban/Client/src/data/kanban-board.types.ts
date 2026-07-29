@@ -7,6 +7,8 @@ export interface KanbanCardPropertyModel {
   name: string;
   /** The property editor *schema* alias, handed to umb-value-summary-extension. */
   editorAlias: string;
+  /** A UFM template to render instead of the value's own summary, when configured. */
+  nameTemplate?: string | null;
   value: unknown;
 }
 

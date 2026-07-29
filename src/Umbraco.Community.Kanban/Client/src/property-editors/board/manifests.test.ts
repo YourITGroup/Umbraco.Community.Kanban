@@ -68,4 +68,17 @@ describe('board property editor manifests', () => {
     expect(defaults.lanePageSize).toBe(25);
     expect(defaults.allowDrag).toBe(true);
   });
+
+  it('defaults card properties to the created and updated dates, in that order', () => {
+    // What a fresh List View shows. Without it a new board's cards carry nothing but a title.
+    const ui = manifests.find((m) => m.type === 'propertyEditorUi') as any;
+    const defaults = Object.fromEntries(
+      ui.meta.settings.defaultData.map((d: { alias: string; value: unknown }) => [d.alias, d.value]),
+    );
+
+    expect(defaults.cardProperties).toEqual([
+      { alias: 'createDate', header: 'Created', isSystem: 1 },
+      { alias: 'updateDate', header: 'Last edited', isSystem: 1 },
+    ]);
+  });
 });

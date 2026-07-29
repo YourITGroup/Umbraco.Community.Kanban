@@ -43,41 +43,22 @@ Two things to settle when it is built:
   collection's `items` observable already drives reloads, so a save may cover this for free — worth
   checking rather than assuming.
 
-## 2. Card properties: use the List View's own column control
+## 2 & 3. Card properties as List View columns — **done 2026-07-29**
 
-The card properties editor built on 2026-07-28 stores a bare list of aliases. Umbraco's Collection
-column configuration stores more per row, and shows it better: a drag handle, an editable **header**
-(so "bookingOwner" can display as "Owner"), the alias, a **label template** (UFM, e.g.
-`{umbMemberName: value}` or `${ value ? 'Yes' : 'No' }`), and a Remove.
+Both items are built, from
+[their design](superpowers/specs/2026-07-29-card-properties-columns-design.md): card properties now
+store alias, header, label template and a system flag, are edited with the List View's own column
+control, drag to reorder, render label templates through `umb-ufm-render`, and default a new board to
+the created and updated dates.
 
-Cards want all of that for the same reasons a list does. The board already renders summary values
-through `umb-value-summary-extension`, so a label template has somewhere to land.
+Two things recorded here turned out to be wrong and are corrected in the design:
 
-This is not a drop-in swap:
-
-- **The stored shape changes** from `string[]` to a list of objects (alias, header, template,
-  `isSystem`). `KanbanBoardConfiguration.CardProperties` and `KanbanCardMapper` both change, and
-  deserialisation has to stay lenient enough to read the old `string[]` — every board configured
-  before the change stores it.
-- **Core's element is not a public export.** `umb-property-editor-ui-collection-column-configuration`
-  and its inner input live under `dist-cms`. Either rebuild it from public parts, as
-  `pickContentTypeProperty` already does for the pick sequence, or accept the internal dependency
-  deliberately.
-- It supersedes the current editor rather than extending it.
-
-## 3. Default card properties to the created and updated dates
-
-A board with no card properties configured shows cards with nothing but a title. Created and updated
-dates are the sensible default, matching what a fresh List View shows.
-
-**Blocked on system property support.** `createDate` and `updateDate` are not content type
-properties: `IKanbanPropertyDataTypeLookup` finds no data type for them, the picker deliberately
-excludes them (offering a property that silently renders nothing is worse than not offering it), and
-`KanbanCardMapper` reads content properties only. So this needs system properties handled end to end —
-which is also what item 2's `isSystem` flag is for, and why these two belong together.
-
-Once they resolve, the default itself is one `defaultData` entry on the board's `propertyEditorUi`
-manifest, beside `lanePageSize` and `allowDrag`.
+- Item 2 said core's element "is not a public export ... under `dist-cms`". The *property editor* is
+  not, but every part it is built from is: `UmbSorterController`, `umb-ufm-render` and
+  `UmbCollectionColumnConfiguration` are all public.
+- Item 3 called itself "blocked on system property support". It was — that support is what this work
+  added, reading the five fields off `IContent` rather than through `IKanbanPropertyDataTypeLookup`,
+  which is deliberately not involved.
 
 ## 4. Default to `icon-columns`, not `icon-grid`
 

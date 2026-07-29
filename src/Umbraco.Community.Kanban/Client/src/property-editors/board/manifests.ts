@@ -92,6 +92,16 @@ export const manifests: Array<UmbExtensionManifest> = [
         defaultData: [
           { alias: 'lanePageSize', value: 25 },
           { alias: 'allowDrag', value: true },
+          {
+            // What a fresh List View shows, and without it a new board's cards carry nothing but a
+            // title. Defaults apply to newly created data types only, so no existing board gains
+            // them — and either row can be removed like any other.
+            alias: 'cardProperties',
+            value: [
+              { alias: 'createDate', header: 'Created', isSystem: 1 },
+              { alias: 'updateDate', header: 'Last edited', isSystem: 1 },
+            ],
+          },
         ],
       },
     },

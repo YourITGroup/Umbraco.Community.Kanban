@@ -1,7 +1,7 @@
 # Lane order: unassigned first, and a draggable order
 
 **Date:** 2026-07-29
-**Status:** Approved for planning
+**Status:** Implemented
 **Parent design:** [2026-07-28-umbraco-community-kanban-design.md](2026-07-28-umbraco-community-kanban-design.md)
 **Builds on:** [2026-07-29-lane-appearance-preview-and-colour-picker-design.md](2026-07-29-lane-appearance-preview-and-colour-picker-design.md)
 **Sibling:** [2026-07-29-card-properties-columns-design.md](2026-07-29-card-properties-columns-design.md) — built together, independent of this
@@ -26,7 +26,7 @@ change the underlying data type's options, which changes every other use of that
 - The unassigned lane renders **first**, always.
 - A new `laneOrder` configuration field, holding lane values in display order.
 - Reordering by dragging in the **Lane appearance** editor, for lanes from any source — a lane property
-  or manual lanes alike — using Umbraco's own sortable list.
+  or manual lanes alike — using Umbraco's own sorter.
 - Palette colours assigned by a lane's position in its **source** order, not its display order.
 
 **Out**
@@ -88,10 +88,16 @@ is stored under an undeclared configuration alias, the same way `laneContentType
 
 ### 3.4 Dragging in the Lane appearance editor
 
-The editor's rows become an `umb-sortable-list` from `@umbraco-cms/backoffice/sorter` — the same
-component Umbraco's own List View column configuration uses. It takes `items`, a `getUnique`, and a
-`renderMethod`, and fires a change carrying the reordered array, so the element does not implement
-dragging at all. Each row becomes an `umb-sortable-list-item`, which supplies the handle.
+The editor's rows are reordered by `UmbSorterController` from `@umbraco-cms/backoffice/sorter` — the
+same helper Umbraco's own List View column configuration uses, so the element implements no dragging
+itself. It takes `getUniqueOfElement`, `getUniqueOfModel`, an item and container selector, a
+`handleSelector`, and calls back with the whole reordered model.
+
+**Corrected during implementation:** this section originally specified `umb-sortable-list`, the
+declarative wrapper around that controller. It exists only in Umbraco `main`; the `18.0.2` this package
+builds against ships the controller alone. The unique comes from a `data-` attribute rather than `id`,
+which is what core's column editor uses, because a lane value is editor-authored and may contain spaces
+that an `id` may not.
 
 `moveItem`, this package's own index arithmetic, is no longer needed for lanes. It stays for manual
 lanes' ↑ ↓ buttons.

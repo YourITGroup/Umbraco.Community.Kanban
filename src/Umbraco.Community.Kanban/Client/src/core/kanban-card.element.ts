@@ -2,6 +2,7 @@ import { css, customElement, html, nothing, property, repeat } from '@umbraco-cm
 import type { PropertyValues } from '@umbraco-cms/backoffice/external/lit';
 import { UmbLitElement } from '@umbraco-cms/backoffice/lit-element';
 import { UmbEntityContext } from '@umbraco-cms/backoffice/entity';
+import '@umbraco-cms/backoffice/ufm';
 import { cardStateTag } from './card.model.js';
 import type { KanbanCardModel, KanbanCardPropertyModel } from '../data/kanban-board.types.js';
 
@@ -87,7 +88,15 @@ export class UmbCommunityKanbanCardElement extends UmbLitElement {
     return html`
       <div class="property">
         <span class="label">${item.name}</span>
-        <umb-value-summary-extension .valueType=${item.editorAlias} .value=${item.value}></umb-value-summary-extension>
+        ${item.nameTemplate
+          ? // The backoffice's own UFM renderer, and the same syntax a List View column template uses,
+            // so a template copied from one behaves identically here.
+            html`<umb-ufm-render inline .markdown=${item.nameTemplate} .value=${item.value}></umb-ufm-render>`
+          : // No template: the summary extension is what makes a picker or a dropdown render sensibly
+            // with no configuration at all, which is why both paths are kept.
+            html`<umb-value-summary-extension
+              .valueType=${item.editorAlias}
+              .value=${item.value}></umb-value-summary-extension>`}
       </div>
     `;
   }

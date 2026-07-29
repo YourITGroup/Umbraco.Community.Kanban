@@ -5,7 +5,13 @@ import {
   UmbDocumentTypeDetailRepository,
   type UmbDocumentTypeDetailModel,
 } from '@umbraco-cms/backoffice/document-type';
-import { toPropertyPickerItems, type KanbanPickedProperty } from './content-type-property.model.js';
+import {
+  isSystemProperty,
+  toPropertyPickerItems,
+  toSystemPropertyPickerItems,
+  type KanbanPickedProperty,
+  type KanbanPropertyPickerItem,
+} from './content-type-property.model.js';
 
 /**
  * Browses to a content type property: choose a document type, then choose one of its properties.
@@ -14,15 +20,27 @@ import { toPropertyPickerItems, type KanbanPickedProperty } from './content-type
  *
  * Shared by every Kanban setting that names a property, so they all behave identically. Resolves to
  * `undefined` whenever the editor backs out of either step.
+ *
+ * `includeSystemProperties` offers the document's own fields — created date, last edited and friends —
+ * alongside the content type's properties. Card properties want them; a lane property cannot use them,
+ * because lanes are resolved through the data type behind a property and a system field has none.
  */
-export async function pickContentTypeProperty(host: UmbControllerHost): Promise<KanbanPickedProperty | undefined> {
+export async function pickContentTypeProperty(
+  host: UmbControllerHost,
+  options?: { includeSystemProperties?: boolean },
+): Promise<KanbanPickedProperty | undefined> {
   const contentType = await pickContentType(host);
   if (!contentType) return undefined;
+
+  const contentTypeItems = toPropertyPickerItems(contentType.properties);
+  const items: KanbanPropertyPickerItem[] = options?.includeSystemProperties
+    ? [...toSystemPropertyPickerItems(), ...contentTypeItems]
+    : contentTypeItems;
 
   const picked = await umbOpenModal(host, UMB_ITEM_PICKER_MODAL, {
     data: {
       headline: `Select a property from ${contentType.name}`,
-      items: toPropertyPickerItems(contentType.properties),
+      items,
     },
   }).catch(() => undefined);
 
@@ -32,6 +50,10 @@ export async function pickContentTypeProperty(host: UmbControllerHost): Promise<
     alias: picked.value,
     contentTypeUnique: contentType.unique,
     contentTypeName: contentType.name,
+    label: items.find((item) => item.value === picked.value)?.label ?? picked.value,
+    // Only claimed when system properties were actually on offer, so a content type property that
+    // happens to be aliased "published" is never mistaken for the document flag.
+    isSystem: options?.includeSystemProperties === true && isSystemProperty(picked.value),
   };
 }
 

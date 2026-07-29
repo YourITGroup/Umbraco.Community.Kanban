@@ -1,7 +1,7 @@
 # Card properties as List View columns
 
 **Date:** 2026-07-29
-**Status:** Approved for planning
+**Status:** Implemented
 **Parent design:** [2026-07-28-umbraco-community-kanban-design.md](2026-07-28-umbraco-community-kanban-design.md)
 **Supersedes:** [ENHANCEMENTS.md](../../ENHANCEMENTS.md) items 2 and 3
 **Sibling:** [2026-07-29-lane-order-design.md](2026-07-29-lane-order-design.md) — built together, independent of this
@@ -39,7 +39,7 @@ row and shows it better, and cards want the same things for the same reasons:
 
 - **Sorting or filtering cards by these properties.** They are display only, as they are today.
 - **The calendar editor's `dateProperty`**, which is a different setting with a different job.
-- **Lane order**, which is the sibling design, though both use the same sortable list.
+- **Lane order**, which is the sibling design, though both use the same sorter.
 - **A card properties *preview*.** Unlike lanes, nothing needs resolving from the server to show the
   rows: the editor already knows every alias it holds.
 
@@ -86,9 +86,11 @@ They need three things the current pipeline has none of:
 - **Rendering them.** A card property carries an `EditorAlias` the client hands to
   `umb-value-summary-extension` to choose a renderer. A system field has no data type and so no real
   editor alias, so the mapper supplies the alias of the editor whose renderer suits the value:
-  `Umbraco.DateTime` for the two dates, `Umbraco.TrueFalse` for `published`, `Umbraco.Integer` for
-  `sortOrder`, `Umbraco.TextBox` for `creator`. These are presentation choices, not claims about a data
-  type, and the mapper says so where it makes them.
+  `Umbraco.DateTime` for the two dates, `Umbraco.TrueFalse` for `published`, and `Umbraco.Integer` for
+  `sortOrder` and `creator`. These are presentation choices, not claims about a data type, and the
+  mapper says so where it makes them. (`creator` was specified as `Umbraco.TextBox`; it is the
+  creator's **id**, so an integer renderer is correct. Resolving it to a user name would need the user
+  service and is not in this scope.)
 
 `IKanbanPropertyDataTypeLookup` is **not** involved. It exists to resolve *lane* properties, where a
 data type's configuration is what produces lanes; a card property only needs a value and something to
@@ -107,9 +109,13 @@ configuration, and a template is the escape hatch when it does not.
 
 ### 3.4 The editor
 
-Rebuilt to match the List View's column control: an `umb-sortable-list` of rows, each row a handle, a
-header `uui-input`, the alias as `<code>`, a label template `uui-input`, and a **Remove**; below them a
-full-width **Choose** that opens the existing pick sequence.
+Rebuilt to match the List View's column control: rows carrying a drag handle, a header `uui-input`, the
+alias as `<code>`, a label template `uui-input`, and a **Remove**; below them a full-width **Choose**
+that opens the existing pick sequence.
+
+Reordering uses `UmbSorterController`, as the sibling design's lane rows do. **Corrected during
+implementation:** this section originally said `umb-sortable-list`, which exists only in Umbraco `main`
+and not in the `18.0.2` this package builds against.
 
 The pick sequence itself is unchanged — `pickContentTypeProperty`, built from public parts because
 Umbraco's `umb-input-collection-content-type-property` is not exported. It gains the system group.
