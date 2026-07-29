@@ -4,6 +4,7 @@ import { UmbLitElement } from '@umbraco-cms/backoffice/lit-element';
 import { UmbEntityContext } from '@umbraco-cms/backoffice/entity';
 import '@umbraco-cms/backoffice/ufm';
 import { cardStateTag } from './card.model.js';
+import './kanban-card-children.element.js';
 import type { KanbanCardModel, KanbanCardPropertyModel } from '../data/kanban-board.types.js';
 
 /**
@@ -18,6 +19,13 @@ import type { KanbanCardModel, KanbanCardPropertyModel } from '../data/kanban-bo
 export class UmbCommunityKanbanCardElement extends UmbLitElement {
   @property({ attribute: false })
   card?: KanbanCardModel;
+
+  /**
+   * Whether this board lists a card's children. Board-wide state forwarded down, the way `readonly`
+   * is — it is a property of the board's configuration, not of this card.
+   */
+  @property({ type: Boolean, attribute: 'show-child-items' })
+  showChildItems = false;
 
   /**
    * The card owns the entity identity for its own subtree. `<umb-entity-actions-bundle>` reads
@@ -75,11 +83,21 @@ export class UmbCommunityKanbanCardElement extends UmbLitElement {
               )}
             </div>`
           : nothing}
+        ${this.#renderChildren()}
         <div class="footer">
           <uui-tag color=${tag.color} look="secondary">${this.localize.term(tag.term)}</uui-tag>
         </div>
       </div>
     `;
+  }
+
+  #renderChildren() {
+    if (!this.showChildItems || !this.card) return nothing;
+
+    // Nothing to list and nothing to add: no section at all, rather than an empty rule across the card.
+    if (this.card.children.length === 0 && this.card.canCreate === false) return nothing;
+
+    return html`<umb-community-kanban-card-children .card=${this.card}></umb-community-kanban-card-children>`;
   }
 
   #renderProperty(item: KanbanCardPropertyModel) {

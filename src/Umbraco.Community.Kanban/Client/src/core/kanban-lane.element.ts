@@ -15,6 +15,9 @@ export class UmbCommunityKanbanLaneElement extends UmbLitElement {
   @property({ type: Boolean })
   readonly = true;
 
+  @property({ type: Boolean, attribute: 'show-child-items' })
+  showChildItems = false;
+
   #onLoadMore() {
     if (!this.lane) return;
 
@@ -43,7 +46,9 @@ export class UmbCommunityKanbanLaneElement extends UmbLitElement {
           ${repeat(
             this.lane.cards,
             (card) => card.key,
-            (card) => html`<umb-community-kanban-card .card=${card}></umb-community-kanban-card>`,
+            (card) => html`<umb-community-kanban-card
+              .card=${card}
+              ?show-child-items=${this.showChildItems}></umb-community-kanban-card>`,
           )}
           ${this.lane.cards.length === 0 ? html`<span class="empty">No cards</span>` : nothing}
         </div>
