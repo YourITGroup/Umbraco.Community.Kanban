@@ -201,10 +201,14 @@ colours* section) and exposes it as the `--kanban-lane-colour` custom property, 
 `.header` div only. This milestone moves that variable one level up, onto `.lane` itself, so both the
 header and the new highlight can read the same value without threading it through twice:
 
-- **Drop target, accepts:** background uses `color-mix(in srgb, var(--kanban-lane-colour, var(--uui-color-border)) 15%, transparent)`
-  and the border switches to a solid 2px `var(--kanban-lane-colour, var(--uui-color-border))` — a
-  tinted version of the lane's own colour, so a red "Blocked" lane highlights red and a green "Done"
-  lane highlights green, rather than every lane flashing the same generic positive colour.
+- **Drop target, accepts:** both the background and the border are `color-mix` shades of the same
+  `var(--kanban-lane-colour, var(--uui-color-border))`, at two different strengths so the border reads
+  as the stronger, more saturated edge of the same colour the background is faintly tinted with:
+  - background: `color-mix(in srgb, var(--kanban-lane-colour, var(--uui-color-border)) 20%, transparent)`
+  - border: solid 2px `color-mix(in srgb, var(--kanban-lane-colour, var(--uui-color-border)) 80%, transparent)`
+
+  A red "Blocked" lane highlights red and a green "Done" lane highlights green, rather than every lane
+  flashing the same generic positive colour.
 - **Drop target, rejects:** no tint; a muted dashed border in `--uui-color-border`, independent of the
   lane's own colour — rejection reads as neutral/disabled, not as a variant of the lane's identity.
 - **Not the drop target:** unchanged from today, regardless of drag state.
