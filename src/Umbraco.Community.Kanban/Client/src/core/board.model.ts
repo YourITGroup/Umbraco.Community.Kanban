@@ -5,10 +5,16 @@ export interface KanbanBoardState {
   lanes: KanbanBoardLaneModel[];
   truncated: boolean;
   childCount: number;
+  showChildItems: boolean;
 }
 
 export function toBoardState(board: KanbanBoardModel): KanbanBoardState {
-  return { lanes: [...board.lanes], truncated: board.truncated, childCount: board.childCount };
+  return {
+    lanes: [...board.lanes],
+    truncated: board.truncated,
+    childCount: board.childCount,
+    showChildItems: board.showChildItems,
+  };
 }
 
 /**
@@ -40,7 +46,12 @@ export function mergeLanePage(state: KanbanBoardState, page: KanbanBoardModel): 
     };
   });
 
-  return { lanes, truncated: page.truncated, childCount: page.childCount };
+  return {
+    lanes,
+    truncated: page.truncated,
+    childCount: page.childCount,
+    showChildItems: page.showChildItems,
+  };
 }
 
 /** True while the lane may hold cards that are not loaded. */

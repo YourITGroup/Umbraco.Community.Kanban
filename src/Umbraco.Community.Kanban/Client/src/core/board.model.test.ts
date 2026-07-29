@@ -12,8 +12,13 @@ const card = (key: string): KanbanCardModel => ({
   key,
   name: key,
   contentTypeAlias: 'task',
+  contentTypeKey: '00000000-0000-0000-0000-000000000001',
   state: 'draft',
   canUpdate: false,
+  canCreate: false,
+  children: [],
+  childTotal: 0,
+  childTotalIsExact: true,
   properties: [],
 });
 
@@ -33,6 +38,7 @@ const board = (lanes: KanbanBoardLaneModel[], overrides: Partial<KanbanBoardMode
   lanes,
   truncated: false,
   childCount: lanes.reduce((sum, l) => sum + l.total, 0),
+  showChildItems: false,
   ...overrides,
 });
 
@@ -43,6 +49,10 @@ describe('toBoardState', () => {
     expect(state.lanes.map((l) => l.value)).toEqual(['todo']);
     expect(state.truncated).toBe(true);
     expect(state.childCount).toBe(4000);
+  });
+
+  it('carries the child items flag across', () => {
+    expect(toBoardState(board([], { showChildItems: true })).showChildItems).toBe(true);
   });
 });
 
@@ -60,6 +70,15 @@ describe('mergeLanePage', () => {
     const next = mergeLanePage(initial(), board([lane('todo', ['b'], { total: 3, skip: 1 })]));
 
     expect(next.lanes[1].cards.map((c) => c.key)).toEqual(['x']);
+  });
+
+  it('keeps the child items flag when a lane page is merged in', () => {
+    // Easy to lose: mergeLanePage rebuilds the board state object from the incoming page.
+    const state = toBoardState(board([lane('todo', ['a'], { total: 3 })], { showChildItems: true }));
+
+    const next = mergeLanePage(state, board([lane('todo', ['b'], { total: 3, skip: 1 })], { showChildItems: true }));
+
+    expect(next.showChildItems).toBe(true);
   });
 
   it('does not duplicate a card already held, so a double-clicked show-more is harmless', () => {
