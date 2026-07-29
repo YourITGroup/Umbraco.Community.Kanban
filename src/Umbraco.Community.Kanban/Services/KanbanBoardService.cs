@@ -19,6 +19,7 @@ public sealed class KanbanBoardService(
 {
     private static readonly ISet<string> BrowsePermission = new HashSet<string> { ActionBrowse.ActionLetter };
     private static readonly ISet<string> UpdatePermission = new HashSet<string> { ActionUpdate.ActionLetter };
+    private static readonly ISet<string> CreatePermission = new HashSet<string> { ActionNew.ActionLetter };
 
     public async Task<KanbanBoardResult> GetBoardAsync(KanbanBoardRequest request, IUser user)
     {
@@ -69,9 +70,34 @@ public sealed class KanbanBoardService(
         KanbanChildPage page = contentLoader.GetChildren(parent.Id, Constants.DefaultChildCap);
         List<Guid> keys = page.Children.Select(child => child.Key).ToList();
 
+        // Children of the cards, for the per-card child list. Skipped entirely when the board does not
+        // show them, so a board that lists no children pays for neither the query nor the payload.
+        KanbanGrandchildPage grandchildren = configuration.ShowChildItems
+            ? contentLoader.GetGrandchildren(
+                parent.Id,
+                parent.Level + 2,
+                Constants.DefaultGrandchildCap,
+                KanbanChildOrdering.From(
+                    configuration.ChildItemsSortBy,
+                    configuration.ChildItemsSortDirection,
+                    request.Culture))
+            : new KanbanGrandchildPage([], false);
+
         // One bulk call per permission, never one per node — a board may hold a thousand children.
-        ISet<Guid> browseable = await permissionAuthorizer.FilterAuthorizedAsync(user, keys, BrowsePermission);
+        // Browse covers cards and their children together rather than in two round trips.
+        ISet<Guid> browseable = await permissionAuthorizer.FilterAuthorizedAsync(
+            user,
+            [.. keys, .. grandchildren.Grandchildren.Select(grandchild => grandchild.Key)],
+            BrowsePermission);
         ISet<Guid> updatable = await permissionAuthorizer.FilterAuthorizedAsync(user, keys, UpdatePermission);
+        ISet<Guid> creatable = await permissionAuthorizer.FilterAuthorizedAsync(user, keys, CreatePermission);
+
+        IReadOnlyDictionary<int, KanbanCardChildren> childrenByCard = KanbanCardChildAssembler.Assemble(
+            grandchildren.Grandchildren,
+            browseable,
+            grandchildren.Capped,
+            request.Culture,
+            Constants.CardChildDisplayCap);
 
         List<KanbanCardAssignment> assignments = page.Children
             .Where(child => browseable.Contains(child.Key))
@@ -82,7 +108,9 @@ public sealed class KanbanBoardService(
                     configuration.CardProperties,
                     request.Culture,
                     updatable.Contains(child.Key),
-                    propertyValueReader)))
+                    propertyValueReader,
+                    creatable.Contains(child.Key),
+                    childrenByCard.GetValueOrDefault(child.Id) ?? KanbanCardChildren.None)))
             .ToList();
 
         var truncated = page.TotalChildCount > page.Children.Count;
@@ -95,6 +123,7 @@ public sealed class KanbanBoardService(
             truncated,
             pageSize,
             request.Lane,
-            request.Skip ?? 0));
+            request.Skip ?? 0,
+            configuration.ShowChildItems));
     }
 }

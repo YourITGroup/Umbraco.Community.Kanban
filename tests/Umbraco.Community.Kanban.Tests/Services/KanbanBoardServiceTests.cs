@@ -1,7 +1,9 @@
+using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Actions;
 using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Models.Membership;
 using Umbraco.Cms.Core.PropertyEditors;
+using Umbraco.Cms.Core.Services;
 using Umbraco.Community.Kanban.Models;
 using Umbraco.Community.Kanban.Models.Api;
 using Umbraco.Community.Kanban.Services;
@@ -97,9 +99,9 @@ public class KanbanBoardServiceTests
         return new Harness(service, loader, permissions, laneResolver, contentTypes, dataTypes, configurations, ChildType());
     }
 
-    private static Content Child(Harness harness, string name, string? status, Guid? key = null)
+    private static Content Child(Harness harness, string name, string? status, Guid? key = null, int id = 0)
     {
-        var child = new Content(name, 1234, harness.ChildContentType) { Key = key ?? Guid.NewGuid() };
+        var child = new Content(name, 1234, harness.ChildContentType) { Key = key ?? Guid.NewGuid(), Id = id };
 
         if (status is not null)
         {
@@ -110,6 +112,26 @@ public class KanbanBoardServiceTests
 
         return child;
     }
+
+    private static Content Grandchild(Harness harness, string name, Content card)
+    {
+        var grandchild = new Content(name, card.Id, harness.ChildContentType) { Key = Guid.NewGuid() };
+
+        harness.Loader.Grandchildren.Add(grandchild);
+
+        return grandchild;
+    }
+
+    private static KanbanBoardConfiguration WithChildItems(string? sortBy = null, string? direction = null) =>
+        new()
+        {
+            LaneProperty = "status",
+            CardProperties = CardPropertyList.Of("status"),
+            LanePageSize = 25,
+            ShowChildItems = true,
+            ChildItemsSortBy = sortBy,
+            ChildItemsSortDirection = direction,
+        };
 
     private static KanbanBoardRequest Request(string? lane = null, int? skip = null, int? take = null) =>
         new(ParentKey, null, null, lane, skip, take);
@@ -219,7 +241,7 @@ public class KanbanBoardServiceTests
 
         await harness.Service.GetBoardAsync(Request(), User);
 
-        harness.Permissions.FilterCalls.Should().HaveCount(2, "one bulk call per permission");
+        harness.Permissions.FilterCalls.Should().HaveCount(3, "one bulk call per permission: browse, update, create");
         harness.Permissions.FilterCalls.Should().OnlyContain(call => call.KeyCount == 3);
     }
 
@@ -304,5 +326,123 @@ public class KanbanBoardServiceTests
         result.Board!.Truncated.Should().BeFalse();
         result.Board.ChildCount.Should().Be(1);
         result.Board.Lanes.Should().OnlyContain(l => l.TotalIsExact);
+    }
+
+    [Fact]
+    public async Task Does_not_read_grandchildren_when_child_items_are_off()
+    {
+        Harness harness = Configured();
+        Child(harness, "One", "todo", key: Guid.NewGuid());
+
+        await harness.Service.GetBoardAsync(Request(), User);
+
+        harness.Loader.GrandchildRequests.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Reports_child_items_as_off_on_the_response_when_they_are_off()
+    {
+        Harness harness = Configured();
+
+        KanbanBoardResult result = await harness.Service.GetBoardAsync(Request(), User);
+
+        result.Board!.ShowChildItems.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Reads_grandchildren_once_for_the_whole_board()
+    {
+        Harness harness = Configured(WithChildItems());
+        Content card = Child(harness, "One", "todo", id: 10);
+        Grandchild(harness, "Line 1", card);
+
+        KanbanBoardResult result = await harness.Service.GetBoardAsync(Request(), User);
+
+        harness.Loader.GrandchildRequests.Should().HaveCount(1);
+        result.Board!.ShowChildItems.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Asks_for_the_grandchild_level_and_the_configured_order()
+    {
+        Harness harness = Configured(WithChildItems("name", "desc"));
+        Child(harness, "One", "todo");
+
+        await harness.Service.GetBoardAsync(Request(), User);
+
+        (int parentId, int level, int cap, Ordering ordering) = harness.Loader.GrandchildRequests.Single();
+
+        parentId.Should().Be(1234);
+        level.Should().Be(2);
+        cap.Should().Be(Constants.DefaultGrandchildCap);
+        ordering.OrderBy.Should().Be("name");
+        ordering.Direction.Should().Be(Direction.Descending);
+    }
+
+    [Fact]
+    public async Task Attaches_each_cards_own_children()
+    {
+        Harness harness = Configured(WithChildItems());
+        Content first = Child(harness, "One", "todo", id: 10);
+        Content second = Child(harness, "Two", "todo", id: 20);
+        Grandchild(harness, "Line 1", first);
+        Grandchild(harness, "Line 2", second);
+
+        KanbanBoardResult result = await harness.Service.GetBoardAsync(Request(), User);
+
+        KanbanBoardLaneModel lane = result.Board!.Lanes.Single(candidate => candidate.Value == "todo");
+
+        lane.Cards.Single(card => card.Name == "One").Children.Select(child => child.Name).Should().Equal("Line 1");
+        lane.Cards.Single(card => card.Name == "Two").Children.Select(child => child.Name).Should().Equal("Line 2");
+    }
+
+    [Fact]
+    public async Task Hides_children_the_user_cannot_browse()
+    {
+        Harness harness = Configured(WithChildItems());
+        Content card = Child(harness, "One", "todo", id: 10);
+        Content visible = Grandchild(harness, "Line 1", card);
+        Grandchild(harness, "Line 2", card);
+
+        harness.Permissions.Allowed[ActionBrowse.ActionLetter] = [ParentKey, card.Key, visible.Key];
+
+        KanbanBoardResult result = await harness.Service.GetBoardAsync(Request(), User);
+
+        KanbanCardModel model = result.Board!.Lanes.Single(lane => lane.Value == "todo").Cards.Single();
+
+        model.Children.Select(child => child.Name).Should().Equal("Line 1");
+        model.ChildTotal.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Filters_browse_permission_in_one_bulk_call_covering_children_and_grandchildren()
+    {
+        Harness harness = Configured(WithChildItems());
+        Content card = Child(harness, "One", "todo", id: 10);
+        Grandchild(harness, "Line 1", card);
+
+        await harness.Service.GetBoardAsync(Request(), User);
+
+        // One browse filter for two children + one grandchild is the point: never one call per node.
+        harness.Permissions.FilterCalls
+            .Where(call => call.Permission == ActionBrowse.ActionLetter)
+            .Should().ContainSingle().Which.KeyCount.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Reports_create_permission_per_card()
+    {
+        Harness harness = Configured();
+        Content allowed = Child(harness, "One", "todo");
+        Content denied = Child(harness, "Two", "todo");
+
+        harness.Permissions.Allowed[ActionNew.ActionLetter] = [allowed.Key];
+
+        KanbanBoardResult result = await harness.Service.GetBoardAsync(Request(), User);
+
+        IReadOnlyList<KanbanCardModel> cards = result.Board!.Lanes.Single(lane => lane.Value == "todo").Cards;
+
+        cards.Single(card => card.Name == "One").CanCreate.Should().BeTrue();
+        cards.Single(card => card.Name == "Two").CanCreate.Should().BeFalse();
     }
 }
