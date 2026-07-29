@@ -1,4 +1,5 @@
 using Umbraco.Cms.Core.Models;
+using Umbraco.Community.Kanban.Models;
 using Umbraco.Community.Kanban.Models.Api;
 
 namespace Umbraco.Community.Kanban.Services;
@@ -11,7 +12,7 @@ public static class KanbanCardMapper
 {
     public static KanbanCardModel Map(
         IContent content,
-        IReadOnlyList<string> cardProperties,
+        IReadOnlyList<KanbanCardProperty> cardProperties,
         string? culture,
         bool canUpdate)
     {
@@ -44,33 +45,71 @@ public static class KanbanCardMapper
 
     private static List<KanbanCardPropertyModel> MapProperties(
         IContent content,
-        IReadOnlyList<string> cardProperties,
+        IReadOnlyList<KanbanCardProperty> cardProperties,
         string? culture)
     {
         var properties = new List<KanbanCardPropertyModel>(cardProperties.Count);
 
-        foreach (var alias in cardProperties)
+        foreach (var cardProperty in cardProperties)
         {
-            if (content.Properties.TryGetValue(alias, out IProperty? property) == false)
+            var mapped = cardProperty.IsSystem != 0
+                ? MapSystemProperty(content, cardProperty)
+                : MapContentProperty(content, cardProperty, culture);
+
+            if (mapped is not null)
             {
-                continue;
+                properties.Add(mapped);
             }
-
-            // A culture only applies where the property itself varies; an invariant
-            // property on a varying document still stores its value under no culture.
-            var propertyCulture = property.PropertyType.Variations.HasFlag(ContentVariation.Culture)
-                ? culture
-                : null;
-
-            properties.Add(new KanbanCardPropertyModel
-            {
-                Alias = property.PropertyType.Alias,
-                Name = property.PropertyType.Name,
-                EditorAlias = property.PropertyType.PropertyEditorAlias,
-                Value = content.GetValue(alias, propertyCulture),
-            });
         }
 
         return properties;
     }
+
+    private static KanbanCardPropertyModel? MapSystemProperty(IContent content, KanbanCardProperty cardProperty)
+    {
+        var system = KanbanSystemProperty.Read(content, cardProperty.Alias);
+
+        if (system is null)
+        {
+            return null;
+        }
+
+        return new KanbanCardPropertyModel
+        {
+            Alias = cardProperty.Alias,
+            Name = Header(cardProperty) ?? KanbanSystemProperty.DefaultHeader(cardProperty.Alias),
+            EditorAlias = system.Value.EditorAlias,
+            NameTemplate = cardProperty.NameTemplate,
+            Value = system.Value.Value,
+        };
+    }
+
+    private static KanbanCardPropertyModel? MapContentProperty(
+        IContent content,
+        KanbanCardProperty cardProperty,
+        string? culture)
+    {
+        if (content.Properties.TryGetValue(cardProperty.Alias, out IProperty? property) == false)
+        {
+            return null;
+        }
+
+        // A culture only applies where the property itself varies; an invariant
+        // property on a varying document still stores its value under no culture.
+        var propertyCulture = property.PropertyType.Variations.HasFlag(ContentVariation.Culture)
+            ? culture
+            : null;
+
+        return new KanbanCardPropertyModel
+        {
+            Alias = property.PropertyType.Alias,
+            Name = Header(cardProperty) ?? property.PropertyType.Name,
+            EditorAlias = property.PropertyType.PropertyEditorAlias,
+            NameTemplate = cardProperty.NameTemplate,
+            Value = content.GetValue(cardProperty.Alias, propertyCulture),
+        };
+    }
+
+    private static string? Header(KanbanCardProperty cardProperty) =>
+        string.IsNullOrWhiteSpace(cardProperty.Header) ? null : cardProperty.Header;
 }

@@ -1,5 +1,6 @@
 using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.PropertyEditors;
+using Umbraco.Community.Kanban.Models;
 using Umbraco.Community.Kanban.Models.Api;
 using Umbraco.Community.Kanban.Services;
 using Umbraco.Community.Kanban.Tests.Fakes;
@@ -79,7 +80,7 @@ public class KanbanCardMapperTests
         content.SetValue("status", "doing");
         content.SetValue("owner", "robert");
 
-        KanbanCardModel card = KanbanCardMapper.Map(content, ["owner", "status"], null, false);
+        KanbanCardModel card = KanbanCardMapper.Map(content, CardPropertyList.Of("owner", "status"), null, false);
 
         card.Properties.Select(p => p.Alias).Should().Equal("owner", "status");
         card.Properties.Select(p => p.Value).Should().Equal("robert", "doing");
@@ -92,7 +93,7 @@ public class KanbanCardMapperTests
         var content = new Content("A", -1, contentType);
         content.SetValue("status", "doing");
 
-        KanbanCardPropertyModel property = KanbanCardMapper.Map(content, ["status"], null, false).Properties.Single();
+        KanbanCardPropertyModel property = KanbanCardMapper.Map(content, CardPropertyList.Of("status"), null, false).Properties.Single();
 
         property.EditorAlias.Should().Be("Umbraco.TextBox");
         property.Name.Should().Be("status");
@@ -104,7 +105,7 @@ public class KanbanCardMapperTests
         ContentType contentType = ContentTypeWith(ContentVariation.Nothing, ("status", ContentVariation.Nothing));
         var content = new Content("A", -1, contentType);
 
-        KanbanCardMapper.Map(content, ["status", "nope"], null, false).Properties
+        KanbanCardMapper.Map(content, CardPropertyList.Of("status", "nope"), null, false).Properties
             .Select(p => p.Alias).Should().Equal("status");
     }
 
@@ -118,7 +119,7 @@ public class KanbanCardMapperTests
         content.SetValue("status", "doing", "en-US");
         content.SetValue("status", "i gang", "da-DK");
 
-        KanbanCardMapper.Map(content, ["status"], "da-DK", false).Properties.Single().Value
+        KanbanCardMapper.Map(content, CardPropertyList.Of("status"), "da-DK", false).Properties.Single().Value
             .Should().Be("i gang");
     }
 
@@ -130,7 +131,131 @@ public class KanbanCardMapperTests
         content.SetCultureName("A", "en-US");
         content.SetValue("status", "doing");
 
-        KanbanCardMapper.Map(content, ["status"], "en-US", false).Properties.Single().Value
+        KanbanCardMapper.Map(content, CardPropertyList.Of("status"), "en-US", false).Properties.Single().Value
             .Should().Be("doing");
+    }
+
+    [Fact]
+    public void Uses_the_configured_header_as_the_property_name()
+    {
+        ContentType contentType = ContentTypeWith(ContentVariation.Nothing, ("bookingOwner", ContentVariation.Nothing));
+        var content = new Content("A", -1, contentType);
+
+        KanbanCardPropertyModel property = KanbanCardMapper.Map(
+            content,
+            [new KanbanCardProperty { Alias = "bookingOwner", Header = "Owner" }],
+            null,
+            false).Properties.Single();
+
+        property.Name.Should().Be("Owner");
+    }
+
+    [Fact]
+    public void Falls_back_to_the_propertys_own_name_when_no_header_is_configured()
+    {
+        ContentType contentType = ContentTypeWith(ContentVariation.Nothing, ("bookingOwner", ContentVariation.Nothing));
+        var content = new Content("A", -1, contentType);
+
+        KanbanCardMapper.Map(
+            content,
+            [new KanbanCardProperty { Alias = "bookingOwner", Header = "   " }],
+            null,
+            false).Properties.Single().Name.Should().Be("bookingOwner");
+    }
+
+    [Fact]
+    public void Carries_the_label_template_untouched_for_the_client_to_render()
+    {
+        // UFM is resolved by the backoffice's own renderer; the server only carries the template.
+        ContentType contentType = ContentTypeWith(ContentVariation.Nothing, ("recurring", ContentVariation.Nothing));
+        var content = new Content("A", -1, contentType);
+
+        KanbanCardMapper.Map(
+            content,
+            [new KanbanCardProperty { Alias = "recurring", NameTemplate = "${ value ? 'Yes' : 'No' }" }],
+            null,
+            false).Properties.Single().NameTemplate.Should().Be("${ value ? 'Yes' : 'No' }");
+    }
+
+    [Fact]
+    public void Reads_the_update_date_as_a_system_property()
+    {
+        var content = new Content("A", -1, ContentTypeWith(ContentVariation.Nothing))
+        {
+            UpdateDate = new DateTime(2026, 7, 29, 10, 30, 0, DateTimeKind.Utc),
+        };
+
+        KanbanCardPropertyModel property = KanbanCardMapper.Map(
+            content,
+            [CardPropertyList.System("updateDate")],
+            null,
+            false).Properties.Single();
+
+        property.Value.Should().Be(content.UpdateDate);
+        property.Name.Should().Be("Last edited");
+
+        // Not a claim about a data type — a system field has none. It names the renderer the client
+        // should use for the value.
+        property.EditorAlias.Should().Be("Umbraco.DateTime");
+    }
+
+    [Theory]
+    [InlineData("createDate", "Created", "Umbraco.DateTime")]
+    [InlineData("updateDate", "Last edited", "Umbraco.DateTime")]
+    [InlineData("creator", "Creator", "Umbraco.Integer")]
+    [InlineData("sortOrder", "Sort order", "Umbraco.Integer")]
+    [InlineData("published", "Published", "Umbraco.TrueFalse")]
+    public void Maps_every_system_property_it_offers(string alias, string header, string editorAlias)
+    {
+        var content = new Content("A", -1, ContentTypeWith(ContentVariation.Nothing));
+
+        KanbanCardPropertyModel property = KanbanCardMapper.Map(
+            content,
+            [CardPropertyList.System(alias)],
+            null,
+            false).Properties.Single();
+
+        property.Alias.Should().Be(alias);
+        property.Name.Should().Be(header);
+        property.EditorAlias.Should().Be(editorAlias);
+    }
+
+    [Fact]
+    public void Prefers_the_configured_header_over_a_system_propertys_default_label()
+    {
+        var content = new Content("A", -1, ContentTypeWith(ContentVariation.Nothing));
+
+        KanbanCardMapper.Map(
+            content,
+            [CardPropertyList.System("updateDate", "Touched")],
+            null,
+            false).Properties.Single().Name.Should().Be("Touched");
+    }
+
+    [Fact]
+    public void Distinguishes_a_system_field_from_a_content_property_of_the_same_alias()
+    {
+        // Why IsSystem is stored rather than derived: a content type may declare "published" itself,
+        // and only the editor who added the row knows which was meant.
+        ContentType contentType = ContentTypeWith(ContentVariation.Nothing, ("published", ContentVariation.Nothing));
+        var content = new Content("A", -1, contentType);
+        content.SetValue("published", "the property, not the flag");
+
+        KanbanCardMapper.Map(content, [CardPropertyList.System("published")], null, false)
+            .Properties.Single().Value.Should().Be(false);
+
+        KanbanCardMapper.Map(content, CardPropertyList.Of("published"), null, false)
+            .Properties.Single().Value.Should().Be("the property, not the flag");
+    }
+
+    [Fact]
+    public void Skips_a_system_flagged_alias_that_names_no_system_field()
+    {
+        // A hand-edited configuration, or one whose alias was renamed. A missing summary item beats a
+        // failed board.
+        var content = new Content("A", -1, ContentTypeWith(ContentVariation.Nothing));
+
+        KanbanCardMapper.Map(content, [CardPropertyList.System("nonsense")], null, false)
+            .Properties.Should().BeEmpty();
     }
 }

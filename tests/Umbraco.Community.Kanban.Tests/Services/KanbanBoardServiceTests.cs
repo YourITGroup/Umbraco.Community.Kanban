@@ -82,7 +82,7 @@ public class KanbanBoardServiceTests
         configurations.BoardConfigurations[BoardConfigKey] = configuration ?? new KanbanBoardConfiguration
         {
             LaneProperty = "status",
-            CardProperties = ["status"],
+            CardProperties = CardPropertyList.Of("status"),
             LanePageSize = 25,
         };
 

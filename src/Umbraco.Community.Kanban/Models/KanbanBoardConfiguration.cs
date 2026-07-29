@@ -72,8 +72,16 @@ public class KanbanBoardConfiguration
     [ConfigurationField("laneOverrides")]
     public KanbanLaneOverride[] LaneOverrides { get; set; } = [];
 
+    /// <summary>
+    /// The properties shown as summary items on a card, in the order they appear.
+    /// </summary>
+    /// <remarks>
+    /// Read through <see cref="KanbanCardPropertyArrayJsonConverter" />, which also accepts the bare
+    /// array of aliases this was before headers and label templates existed.
+    /// </remarks>
     [ConfigurationField("cardProperties")]
-    public string[] CardProperties { get; set; } = [];
+    [JsonConverter(typeof(KanbanCardPropertyArrayJsonConverter))]
+    public KanbanCardProperty[] CardProperties { get; set; } = [];
 
     [ConfigurationField("lanePageSize")]
     public int LanePageSize { get; set; } = 25;

@@ -26,6 +26,12 @@ public sealed class KanbanCardPropertyModel
     /// </summary>
     public required string EditorAlias { get; init; }
 
+    /// <summary>
+    /// A UFM template the client renders instead of the value's own summary, when set. Carried rather
+    /// than applied: resolving it needs the backoffice's own UFM renderer.
+    /// </summary>
+    public string? NameTemplate { get; init; }
+
     public object? Value { get; init; }
 }
 
