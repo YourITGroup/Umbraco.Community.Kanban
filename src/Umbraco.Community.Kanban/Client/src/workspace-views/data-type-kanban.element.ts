@@ -216,7 +216,7 @@ export class UmbCommunityKanbanDataTypeViewElement extends UmbLitElement {
         name=${configuration?.name ?? 'Unknown configuration'}
         detail=${configuration ? '' : 'This data type no longer exists'}
         @open=${this.#onEdit}>
-        <uui-icon slot="icon" name="icon-grid"></uui-icon>
+        <uui-icon slot="icon" name="icon-columns"></uui-icon>
         <uui-action-bar slot="actions">
           ${this._modalReady
             ? html`<uui-button label="Edit" @click=${this.#onEdit}>Edit</uui-button>`

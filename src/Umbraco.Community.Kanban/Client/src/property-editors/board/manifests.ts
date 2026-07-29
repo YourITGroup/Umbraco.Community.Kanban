@@ -24,7 +24,7 @@ export const manifests: Array<UmbExtensionManifest> = [
     meta: {
       label: 'Kanban Board',
       propertyEditorSchemaAlias: KANBAN_BOARD_EDITOR_ALIAS,
-      icon: 'icon-grid',
+      icon: 'icon-columns',
       group: 'lists',
       settings: {
         properties: [

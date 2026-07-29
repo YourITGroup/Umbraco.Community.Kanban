@@ -12,7 +12,7 @@ export const manifests: Array<UmbExtensionManifest> = [
     weight: 250,
     meta: {
       label: 'Kanban',
-      icon: 'icon-grid',
+      icon: 'icon-columns',
       pathName: 'kanban',
     },
     conditions: [

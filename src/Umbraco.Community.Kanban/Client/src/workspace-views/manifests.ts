@@ -19,7 +19,7 @@ export const manifests: Array<UmbExtensionManifest> = [
     meta: {
       label: 'Kanban',
       pathname: 'kanban',
-      icon: 'icon-grid',
+      icon: 'icon-columns',
     },
     // The workspace-alias condition alone would put an empty Kanban tab on every data type,
     // so the tab is also gated on the data type actually being a Collection.
