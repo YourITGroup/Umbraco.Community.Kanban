@@ -12,6 +12,13 @@ export const KANBAN_BOARD_ENDPOINT = `${KANBAN_API_PATH}/board`;
 export const KANBAN_CONFIGURATIONS_ENDPOINT = `${KANBAN_API_PATH}/configurations`;
 export const KANBAN_LANES_PREVIEW_ENDPOINT = `${KANBAN_API_PATH}/lanes/preview`;
 
+/**
+ * One card's lane, for the drag write-back. A function rather than a template constant because the key
+ * is a path segment: it is encoded here so no caller has to remember to.
+ */
+export const KANBAN_CARD_LANE_ENDPOINT = (key: string): string =>
+  `${KANBAN_API_PATH}/card/${encodeURIComponent(key)}/lane`;
+
 export const KANBAN_COLLECTION_VIEW_BOARD_ALIAS = 'Umb.Community.Kanban.CollectionView.Board';
 export const KANBAN_DATA_TYPE_WORKSPACE_VIEW_ALIAS = 'Umb.Community.Kanban.WorkspaceView.DataType.Kanban';
 
