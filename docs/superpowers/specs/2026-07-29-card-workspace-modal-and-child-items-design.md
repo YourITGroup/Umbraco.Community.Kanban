@@ -206,6 +206,12 @@ Ordering.By("sortOrder", direction)
 The culture passed is the request's, so a varying document's children sort by the name the board is
 actually showing.
 
+`Umb.PropertyEditorUi.Dropdown` complicates the round trip: its single-select mode still stores the
+choice as a one-element JSON array once an editor touches it — only a fresh `defaultData` value, never
+edited, is a bare string. Both `ChildItemsSortBy` and `ChildItemsSortDirection` read through a new
+`SingleSelectDropdownJsonConverter`, in the same spirit as `NullableGuidJsonConverter`: it accepts a
+bare string, a one-element array, or an empty array, and always writes a bare string.
+
 Sorting by name or date is *global* across the query, then grouped by parent — which is exactly right,
 because ordering within a group is preserved by the grouping. Sorting by `sortOrder` orders each
 card's children among themselves, which is what an editor dragging children in the tree means by it.
