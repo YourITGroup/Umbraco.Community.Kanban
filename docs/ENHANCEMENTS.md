@@ -112,10 +112,23 @@ header's click. That did not turn out to be necessary: nothing is ever bound to 
 there was never a click to protect, and nothing in `kanban-lane.element.ts` or `kanban-card.element.ts`
 changed for this at all.
 
-Extended the same day to pan vertically too, from
-[a follow-up design](superpowers/specs/2026-07-29-board-pan-vertical-design.md): `.lanes` has no
-vertical overflow of its own, so the drag also drives whatever ancestor already owns vertical
-scrolling — found by walking up through parent elements and, crossing shadow boundaries via
-`shadowRoot.host`, to Umbraco's own `<uui-scroll-container>` in the live Collection View host. A board
-that fits entirely within the viewport is unaffected: nothing is found to scroll, and the drag pans
-sideways exactly as it always has.
+An attempt the same day to also pan vertically, from
+[a follow-up design](superpowers/specs/2026-07-29-board-pan-vertical-design.md), did not work and was
+reverted: it walked up through parent elements to find whatever ancestor already owned vertical
+scrolling, but in the real Collection View host that ancestor is a plain `#main` div sealed inside
+`umb-body-layout`'s own shadow root — reachable by climbing *past* that component as a host element,
+never by looking *into* its shadow content, so the walk always found nothing and the drag silently
+stayed horizontal-only. Same shadow-encapsulation problem the design meant to solve, one layer further
+in.
+
+**Backlog:** a real fix needs the board to own its own vertical scrolling rather than borrow an
+ancestor's — give `.lanes` `overflow-y: auto` and a genuine bounded height. That height can't come from
+a CSS percentage/flex chain either: walking that chain (`umb-collection-default` → `#router` →
+our host) shows `#router` has no explicit height of its own (`router-slot { height: 100% }` resolves
+against it to `auto`), and `#router` is itself shadow-sealed, so there's no ancestor CSS to fix. Filling
+the viewport reliably means measuring it in JS (`getBoundingClientRect()` + `window.innerHeight`,
+recomputed on resize) and setting an explicit pixel height — read-only geometry, not reaching into any
+other component's internals. Also worth deciding then: whether pagination/selection-action controls that
+render below the board in the same scroll region need a reserved buffer, and whether a fixed-transform 2D
+canvas (enabling zoom) is worth the bigger rewrite over this simpler self-scrolling box. Not spec'd out
+yet — pick this back up with superpowers:brainstorming when it's next in scope.

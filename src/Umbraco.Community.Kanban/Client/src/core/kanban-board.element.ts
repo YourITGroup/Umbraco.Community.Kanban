@@ -40,17 +40,11 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
   @state()
   private _isPanning = false;
 
-  /**
-   * The in-progress pan, or undefined between drags. Keyed by pointerId so a second pointer is
-   * ignored. `vertical` is present only when an ancestor with its own vertical overflow was found
-   * at drag start — its absence means this drag pans horizontally only, exactly as it did before
-   * this axis was added.
-   */
+  /** The in-progress pan, or undefined between drags. Keyed by pointerId so a second pointer is ignored. */
   #pan?: {
     pointerId: number;
     startX: number;
     startScrollLeft: number;
-    vertical?: { target: Element; startY: number; startScrollTop: number };
   };
 
   /**
@@ -117,42 +111,6 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
   }
 
   /**
-   * The nearest ancestor of `from` whose *computed* overflow-y is auto, scroll or overlay — the
-   * element that actually owns vertical scrolling here, whatever it is. `.lanes` has no vertical
-   * overflow of its own, so when a board grows taller than the viewport, some ancestor outside this
-   * component already scrolls it (in the live Collection View host, Umbraco's own
-   * `<uui-scroll-container>`, several shadow trees up) — this finds it without assuming which
-   * element that is.
-   *
-   * `parentElement` returns null at the top of a shadow tree, where `getRootNode()` returns the
-   * `ShadowRoot` itself; its `.host` is the next real element up, which is how this crosses shadow
-   * boundaries a plain `.closest()` cannot. Deliberately not cached across drags — a reload or a
-   * host swap could change the ancestry between one drag and the next — and deliberately not a
-   * pure function: it reads live layout, so it is verified by hand, like the rest of this file's
-   * pointer-event wiring.
-   */
-  #findVerticalScrollAncestor(from: Element): Element | null {
-    let node: Node | null = from.parentElement ?? from.getRootNode();
-
-    while (node) {
-      if (node instanceof ShadowRoot) {
-        node = node.host;
-        continue;
-      }
-
-      if (!(node instanceof Element)) return null; // reached the Document with nothing found
-
-      if (/(auto|scroll|overlay)/.test(getComputedStyle(node).overflowY)) {
-        return node;
-      }
-
-      node = node.parentElement ?? node.getRootNode();
-    }
-
-    return null;
-  }
-
-  /**
    * Starts a background pan. Gated on `event.target === event.currentTarget`: the listener is bound
    * directly on `.lanes`, so `currentTarget` is always that div, and the two are equal only when the
    * pointer went down on the div itself — never a lane or a card inside it. Touch is excluded because
@@ -180,15 +138,10 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
 
     lanes.setPointerCapture(event.pointerId);
 
-    const verticalTarget = this.#findVerticalScrollAncestor(lanes);
-
     this.#pan = {
       pointerId: event.pointerId,
       startX: event.clientX,
       startScrollLeft: lanes.scrollLeft,
-      vertical: verticalTarget
-        ? { target: verticalTarget, startY: event.clientY, startScrollTop: verticalTarget.scrollTop }
-        : undefined,
     };
     this._isPanning = true;
 
@@ -208,12 +161,6 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
     const lanes = event.currentTarget as HTMLDivElement;
 
     lanes.scrollLeft = panScrollOffset(this.#pan.startScrollLeft, this.#pan.startX, event.clientX);
-
-    const vertical = this.#pan.vertical;
-
-    if (vertical) {
-      vertical.target.scrollTop = panScrollOffset(vertical.startScrollTop, vertical.startY, event.clientY);
-    }
   }
 
   /**
