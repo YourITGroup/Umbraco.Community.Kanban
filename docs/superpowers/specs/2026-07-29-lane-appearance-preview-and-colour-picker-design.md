@@ -1,7 +1,7 @@
 # Lane appearance: real lanes, and a colour picker
 
 **Date:** 2026-07-29
-**Status:** Approved for planning
+**Status:** Implemented
 **Parent design:** [2026-07-28-umbraco-community-kanban-design.md](2026-07-28-umbraco-community-kanban-design.md)
 **Builds on:** [2026-07-28-kanban-configuration-pickers-design.md](2026-07-28-kanban-configuration-pickers-design.md)
 
