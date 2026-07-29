@@ -19,6 +19,7 @@ public class KanbanBoardRegistrationTests
         { typeof(IKanbanContentWriter), typeof(KanbanContentWriter) },
         { typeof(IKanbanPropertyValueReader), typeof(KanbanPropertyValueReader) },
         { typeof(IKanbanBoardService), typeof(KanbanBoardService) },
+        { typeof(IKanbanCardService), typeof(KanbanCardService) },
     };
 
     [Theory]

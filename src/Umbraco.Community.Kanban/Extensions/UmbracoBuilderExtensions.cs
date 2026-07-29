@@ -32,6 +32,7 @@ public static class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IKanbanContentWriter, KanbanContentWriter>();
         builder.Services.AddSingleton<IKanbanPropertyValueReader, KanbanPropertyValueReader>();
         builder.Services.AddSingleton<IKanbanBoardService, KanbanBoardService>();
+        builder.Services.AddSingleton<IKanbanCardService, KanbanCardService>();
 
         // Manual is appended first so a configuration that pins it wins over an
         // editor-matching source.
