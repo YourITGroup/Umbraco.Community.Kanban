@@ -100,28 +100,14 @@ this needs to degrade to a plain create rather than write something the property
 
 ## 9. Grab the board to pan it sideways
 
-Click-and-hold on the board background, drag, and the board scrolls sideways with the pointer — so a
-board with more lanes than fit is navigable without hunting for a scrollbar or shift-scrolling.
+**Built 2026-07-29**, from
+[its design](superpowers/specs/2026-07-29-board-pan-to-scroll-design.md). Dragging the board's own
+background — never a card, never a lane — scrolls it sideways with the pointer, via a single
+`event.target === event.currentTarget` check on `.lanes` and Pointer Capture retargeting. Touch is
+untouched: `.lanes` already swipe-scrolls natively, with momentum, so the custom pan applies only to
+mouse and pen pointer types.
 
-The container is already right: `.lanes` in
-[core/kanban-board.element.ts:144-150](../src/Umbraco.Community.Kanban/Client/src/core/kanban-board.element.ts#L144-L150)
-is a flex row with `overflow-x: auto`, so panning is `scrollLeft` arithmetic on pointer moves. Use
-Pointer Events with `setPointerCapture`, not mouse events — a capture keeps the drag alive when the
-pointer leaves the element, and it makes trackpads and touch work without a second code path.
-
-**The whole difficulty is telling a pan from the interactions already on the board**, and it gets
-harder with every item above:
-
-- **A card's title is a real button** that opens the workspace modal, done as part of item 1 — the
-  title, not the whole card, was chosen deliberately so a pan starting anywhere else on a card has
-  nothing to suppress. A pan that starts on the title itself still needs a movement threshold: a few
-  pixels before the gesture becomes a pan, suppressing the click only once it does.
-- **Milestone 3 gives cards their own drag**, which is a direct conflict: the same gesture on the same
-  pixel means two things. The clean split is that a pan starts only on the background — lane gutters,
-  the space below the cards — and never on a card. Worth deciding before milestone 3 rather than
-  retrofitting afterwards, since it constrains where a card's drag handle can live.
-- **Lane headers and load-more buttons** are also interactive and want the same threshold treatment.
-
-Two smaller things to get right: leave keyboard and scrollbar scrolling alone (this is additive, not a
-replacement), and set `cursor: grabbing` plus `user-select: none` only for the duration of a live pan,
-or text selection fights the drag on every board.
+The enhancement anticipated needing a movement threshold to avoid swallowing a card's or a lane
+header's click. That did not turn out to be necessary: nothing is ever bound to a background click, so
+there was never a click to protect, and nothing in `kanban-lane.element.ts` or `kanban-card.element.ts`
+changed for this at all.
