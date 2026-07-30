@@ -1,4 +1,5 @@
 import { customElement, html, state } from '@umbraco-cms/backoffice/external/lit';
+import type { PropertyValues } from '@umbraco-cms/backoffice/external/lit';
 import { UMB_COLLECTION_CONTEXT, UmbCollectionDefaultElement } from '@umbraco-cms/backoffice/collection';
 import { isChromelessCollectionView } from './collection-chrome.model.js';
 
@@ -37,6 +38,23 @@ export class UmbCommunityKanbanDocumentCollectionElement extends UmbCollectionDe
         '_observeKanbanCurrentView',
       );
     });
+  }
+
+  /**
+   * Drops the layout's own padding around the content while a board is showing, so the canvas reaches the
+   * edges of the region instead of sitting in a gutter it does not want.
+   *
+   * Set as an attribute rather than styled: `main-no-padding` is `umb-body-layout`'s own documented switch
+   * for this, and the padded box is inside *its* shadow root where no stylesheet of ours reaches. Set
+   * imperatively rather than in a template because the layout element comes from the inherited `render()`,
+   * which cannot be overridden usefully — it calls private members of the base class.
+   *
+   * A list view still gets the padding, since its rows depend on it.
+   */
+  protected override updated(changedProperties: PropertyValues<this>) {
+    super.updated(changedProperties);
+
+    this.shadowRoot?.querySelector('umb-body-layout')?.toggleAttribute('main-no-padding', this._chromeless);
   }
 
   /**
