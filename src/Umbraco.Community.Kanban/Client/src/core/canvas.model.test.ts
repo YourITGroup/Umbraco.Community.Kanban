@@ -1,25 +1,98 @@
 import { describe, it, expect } from 'vitest';
-import { boardViewportHeight, edgeScrollDelta } from './canvas.model.js';
+import { boardAvailableBottom, boardViewportHeight, edgeScrollDelta } from './canvas.model.js';
 
 describe('boardViewportHeight', () => {
-  it('fills the window below the board’s top edge, less the bottom gutter', () => {
-    expect(boardViewportHeight({ rectTop: 200, innerHeight: 1000, gutter: 24, min: 320 })).toBe(776);
+  it('fills the space below the board’s top edge, less the bottom gutter', () => {
+    expect(boardViewportHeight({ rectTop: 200, availableBottom: 1000, gutter: 24, min: 320 })).toBe(776);
   });
 
-  it('clamps to the minimum when the board starts near the bottom of the window', () => {
-    // 1000 - 900 - 24 = 76, which is uselessly short; the floor wins and the page scrolls instead.
-    expect(boardViewportHeight({ rectTop: 900, innerHeight: 1000, gutter: 24, min: 320 })).toBe(320);
+  it('clamps to the minimum when the board starts near the bottom of the space', () => {
+    // 1000 - 900 - 24 = 76, which is uselessly short; the floor wins and the region scrolls instead.
+    expect(boardViewportHeight({ rectTop: 900, availableBottom: 1000, gutter: 24, min: 320 })).toBe(320);
   });
 
-  it('clamps to the minimum in a window shorter than the minimum', () => {
-    expect(boardViewportHeight({ rectTop: 0, innerHeight: 200, gutter: 24, min: 320 })).toBe(320);
+  it('clamps to the minimum in a space shorter than the minimum', () => {
+    expect(boardViewportHeight({ rectTop: 0, availableBottom: 200, gutter: 24, min: 320 })).toBe(320);
   });
 
-  it('subtracts the gutter, so the board never overhangs the window', () => {
-    const withGutter = boardViewportHeight({ rectTop: 100, innerHeight: 1000, gutter: 24, min: 320 });
-    const without = boardViewportHeight({ rectTop: 100, innerHeight: 1000, gutter: 0, min: 320 });
+  it('subtracts the gutter, so the board never overhangs its container', () => {
+    const withGutter = boardViewportHeight({ rectTop: 100, availableBottom: 1000, gutter: 24, min: 320 });
+    const without = boardViewportHeight({ rectTop: 100, availableBottom: 1000, gutter: 0, min: 320 });
 
     expect(without - withGutter).toBe(24);
+  });
+});
+
+describe('boardAvailableBottom', () => {
+  it('falls back to the window when no ancestor bounds the board', () => {
+    expect(boardAvailableBottom({ windowHeight: 1201, rectTop: 272, ancestors: [] })).toBe(1201);
+  });
+
+  it('uses the container’s bottom rather than the window, so the Save bar is not overhung', () => {
+    // The real measurements from the backoffice: the collection's container ends 54px above the window,
+    // which is the workspace footer, and sizing to the window is what produced a second scrollbar.
+    expect(
+      boardAvailableBottom({
+        windowHeight: 1201,
+        rectTop: 272,
+        ancestors: [
+          { bottom: 1147, definiteHeight: true },
+          { bottom: 1201, definiteHeight: true },
+        ],
+      }),
+    ).toBe(1147);
+  });
+
+  it('ignores the boxless router-slot wrappers between the board and its container', () => {
+    // These report a percentage height and no box; believing their bottoms would defeat the whole search.
+    expect(
+      boardAvailableBottom({
+        windowHeight: 1201,
+        rectTop: 272,
+        ancestors: [
+          { bottom: 1201, definiteHeight: false },
+          { bottom: 1147, definiteHeight: true },
+        ],
+      }),
+    ).toBe(1147);
+  });
+
+  it('takes the lowest bounding ancestor when several bound it', () => {
+    expect(
+      boardAvailableBottom({
+        windowHeight: 1201,
+        rectTop: 272,
+        ancestors: [
+          { bottom: 1147, definiteHeight: true },
+          { bottom: 900, definiteHeight: true },
+        ],
+      }),
+    ).toBe(900);
+  });
+
+  it('ignores an ancestor ending above the board, which cannot be containing it', () => {
+    // umb-split-panel reports a 0-height box in the real chain; treating it as the container would
+    // collapse the board to its minimum height.
+    expect(
+      boardAvailableBottom({
+        windowHeight: 1201,
+        rectTop: 272,
+        ancestors: [
+          { bottom: 0, definiteHeight: true },
+          { bottom: 1147, definiteHeight: true },
+        ],
+      }),
+    ).toBe(1147);
+  });
+
+  it('never returns more than the window, however tall an ancestor claims to be', () => {
+    expect(
+      boardAvailableBottom({
+        windowHeight: 1201,
+        rectTop: 272,
+        ancestors: [{ bottom: 5000, definiteHeight: true }],
+      }),
+    ).toBe(1201);
   });
 });
 

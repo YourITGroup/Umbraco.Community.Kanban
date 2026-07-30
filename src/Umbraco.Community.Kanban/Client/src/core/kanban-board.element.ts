@@ -22,7 +22,7 @@ import {
   moveFailureMessage,
   type KanbanLaneHitTarget,
 } from './drag.model.js';
-import { boardViewportHeight, edgeScrollDelta } from './canvas.model.js';
+import { boardAvailableBottom, boardViewportHeight, edgeScrollDelta } from './canvas.model.js';
 import './kanban-lane.element.js';
 import type { KanbanBoardQuery, KanbanDataSource } from '../data/kanban-data-source.js';
 import { isPannablePath, panScrollOffset, shouldStartPan } from './pan.model.js';
@@ -305,10 +305,15 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
     // The action bar sits below the viewport inside this element, so its height is space the canvas
     // cannot have. Measured rather than assumed — it holds a growing set of actions and may wrap.
     const actions = this.renderRoot.querySelector<HTMLDivElement>('.actions');
+    const rectTop = viewport.getBoundingClientRect().top;
 
     const height = boardViewportHeight({
-      rectTop: viewport.getBoundingClientRect().top,
-      innerHeight: window.innerHeight,
+      rectTop,
+      availableBottom: boardAvailableBottom({
+        windowHeight: window.innerHeight,
+        rectTop,
+        ancestors: this.#ancestorBoxes(),
+      }),
       gutter: VIEWPORT_GUTTER + (actions?.getBoundingClientRect().height ?? 0),
       min: VIEWPORT_MIN_HEIGHT,
     });
@@ -318,6 +323,44 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
     if (this._viewportHeight === undefined || Math.abs(this._viewportHeight - height) >= 1) {
       this._viewportHeight = height;
     }
+  }
+
+  /**
+   * Every ancestor above this element, out through shadow boundaries, as bottom edge plus whether it has a
+   * real box. Read-only geometry on elements we climb past — it never looks *into* another component's
+   * shadow content, which is the mistake the reverted vertical pan made.
+   *
+   * A boxless wrapper is recognised by a computed height that is not a pixel value: an element with a
+   * rendered box always resolves to pixels, while the layout's `router-slot` wrappers report `100%` and a
+   * zero `clientHeight`.
+   */
+  #ancestorBoxes(): { bottom: number; definiteHeight: boolean }[] {
+    const boxes: { bottom: number; definiteHeight: boolean }[] = [];
+
+    // Starts at the parent: this element's own box is the thing being sized, so it cannot bound itself.
+    let element = this.#parentOf(this);
+
+    while (element) {
+      const height = getComputedStyle(element).height;
+
+      boxes.push({
+        bottom: element.getBoundingClientRect().bottom,
+        definiteHeight: height.endsWith('px') && element.clientHeight > 0,
+      });
+
+      element = this.#parentOf(element);
+    }
+
+    return boxes;
+  }
+
+  /** The next element up, hopping out of a shadow root to its host when there is no parent element. */
+  #parentOf(element: Element): Element | null {
+    if (element.parentElement) return element.parentElement;
+
+    const root = element.getRootNode();
+
+    return root instanceof ShadowRoot ? root.host : null;
   }
 
   #onWindowResize = () => this.#measureViewport();
