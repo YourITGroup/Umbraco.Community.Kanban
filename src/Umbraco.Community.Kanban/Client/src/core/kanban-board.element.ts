@@ -302,10 +302,14 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
 
     if (!viewport) return;
 
+    // The action bar sits below the viewport inside this element, so its height is space the canvas
+    // cannot have. Measured rather than assumed — it holds a growing set of actions and may wrap.
+    const actions = this.renderRoot.querySelector<HTMLDivElement>('.actions');
+
     const height = boardViewportHeight({
       rectTop: viewport.getBoundingClientRect().top,
       innerHeight: window.innerHeight,
-      gutter: VIEWPORT_GUTTER,
+      gutter: VIEWPORT_GUTTER + (actions?.getBoundingClientRect().height ?? 0),
       min: VIEWPORT_MIN_HEIGHT,
     });
 
@@ -550,6 +554,39 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
   }
 
   /**
+   * The board's action bar, pinned below the canvas. Deliberately shaped like core's own
+   * `umb-collection-selection-actions` — same background, contrast colour and space-between layout — so a
+   * board action reads as the same kind of thing as a list view's bulk action. Built to hold more than one
+   * action: further board-level actions belong in `.buttons` beside Publish.
+   */
+  #renderActions() {
+    if (!this._board) return nothing;
+
+    const pending = pendingCards(this._board);
+
+    if (pending.length === 0) return nothing;
+
+    return html`
+      <div class="actions">
+        <div class="summary">
+          ${pending.length} ${pending.length === 1 ? 'card has' : 'cards have'} pending changes
+        </div>
+        <div class="buttons">
+          <uui-button
+            look="primary"
+            color="positive"
+            icon="icon-globe"
+            label="Publish pending changes"
+            ?disabled=${this._publishing}
+            @click=${this.#onPublishPending}>
+            Publish pending changes
+          </uui-button>
+        </div>
+      </div>
+    `;
+  }
+
+  /**
    * The dragged card, following the pointer. A real card element rather than a bespoke chip, so it cannot
    * drift from how cards actually look; `allow-drag` is left off (defaulting false) so the clone cannot
    * start a gesture of its own, and `pointer-events: none` keeps it inert under the cursor.
@@ -574,23 +611,7 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
   #renderBoard() {
     if (!this._board) return nothing;
 
-    const pending = pendingCards(this._board);
-
     return html`
-      ${pending.length
-        ? html`<div class="toolbar">
-            <uui-button
-              look="primary"
-              color="positive"
-              icon="icon-globe"
-              label="Publish pending changes"
-              ?disabled=${this._publishing}
-              @click=${this.#onPublishPending}>
-              Publish pending changes
-              <uui-badge look="secondary">${pending.length}</uui-badge>
-            </uui-button>
-          </div>`
-        : nothing}
       ${this._board.truncated
         ? // Deliberately no child count: it is the parent's true count, not permission-filtered,
           // so printing it would disclose the existence of siblings a restricted user cannot see.
@@ -620,7 +641,7 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
           )}
         </div>
       </div>
-      ${this.#renderGhost()}
+      ${this.#renderActions()} ${this.#renderGhost()}
     `;
   }
 
@@ -683,10 +704,24 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
         color: var(--uui-color-text-alt);
       }
 
-      .toolbar {
+      /* Matches core's umb-collection-selection-actions: the same surface, contrast colour and
+         space-between layout, so a board action reads as the same kind of control as a bulk action. */
+      .actions {
         display: flex;
-        justify-content: flex-end;
-        padding-bottom: var(--uui-size-space-3);
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--uui-size-3);
+        box-sizing: border-box;
+        padding: var(--uui-size-space-4) var(--uui-size-space-6);
+        background-color: var(--uui-color-selected);
+        color: var(--uui-color-selected-contrast);
+      }
+
+      .summary,
+      .buttons {
+        display: flex;
+        align-items: center;
+        gap: var(--uui-size-3);
       }
     `,
   ];
