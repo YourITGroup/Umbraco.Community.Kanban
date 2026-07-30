@@ -1,16 +1,25 @@
 import { classMap, css, customElement, html, nothing, property, state } from '@umbraco-cms/backoffice/external/lit';
 import { UmbLitElement } from '@umbraco-cms/backoffice/lit-element';
 import { UMB_NOTIFICATION_CONTEXT } from '@umbraco-cms/backoffice/notification';
+import { UmbDocumentPublishingRepository } from '@umbraco-cms/backoffice/document';
+import { umbConfirmModal } from '@umbraco-cms/backoffice/modal';
+import { UmbVariantId } from '@umbraco-cms/backoffice/variant';
 import {
   applyCardState,
   mergeLanePage,
   moveCard,
   nextStateAfterSave,
+  pendingCards,
   setCardSaving,
   toBoardState,
   type KanbanBoardState,
 } from './board.model.js';
-import { laneAtPoint, moveFailureMessage, type KanbanLaneHitTarget } from './drag.model.js';
+import {
+  formatPublishSummary,
+  laneAtPoint,
+  moveFailureMessage,
+  type KanbanLaneHitTarget,
+} from './drag.model.js';
 import './kanban-lane.element.js';
 import type { KanbanBoardQuery, KanbanDataSource } from '../data/kanban-data-source.js';
 import { panScrollOffset, shouldStartPan } from './pan.model.js';
@@ -56,6 +65,17 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
   /** The lane currently under the pointer, or undefined. Only ever one, which laneAtPoint guarantees. */
   @state()
   private _dropTarget?: { value: string; acceptsDrops: boolean };
+
+  /**
+   * Umbraco's own single-document publishing repository, looped once per pending card. This is exactly
+   * what core's document list-view bulk publish does — that action has no server-side bulk endpoint
+   * behind it either — so this milestone adds no /publish-pending controller of its own.
+   */
+  #publishing = new UmbDocumentPublishingRepository(this);
+
+  /** True while a publish run is in flight, so the button cannot be pressed twice. */
+  @state()
+  private _publishing = false;
 
   /** The in-progress pan, or undefined between drags. Keyed by pointerId so a second pointer is ignored. */
   #pan?: {
@@ -302,6 +322,56 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
     return this._board?.lanes.flatMap((lane) => lane.cards).find((card) => card.key === key);
   }
 
+  async #onPublishPending() {
+    if (!this._board || this._publishing) return;
+
+    const pending = pendingCards(this._board);
+
+    if (pending.length === 0) return;
+
+    const confirmed = await umbConfirmModal(this, {
+      headline: '#content_readyToPublish',
+      content: `${pending.length} ${pending.length === 1 ? 'card has' : 'cards have'} unpublished changes: ${pending
+        .map((card) => card.name)
+        .join(', ')}`,
+      color: 'positive',
+      confirmLabel: this.localize.term('actions_publish'),
+    }).catch(() => false);
+
+    if (confirmed === false) return;
+
+    this._publishing = true;
+
+    // The board's own culture, or the invariant variant where nothing varies — the same choice core's
+    // bulk action makes when every selected document is invariant.
+    const variantId = this.culture ? new UmbVariantId(this.culture, null) : UmbVariantId.CreateInvariant();
+
+    let succeeded = 0;
+
+    for (const card of pending) {
+      const { error } = await this.#publishing.publish(card.key, [{ variantId }]);
+
+      if (error) continue;
+
+      succeeded++;
+
+      // Flip this card locally rather than reloading the whole board: a reload would discard every lane
+      // page the editor has already loaded.
+      if (this._board) {
+        this._board = applyCardState(this._board, card.key, 'published');
+      }
+    }
+
+    this._publishing = false;
+
+    const notifications = await this.getContext(UMB_NOTIFICATION_CONTEXT);
+
+    // One summary line, never one toast per card — a failure folds into the same line as the successes.
+    notifications?.peek(succeeded === pending.length ? 'positive' : 'warning', {
+      data: { message: formatPublishSummary(succeeded, pending.length) },
+    });
+  }
+
   override render() {
     switch (this._status) {
       case 'idle':
@@ -325,7 +395,23 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
   #renderBoard() {
     if (!this._board) return nothing;
 
+    const pending = pendingCards(this._board);
+
     return html`
+      ${pending.length
+        ? html`<div class="toolbar">
+            <uui-button
+              look="primary"
+              color="positive"
+              icon="icon-globe"
+              label="Publish pending changes"
+              ?disabled=${this._publishing}
+              @click=${this.#onPublishPending}>
+              Publish pending changes
+              <uui-badge look="secondary">${pending.length}</uui-badge>
+            </uui-button>
+          </div>`
+        : nothing}
       ${this._board.truncated
         ? // Deliberately no child count: it is the parent's true count, not permission-filtered,
           // so printing it would disclose the existence of siblings a restricted user cannot see.
@@ -383,6 +469,12 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
       .message {
         padding: var(--uui-size-space-4);
         color: var(--uui-color-text-alt);
+      }
+
+      .toolbar {
+        display: flex;
+        justify-content: flex-end;
+        padding-bottom: var(--uui-size-space-3);
       }
     `,
   ];
