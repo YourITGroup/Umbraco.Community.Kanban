@@ -7,6 +7,9 @@ import { umbConfirmModal } from '@umbraco-cms/backoffice/modal';
 import { UmbVariantId } from '@umbraco-cms/backoffice/variant';
 import {
   applyCardState,
+  invertMove,
+  isMoveUndoable,
+  laneOfCard,
   mergeLanePage,
   moveCard,
   nextStateAfterSave,
@@ -14,6 +17,7 @@ import {
   setCardSaving,
   toBoardState,
   type KanbanBoardState,
+  type KanbanCardMove,
 } from './board.model.js';
 import {
   formatPublishSummary,
@@ -98,6 +102,17 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
   private _publishing = false;
 
   /**
+   * The moves this board has made, oldest first — the undo stack. Only what this session did: it is emptied
+   * on a reload, because a move can only be undone against the board state it was made on.
+   */
+  @state()
+  private _moves: KanbanCardMove[] = [];
+
+  /** True while an undo's write is in flight, so it cannot be pressed twice. */
+  @state()
+  private _undoing = false;
+
+  /**
    * The viewport's height in pixels, measured from the window. Undefined until the first measurement,
    * when the CSS `min-height` is what holds the box open.
    */
@@ -135,6 +150,9 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
     // drag would otherwise be stranded on the discarded div (see #endPan for why that's unsafe).
     this.#endPan();
     this.#onDragCancel();
+
+    // A move can only be undone against the board it was made on, and this replaces that board wholesale.
+    this._moves = [];
 
     const token = ++this.#loadToken;
 
@@ -464,20 +482,33 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
     if (!drag || !hit || !hit.acceptsDrops || !this._board || !this.datasource) return;
     if (hit.value.toLowerCase() === drag.lane.toLowerCase()) return;
 
-    const card = this.#findCard(drag.key);
+    await this.#applyMove({ key: drag.key, from: drag.lane, to: hit.value }, { remember: true });
+  }
+
+  /**
+   * Moves a card and writes the new lane, optimistically: the card relocates, its badge flips and it dims
+   * before the request is sent, and snaps back with a notification if the write fails.
+   *
+   * Shared by a drop and an undo so the two cannot drift — an undo that behaves differently from the move
+   * it reverses is worse than no undo. `remember` is what keeps them distinguishable: a drop is recorded on
+   * the undo stack, an undo is not, or undoing would push its own inverse and loop forever.
+   */
+  async #applyMove(move: KanbanCardMove, options: { remember: boolean }) {
+    if (!this._board || !this.datasource) return;
+
+    const card = this.#findCard(move.key);
 
     if (!card) return;
 
-    // Optimistic: the card relocates, its badge flips, and it dims — all before the request is even sent.
-    let next = moveCard(this._board, drag.key, drag.lane, hit.value);
-    next = applyCardState(next, drag.key, nextStateAfterSave(card.state));
-    this._board = setCardSaving(next, drag.key, true);
+    let next = moveCard(this._board, move.key, move.from, move.to);
+    next = applyCardState(next, move.key, nextStateAfterSave(card.state));
+    this._board = setCardSaving(next, move.key, true);
 
     const token = this.#loadToken;
 
     const outcome = await this.datasource.setLane({
-      cardKey: drag.key,
-      laneValue: hit.value,
+      cardKey: move.key,
+      laneValue: move.to,
       culture: this.culture,
     });
 
@@ -487,20 +518,61 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
 
     if (outcome.kind === 'success') {
       // What the server actually persisted, in place of the optimistic guess.
-      this._board = setCardSaving(applyCardState(this._board, drag.key, outcome.state), drag.key, false);
+      this._board = setCardSaving(applyCardState(this._board, move.key, outcome.state), move.key, false);
+
+      if (options.remember) {
+        this._moves = [...this._moves, move];
+      }
+
       return;
     }
 
     // The same function with the lanes swapped: the card goes back exactly where it started.
-    let reverted = moveCard(this._board, drag.key, hit.value, drag.lane);
-    reverted = applyCardState(reverted, drag.key, card.state);
-    this._board = setCardSaving(reverted, drag.key, false);
+    let reverted = moveCard(this._board, move.key, move.to, move.from);
+    reverted = applyCardState(reverted, move.key, card.state);
+    this._board = setCardSaving(reverted, move.key, false);
 
     const notifications = await this.getContext(UMB_NOTIFICATION_CONTEXT);
 
     notifications?.peek('danger', {
       data: { message: moveFailureMessage(card.name, outcome.status) },
     });
+  }
+
+  /**
+   * Undoes the most recent move this board made, and can be pressed repeatedly to walk back through them.
+   *
+   * Only moves made here are undoable: the stack is what this session did, so it is emptied on a reload and
+   * never contains anything another editor did. A move whose card has since moved on is dropped with a
+   * warning rather than written — see `isMoveUndoable`.
+   *
+   * Note it restores the lane, not the publication state: the card stays pending, because a save happened
+   * either way and only Publish clears that.
+   */
+  async #onUndo() {
+    if (!this._board || this._undoing || this._moves.length === 0) return;
+
+    const move = this._moves[this._moves.length - 1];
+
+    this._moves = this._moves.slice(0, -1);
+
+    const card = this.#findCard(move.key);
+
+    if (!card || !isMoveUndoable(move, laneOfCard(this._board, move.key))) {
+      const notifications = await this.getContext(UMB_NOTIFICATION_CONTEXT);
+
+      notifications?.peek('warning', {
+        data: { message: `Couldn’t undo — ‘${card?.name ?? 'that card'}’ has moved on since.` },
+      });
+
+      return;
+    }
+
+    this._undoing = true;
+
+    await this.#applyMove(invertMove(move), { remember: false });
+
+    this._undoing = false;
   }
 
   /** Every rendered lane's identity and viewport rect — the board is the only element that can see them all. */
@@ -616,11 +688,20 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
         </div>
         <div class="buttons">
           <uui-button
+            look="secondary"
+            icon="icon-undo"
+            label="Undo the last move"
+            title="Undo the last move made on this board"
+            ?disabled=${this._moves.length === 0 || this._undoing || this._publishing}
+            @click=${this.#onUndo}>
+            Undo
+          </uui-button>
+          <uui-button
             look="primary"
             color="positive"
             icon="icon-globe"
             label="Publish pending changes"
-            ?disabled=${this._publishing}
+            ?disabled=${this._publishing || this._undoing}
             @click=${this.#onPublishPending}>
             Publish pending changes
           </uui-button>
