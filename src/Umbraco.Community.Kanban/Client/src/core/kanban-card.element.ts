@@ -1,9 +1,10 @@
-import { css, customElement, html, nothing, property, repeat } from '@umbraco-cms/backoffice/external/lit';
+import { classMap, css, customElement, html, nothing, property, repeat, state } from '@umbraco-cms/backoffice/external/lit';
 import type { PropertyValues } from '@umbraco-cms/backoffice/external/lit';
 import { UmbLitElement } from '@umbraco-cms/backoffice/lit-element';
 import { UmbEntityContext } from '@umbraco-cms/backoffice/entity';
 import '@umbraco-cms/backoffice/ufm';
 import { cardStateTag } from './card.model.js';
+import { shouldStartCardDrag } from './drag.model.js';
 import './kanban-card-children.element.js';
 import type { KanbanCardModel, KanbanCardPropertyModel } from '../data/kanban-board.types.js';
 
@@ -28,6 +29,21 @@ export class UmbCommunityKanbanCardElement extends UmbLitElement {
   showChildItems = false;
 
   /**
+   * Whether this board's configuration permits dragging. Board-wide state forwarded down, paired with the
+   * card's own `canUpdate` — dragging needs both, and only the server knows either.
+   */
+  @property({ type: Boolean, attribute: 'allow-drag' })
+  allowDrag = false;
+
+  /**
+   * The value of the lane this card is currently in. Passed down rather than derived: a card has no view
+   * of the board, and the drag's source lane has to travel with the gesture so the failure path can put
+   * the card back exactly where it started.
+   */
+  @property({ type: String, attribute: 'lane-value' })
+  laneValue?: string;
+
+  /**
    * The card owns the entity identity for its own subtree. `<umb-entity-actions-bundle>` reads
    * its entity from the ambient UMB_ENTITY_CONTEXT; its `entityType`/`unique` properties are
    * deprecated and removed in Umbraco 19, and relying on the fallback context they create means
@@ -35,6 +51,24 @@ export class UmbCommunityKanbanCardElement extends UmbLitElement {
    * the host's ambient context — the PARENT document — and aim every action at the wrong entity.
    */
   #entityContext = new UmbEntityContext(this);
+
+  /**
+   * True while this card is the one being dragged. The placeholder the spec asks for is the card itself
+   * reading as lifted-and-left-behind rather than a second floating element: the pointer is captured on
+   * this card, so it is already the thing under the cursor for the whole gesture, and a duplicate ghost
+   * would have to be positioned against a board that is scrolling underneath it.
+   */
+  @state()
+  private _dragging = false;
+
+  /** The live drag, or undefined between gestures. Keyed by pointerId so a second pointer is ignored. */
+  #drag?: { pointerId: number };
+
+  /**
+   * Whether the last gesture moved at all. A drag ends with a pointerup on the card, which the browser
+   * then follows with a click — so without this, every drag would also open the card's document.
+   */
+  #moved = false;
 
   constructor() {
     super();
@@ -53,6 +87,13 @@ export class UmbCommunityKanbanCardElement extends UmbLitElement {
   #onOpen() {
     if (!this.card) return;
 
+    // A drag ends with a pointerup on this card, which the browser follows with a click. Opening the
+    // document then would make every completed drag also open a workspace modal.
+    if (this.#moved) {
+      this.#moved = false;
+      return;
+    }
+
     this.dispatchEvent(
       new CustomEvent('kanban-open-document', {
         detail: { key: this.card.key },
@@ -62,13 +103,100 @@ export class UmbCommunityKanbanCardElement extends UmbLitElement {
     );
   }
 
+  #onPointerDown(event: PointerEvent) {
+    if (this.#drag || !this.card || this.laneValue === undefined) return;
+
+    if (
+      !shouldStartCardDrag({
+        allowDrag: this.allowDrag,
+        canUpdate: this.card.canUpdate,
+        saving: this.card.saving === true,
+        pointerType: event.pointerType,
+        button: event.button,
+        isPrimary: event.isPrimary,
+      })
+    ) {
+      return;
+    }
+
+    // Capturing on the card is what makes every subsequent event for this pointer arrive here regardless
+    // of what is visually underneath — including over another lane, which is the whole point.
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+
+    this.#drag = { pointerId: event.pointerId };
+    this.#moved = false;
+    this._dragging = true;
+
+    this.#dispatch('kanban-drag-start', { key: this.card.key, lane: this.laneValue });
+
+    // Stops the browser's native drag-select starting before the board's re-render lands — Lit's render
+    // is a microtask, not synchronous with this event.
+    event.preventDefault();
+  }
+
+  #onPointerMove(event: PointerEvent) {
+    if (!this.#drag || event.pointerId !== this.#drag.pointerId) return;
+
+    this.#moved = true;
+
+    this.#dispatch('kanban-drag-move', { clientX: event.clientX, clientY: event.clientY });
+  }
+
+  #onPointerUp(event: PointerEvent) {
+    if (!this.#drag || event.pointerId !== this.#drag.pointerId) return;
+
+    this.#releaseCapture(event);
+    this.#drag = undefined;
+    this._dragging = false;
+
+    this.#dispatch('kanban-drag-end', { clientX: event.clientX, clientY: event.clientY });
+  }
+
+  /**
+   * pointercancel and lostpointercapture, the latter of which the browser can fire with no pointerup ever
+   * arriving (losing window focus, an OS gesture taking over the drag). Identical cleanup to a pointerup
+   * over nothing — the same reasoning the board's pan already applies to a revoked capture.
+   */
+  #onPointerCancel(event: PointerEvent) {
+    if (!this.#drag || event.pointerId !== this.#drag.pointerId) return;
+
+    this.#releaseCapture(event);
+    this.#drag = undefined;
+    this._dragging = false;
+
+    this.#dispatch('kanban-drag-cancel', undefined);
+  }
+
+  #releaseCapture(event: PointerEvent) {
+    const target = event.currentTarget as HTMLElement;
+
+    if (target.hasPointerCapture(event.pointerId)) {
+      target.releasePointerCapture(event.pointerId);
+    }
+  }
+
+  #dispatch(type: string, detail: unknown) {
+    this.dispatchEvent(new CustomEvent(type, { detail, bubbles: true, composed: true }));
+  }
+
   override render() {
     if (!this.card) return nothing;
 
     const tag = cardStateTag(this.card.state);
 
     return html`
-      <div class="card">
+      <div
+        class=${classMap({
+          card: true,
+          draggable: this.allowDrag && this.card.canUpdate && this.card.saving !== true,
+          dragging: this._dragging,
+          saving: this.card.saving === true,
+        })}
+        @pointerdown=${this.#onPointerDown}
+        @pointermove=${this.#onPointerMove}
+        @pointerup=${this.#onPointerUp}
+        @pointercancel=${this.#onPointerCancel}
+        @lostpointercapture=${this.#onPointerCancel}>
         <div class="header">
           ${this.card.icon ? html`<umb-icon name=${this.card.icon}></umb-icon>` : nothing}
           <button type="button" class="name" @click=${this.#onOpen}>${this.card.name}</button>
@@ -137,6 +265,26 @@ export class UmbCommunityKanbanCardElement extends UmbLitElement {
 
       .card:hover {
         border-color: var(--uui-color-border-emphasis);
+      }
+
+      .card.draggable {
+        cursor: grab;
+      }
+
+      /* The placeholder: this card is the one in flight, so it reads as lifted out of the lane. Text
+         selection is off for the gesture's duration, the same reason \`.lanes.panning\` turns it off. */
+      .card.dragging {
+        cursor: grabbing;
+        opacity: 0.5;
+        border-style: dashed;
+        user-select: none;
+      }
+
+      /* A write is in flight: the card reads as provisional and cannot be picked up again until it
+         resolves, which shouldStartCardDrag enforces independently of this styling. */
+      .card.saving {
+        opacity: 0.6;
+        cursor: progress;
       }
 
       .header {
