@@ -232,7 +232,6 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
         ${this._board.lanes.map(
           (lane) => html`<umb-community-kanban-lane
             .lane=${lane}
-            ?readonly=${this.readonly}
             ?show-child-items=${this._board?.showChildItems ?? false}></umb-community-kanban-lane>`,
         )}
       </div>
