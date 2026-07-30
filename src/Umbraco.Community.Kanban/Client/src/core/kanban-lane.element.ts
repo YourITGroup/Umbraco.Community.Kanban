@@ -88,13 +88,22 @@ export class UmbCommunityKanbanLaneElement extends UmbLitElement {
 
   static override styles = [
     css`
+      /* The canvas stretches this host to the height of the tallest lane. Making the host a flex container
+         is what passes that height on to the .lane box: without it, .lane keeps its own content height, and
+         an empty lane's sticky header then has only those few pixels to stick within — which is exactly why
+         the Unassigned lane's header scrolled away while full lanes' headers appeared to pin. */
+      :host {
+        display: flex;
+      }
+
       .lane {
         display: flex;
+        flex: 1;
         flex-direction: column;
         gap: var(--uui-size-space-3);
         min-width: 280px;
         max-width: 320px;
-        flex: 0 0 auto;
+        box-sizing: border-box;
         /* A transparent border of the same width the highlight uses, so becoming a drop target changes
            colour and nothing else — no reflow of the whole board mid-drag. */
         border: 2px solid transparent;
