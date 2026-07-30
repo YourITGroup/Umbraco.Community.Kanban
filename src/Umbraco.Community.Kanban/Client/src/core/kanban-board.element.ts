@@ -17,6 +17,7 @@ import {
 } from './board.model.js';
 import {
   formatPublishSummary,
+  ghostPosition,
   laneAtPoint,
   moveFailureMessage,
   type KanbanLaneHitTarget,
@@ -65,10 +66,15 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
 
   /**
    * The live card drag, or undefined between gestures. `lane` is the source lane, captured at drag start
-   * so the revert on a failed write is the exact inverse move.
+   * so the revert on a failed write is the exact inverse move; the offsets and width are what let the
+   * ghost sit where the card was picked up.
    */
   @state()
-  private _drag?: { key: string; lane: string };
+  private _drag?: { key: string; lane: string; grabOffsetX: number; grabOffsetY: number; width: number };
+
+  /** The ghost's top-left corner, recomputed once per frame while a drag is live. */
+  @state()
+  private _ghost?: { left: number; top: number };
 
   /** The lane currently under the pointer, or undefined. Only ever one, which laneAtPoint guarantees. */
   @state()
@@ -91,6 +97,12 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
    */
   @state()
   private _viewportHeight?: number;
+
+  /** The pointer's last known viewport position during a drag. Not `@state()` — the frame loop reads it. */
+  #pointer?: { x: number; y: number };
+
+  /** The live `requestAnimationFrame` handle for the drag loop, or undefined when it is not running. */
+  #frame?: number;
 
   /** The in-progress pan, or undefined between drags. Keyed by pointerId so a second pointer is ignored. */
   #pan?: {
@@ -295,32 +307,85 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
 
   #onWindowResize = () => this.#measureViewport();
 
-  #onDragStart(event: CustomEvent<{ key: string; lane: string }>) {
+  #onDragStart(
+    event: CustomEvent<{ key: string; lane: string; grabOffsetX: number; grabOffsetY: number; width: number }>,
+  ) {
     // A pan and a card drag cannot overlap: the pan only starts on the canvas background, never a card.
-    this._drag = { key: event.detail.key, lane: event.detail.lane };
+    this._drag = { ...event.detail };
     this._dropTarget = undefined;
+    this.#pointer = undefined;
+    this.#startDragLoop();
   }
 
+  /**
+   * Records the pointer only. Everything derived from it — the ghost's position and the drop target — is
+   * computed on the next frame instead, because `pointermove` fires more often than frames and because
+   * the drop target has to keep updating while the canvas auto-scrolls under a stationary pointer.
+   */
   #onDragMove(event: CustomEvent<{ clientX: number; clientY: number }>) {
     if (!this._drag) return;
 
-    const hit = laneAtPoint(event.detail.clientX, event.detail.clientY, this.#laneTargets());
-
-    this._dropTarget = hit ? { value: hit.value, acceptsDrops: hit.acceptsDrops } : undefined;
+    this.#pointer = { x: event.detail.clientX, y: event.detail.clientY };
   }
 
   #onDragCancel() {
+    this.#stopDragLoop();
     this._drag = undefined;
     this._dropTarget = undefined;
+    this._ghost = undefined;
+    this.#pointer = undefined;
+  }
+
+  /** Runs for the whole gesture, not once per pointer event. See `#onDragFrame`. */
+  #startDragLoop() {
+    if (this.#frame !== undefined) return;
+
+    const tick = () => {
+      this.#frame = requestAnimationFrame(tick);
+      this.#onDragFrame();
+    };
+
+    this.#frame = requestAnimationFrame(tick);
+  }
+
+  #stopDragLoop() {
+    if (this.#frame === undefined) return;
+
+    cancelAnimationFrame(this.#frame);
+    this.#frame = undefined;
+  }
+
+  /**
+   * One frame of a live drag: move the ghost, then re-run the hit-test.
+   *
+   * The hit-test belongs here rather than in the move handler because lane rects move whenever the canvas
+   * scrolls, which can happen on a frame where no pointer event arrived at all.
+   */
+  #onDragFrame() {
+    const pointer = this.#pointer;
+
+    if (!this._drag || !pointer) return;
+
+    this._ghost = ghostPosition({
+      pointer,
+      grabOffset: { x: this._drag.grabOffsetX, y: this._drag.grabOffsetY },
+    });
+
+    const hit = laneAtPoint(pointer.x, pointer.y, this.#laneTargets());
+
+    this._dropTarget = hit ? { value: hit.value, acceptsDrops: hit.acceptsDrops } : undefined;
   }
 
   async #onDragEnd(event: CustomEvent<{ clientX: number; clientY: number }>) {
     const drag = this._drag;
     const hit = drag ? laneAtPoint(event.detail.clientX, event.detail.clientY, this.#laneTargets()) : undefined;
 
-    // Clear before awaiting anything, so the highlight never outlives the gesture.
+    // Clear before awaiting anything, so neither the highlight nor the ghost outlives the gesture.
+    this.#stopDragLoop();
     this._drag = undefined;
     this._dropTarget = undefined;
+    this._ghost = undefined;
+    this.#pointer = undefined;
 
     if (!drag || !hit || !hit.acceptsDrops || !this._board || !this.datasource) return;
     if (hit.value.toLowerCase() === drag.lane.toLowerCase()) return;
@@ -457,6 +522,28 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
     return html`<div class="message">${message}</div>`;
   }
 
+  /**
+   * The dragged card, following the pointer. A real card element rather than a bespoke chip, so it cannot
+   * drift from how cards actually look; `allow-drag` is left off (defaulting false) so the clone cannot
+   * start a gesture of its own, and `pointer-events: none` keeps it inert under the cursor.
+   */
+  #renderGhost() {
+    if (!this._drag || !this._ghost) return nothing;
+
+    const card = this.#findCard(this._drag.key);
+
+    if (!card) return nothing;
+
+    return html`<div
+      class="ghost"
+      aria-hidden="true"
+      style=${`transform: translate3d(${this._ghost.left}px, ${this._ghost.top}px, 0) rotate(2deg); width: ${this._drag.width}px`}>
+      <umb-community-kanban-card
+        .card=${card}
+        ?show-child-items=${this._board?.showChildItems ?? false}></umb-community-kanban-card>
+    </div>`;
+  }
+
   #renderBoard() {
     if (!this._board) return nothing;
 
@@ -506,6 +593,7 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
           )}
         </div>
       </div>
+      ${this.#renderGhost()}
     `;
   }
 
@@ -549,6 +637,18 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
 
       .canvas > * {
         cursor: auto;
+      }
+
+      /* Positioned from the top-left of the viewport and moved entirely by transform, so a drag costs no
+         layout. Full opacity on purpose: the dimmed original left behind in the lane is what reads as
+         "in flight", so dimming this too would leave nothing looking solid. */
+      .ghost {
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 10000;
+        pointer-events: none;
+        box-shadow: var(--uui-shadow-depth-3);
       }
 
       .message {

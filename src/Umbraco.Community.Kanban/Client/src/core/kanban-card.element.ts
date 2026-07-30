@@ -119,15 +119,27 @@ export class UmbCommunityKanbanCardElement extends UmbLitElement {
       return;
     }
 
+    const element = event.currentTarget as HTMLElement;
+
     // Capturing on the card is what makes every subsequent event for this pointer arrive here regardless
     // of what is visually underneath — including over another lane, which is the whole point.
-    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    element.setPointerCapture(event.pointerId);
 
     this.#drag = { pointerId: event.pointerId };
     this.#moved = false;
     this._dragging = true;
 
-    this.#dispatch('kanban-drag-start', { key: this.card.key, lane: this.laneValue });
+    // The offset within the card, and its width, are only knowable here — the board never sees this
+    // element's own geometry, and the ghost has to keep both to sit where the card was picked up.
+    const rect = element.getBoundingClientRect();
+
+    this.#dispatch('kanban-drag-start', {
+      key: this.card.key,
+      lane: this.laneValue,
+      grabOffsetX: event.clientX - rect.left,
+      grabOffsetY: event.clientY - rect.top,
+      width: rect.width,
+    });
 
     // Stops the browser's native drag-select starting before the board's re-render lands — Lit's render
     // is a microtask, not synchronous with this event.

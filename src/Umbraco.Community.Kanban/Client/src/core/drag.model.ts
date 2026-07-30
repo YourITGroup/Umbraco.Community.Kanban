@@ -76,3 +76,26 @@ export function formatPublishSummary(succeeded: number, total: number): string {
 
   return `Published ${succeeded} of ${total} — ${total - succeeded} failed.`;
 }
+
+/** Where the ghost's top-left corner goes. */
+export interface KanbanGhostPosition {
+  left: number;
+  top: number;
+}
+
+/**
+ * The ghost's corner, given the pointer and where within the card it was grabbed.
+ *
+ * Subtracting the grab offset is what stops the card jumping so its corner snaps to the cursor — it stays
+ * held exactly where it was picked up. Negative results are legitimate: a drag can travel above or to the
+ * left of the window.
+ */
+export function ghostPosition(input: {
+  pointer: { x: number; y: number };
+  grabOffset: { x: number; y: number };
+}): KanbanGhostPosition {
+  return {
+    left: input.pointer.x - input.grabOffset.x,
+    top: input.pointer.y - input.grabOffset.y,
+  };
+}
