@@ -106,6 +106,23 @@ What this fixed, and what it cost:
   cannot be the same element.
 - **The drop target is computed per frame, not per pointer event.** Auto-scroll moves lane rects while the
   pointer holds still, so a move-driven hit-test would go stale mid-gesture.
+- **The board is sized to its container, not the window.** The workspace footer holding Save sits below
+  the collection's container, so measuring `window.innerHeight` overhung it — 54px in a real layout — and
+  grew a second scrollbar. The container is found by climbing ancestors and ignoring the boxless
+  `router-slot` wrappers, whose percentage heights are the same broken chain that stops CSS sizing.
+- **A lane must fill its stretched host.** `align-items: stretch` sizes the lane *host*; the `.lane` box
+  inside its shadow root kept its own content height, so an empty lane's sticky header had only 82px to
+  stick within. Full lanes hid the bug by being tall anyway.
+
+**One change reaches beyond the board:** the document collection's manifest is re-registered at startup
+with its `element` swapped for `umb-community-kanban-document-collection`, so a Kanban view can hide the
+list view's pager and selection-action bar — neither can act on anything a board shows. The swap keeps
+core's own `api` and `meta` references untouched, because that `api` is the non-public
+`UmbDocumentCollectionContext` and it carries real behaviour (display-culture sequencing, and
+`requestItemHref` for item links). Every other view sees identical behaviour: the suppression is gated on
+the showing view's alias via `isChromelessCollectionView`, which is where the calendar view opts in later.
+There was no narrower seam — the collection layout is chosen per entity type from a fixed alias, so
+neither a collection view nor a data type's configuration can influence it.
 
 ## 7. Board configuration picker: match core's picker styling
 
