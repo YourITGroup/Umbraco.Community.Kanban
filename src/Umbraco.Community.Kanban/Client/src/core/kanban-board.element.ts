@@ -22,7 +22,7 @@ import {
   moveFailureMessage,
   type KanbanLaneHitTarget,
 } from './drag.model.js';
-import { boardViewportHeight } from './canvas.model.js';
+import { boardViewportHeight, edgeScrollDelta } from './canvas.model.js';
 import './kanban-lane.element.js';
 import type { KanbanBoardQuery, KanbanDataSource } from '../data/kanban-data-source.js';
 import { panScrollOffset, shouldStartPan } from './pan.model.js';
@@ -32,6 +32,12 @@ const VIEWPORT_GUTTER = 24;
 
 /** Below this a scrolling canvas is useless — roughly a lane header plus two cards. */
 const VIEWPORT_MIN_HEIGHT = 320;
+
+/** How close to a viewport edge a dragged card must be held before the canvas starts scrolling. */
+const EDGE_SCROLL_THRESHOLD = 60;
+
+/** Peak auto-scroll speed, in pixels per frame — roughly four lane widths a second at 60fps. */
+const EDGE_SCROLL_MAX_SPEED = 20;
 
 type KanbanBoardStatus = 'idle' | 'loading' | 'ready' | 'not-configured' | 'error';
 
@@ -365,6 +371,22 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
     const pointer = this.#pointer;
 
     if (!this._drag || !pointer) return;
+
+    const viewport = this.renderRoot.querySelector<HTMLDivElement>('.viewport');
+
+    if (viewport) {
+      const rect = viewport.getBoundingClientRect();
+      const { dx, dy } = edgeScrollDelta({
+        pointer,
+        rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom },
+        threshold: EDGE_SCROLL_THRESHOLD,
+        maxSpeed: EDGE_SCROLL_MAX_SPEED,
+      });
+
+      // Assigning past either end is harmless — the browser clamps scrollLeft/scrollTop for us.
+      if (dx !== 0) viewport.scrollLeft += dx;
+      if (dy !== 0) viewport.scrollTop += dy;
+    }
 
     this._ghost = ghostPosition({
       pointer,
