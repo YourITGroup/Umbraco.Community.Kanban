@@ -1,14 +1,19 @@
 import { describe, it, expect } from 'vitest';
 import {
+  applyCardState,
   formatLaneTotal,
   laneHasMore,
   mergeLanePage,
+  moveCard,
   nextSkip,
+  nextStateAfterSave,
+  pendingCards,
+  setCardSaving,
   toBoardState,
 } from './board.model.js';
 import type { KanbanBoardLaneModel, KanbanBoardModel, KanbanCardModel } from '../data/kanban-board.types.js';
 
-const card = (key: string): KanbanCardModel => ({
+const card = (key: string, overrides: Partial<KanbanCardModel> = {}): KanbanCardModel => ({
   key,
   name: key,
   contentTypeAlias: 'task',
@@ -20,6 +25,7 @@ const card = (key: string): KanbanCardModel => ({
   childTotal: 0,
   childTotalIsExact: true,
   properties: [],
+  ...overrides,
 });
 
 const lane = (value: string, cards: string[], overrides: Partial<KanbanBoardLaneModel> = {}): KanbanBoardLaneModel => ({
@@ -30,7 +36,7 @@ const lane = (value: string, cards: string[], overrides: Partial<KanbanBoardLane
   total: cards.length,
   totalIsExact: true,
   skip: 0,
-  cards: cards.map(card),
+  cards: cards.map((key) => card(key)),
   ...overrides,
 });
 
@@ -39,6 +45,7 @@ const board = (lanes: KanbanBoardLaneModel[], overrides: Partial<KanbanBoardMode
   truncated: false,
   childCount: lanes.reduce((sum, l) => sum + l.total, 0),
   showChildItems: false,
+  allowDrag: false,
   ...overrides,
 });
 
@@ -53,6 +60,10 @@ describe('toBoardState', () => {
 
   it('carries the child items flag across', () => {
     expect(toBoardState(board([], { showChildItems: true })).showChildItems).toBe(true);
+  });
+
+  it('carries the allow drag flag across', () => {
+    expect(toBoardState(board([], { allowDrag: true })).allowDrag).toBe(true);
   });
 });
 
@@ -79,6 +90,14 @@ describe('mergeLanePage', () => {
     const next = mergeLanePage(state, board([lane('todo', ['b'], { total: 3, skip: 1 })], { showChildItems: true }));
 
     expect(next.showChildItems).toBe(true);
+  });
+
+  it('keeps the allow drag flag when a lane page is merged in', () => {
+    const state = toBoardState(board([lane('todo', ['a'], { total: 3 })], { allowDrag: true }));
+
+    const next = mergeLanePage(state, board([lane('todo', ['b'], { total: 3, skip: 1 })], { allowDrag: true }));
+
+    expect(next.allowDrag).toBe(true);
   });
 
   it('does not duplicate a card already held, so a double-clicked show-more is harmless', () => {
@@ -162,5 +181,186 @@ describe('formatLaneTotal', () => {
 describe('nextSkip', () => {
   it('is the number of cards already loaded, never a running counter', () => {
     expect(nextSkip(lane('todo', ['a', 'b', 'c'], { total: 9, skip: 25 }))).toBe(3);
+  });
+});
+
+describe('moveCard', () => {
+  const initial = () => toBoardState(board([lane('todo', ['a', 'b']), lane('doing', ['x']), lane('', [])]));
+
+  it('removes the card from its source lane and appends it to the target', () => {
+    const next = moveCard(initial(), 'a', 'todo', 'doing');
+
+    expect(next.lanes[0].cards.map((c) => c.key)).toEqual(['b']);
+    expect(next.lanes[1].cards.map((c) => c.key)).toEqual(['x', 'a']);
+  });
+
+  it('moves the totals with the card', () => {
+    const next = moveCard(initial(), 'a', 'todo', 'doing');
+
+    expect(next.lanes[0].total).toBe(1);
+    expect(next.lanes[1].total).toBe(2);
+  });
+
+  it('is its own inverse, which is what the snap-back on a failed write relies on', () => {
+    const state = initial();
+
+    const reverted = moveCard(moveCard(state, 'a', 'todo', 'doing'), 'a', 'doing', 'todo');
+
+    expect(reverted.lanes[0].cards.map((c) => c.key)).toEqual(['b', 'a']);
+    expect(reverted.lanes[0].total).toBe(2);
+    expect(reverted.lanes[1].cards.map((c) => c.key)).toEqual(['x']);
+    expect(reverted.lanes[1].total).toBe(1);
+  });
+
+  it('moves into the unassigned lane, addressed by the empty string', () => {
+    const next = moveCard(initial(), 'a', 'todo', '');
+
+    expect(next.lanes[2].cards.map((c) => c.key)).toEqual(['a']);
+  });
+
+  it('matches lanes case-insensitively, as every other lane lookup does', () => {
+    const next = moveCard(initial(), 'a', 'ToDo', 'DOING');
+
+    expect(next.lanes[1].cards.map((c) => c.key)).toEqual(['x', 'a']);
+  });
+
+  it('changes nothing when the source and target are the same lane', () => {
+    const next = moveCard(initial(), 'a', 'todo', 'todo');
+
+    expect(next.lanes[0].cards.map((c) => c.key)).toEqual(['a', 'b']);
+    expect(next.lanes[0].total).toBe(2);
+  });
+
+  it('changes nothing when the card is not in the source lane', () => {
+    const next = moveCard(initial(), 'x', 'todo', 'doing');
+
+    expect(next.lanes[0].cards.map((c) => c.key)).toEqual(['a', 'b']);
+    expect(next.lanes[1].cards.map((c) => c.key)).toEqual(['x']);
+  });
+
+  it('changes nothing when the target lane does not exist', () => {
+    const next = moveCard(initial(), 'a', 'todo', 'archived');
+
+    expect(next.lanes[0].cards.map((c) => c.key)).toEqual(['a', 'b']);
+  });
+
+  it('does not mutate the state it was given', () => {
+    const state = initial();
+
+    moveCard(state, 'a', 'todo', 'doing');
+
+    expect(state.lanes[0].cards.map((c) => c.key)).toEqual(['a', 'b']);
+    expect(state.lanes[1].cards.map((c) => c.key)).toEqual(['x']);
+  });
+});
+
+describe('nextStateAfterSave', () => {
+  it('turns a published card pending, because a save leaves the live version behind', () => {
+    expect(nextStateAfterSave('published')).toBe('publishedPendingChanges');
+  });
+
+  it('leaves an already-pending card pending', () => {
+    expect(nextStateAfterSave('publishedPendingChanges')).toBe('publishedPendingChanges');
+  });
+
+  it('leaves a draft a draft, since there is no published version to diverge from', () => {
+    expect(nextStateAfterSave('draft')).toBe('draft');
+  });
+});
+
+describe('applyCardState', () => {
+  const initial = () =>
+    toBoardState(board([lane('todo', ['a', 'b']), lane('doing', ['x'])]));
+
+  it('replaces one card’s state wherever it sits', () => {
+    const next = applyCardState(initial(), 'x', 'published');
+
+    expect(next.lanes[1].cards[0].state).toBe('published');
+  });
+
+  it('leaves every other card alone', () => {
+    const next = applyCardState(initial(), 'a', 'published');
+
+    expect(next.lanes[0].cards[1].state).toBe('draft');
+  });
+
+  it('changes nothing for a card it does not hold', () => {
+    const next = applyCardState(initial(), 'nope', 'published');
+
+    expect(next.lanes.flatMap((l) => l.cards).map((c) => c.state)).toEqual(['draft', 'draft', 'draft']);
+  });
+
+  it('does not mutate the state it was given', () => {
+    const state = initial();
+
+    applyCardState(state, 'a', 'published');
+
+    expect(state.lanes[0].cards[0].state).toBe('draft');
+  });
+});
+
+describe('setCardSaving', () => {
+  const initial = () => toBoardState(board([lane('todo', ['a', 'b'])]));
+
+  it('marks one card as saving', () => {
+    const next = setCardSaving(initial(), 'a', true);
+
+    expect(next.lanes[0].cards[0].saving).toBe(true);
+    expect(next.lanes[0].cards[1].saving).toBeUndefined();
+  });
+
+  it('clears the flag again once the write resolves', () => {
+    const next = setCardSaving(setCardSaving(initial(), 'a', true), 'a', false);
+
+    expect(next.lanes[0].cards[0].saving).toBe(false);
+  });
+
+  it('does not mutate the state it was given', () => {
+    const state = initial();
+
+    setCardSaving(state, 'a', true);
+
+    expect(state.lanes[0].cards[0].saving).toBeUndefined();
+  });
+});
+
+describe('pendingCards', () => {
+  it('collects every card with unpublished changes, across lanes', () => {
+    const state = toBoardState(
+      board([
+        lane('todo', [], { cards: [card('a', { state: 'publishedPendingChanges' }), card('b')] }),
+        lane('doing', [], { cards: [card('c', { state: 'publishedPendingChanges' })] }),
+      ]),
+    );
+
+    expect(pendingCards(state).map((c) => c.key)).toEqual(['a', 'c']);
+  });
+
+  it('excludes published and draft cards', () => {
+    const state = toBoardState(
+      board([lane('todo', [], { cards: [card('a', { state: 'published' }), card('b', { state: 'draft' })] })]),
+    );
+
+    expect(pendingCards(state)).toEqual([]);
+  });
+
+  it('is empty for a board with no lanes at all', () => {
+    expect(pendingCards(toBoardState(board([])))).toEqual([]);
+  });
+
+  it('is scoped to the cards the board is holding, never to cards it has not paged in', () => {
+    // A deliberate scope line, matching core's own bulk action being scoped to its selection: a lane with
+    // 40 pending cards but only 25 loaded contributes 25.
+    const state = toBoardState(
+      board([
+        lane('todo', [], {
+          cards: [card('a', { state: 'publishedPendingChanges' })],
+          total: 40,
+          totalIsExact: true,
+        }),
+      ]),
+    );
+
+    expect(pendingCards(state)).toHaveLength(1);
   });
 });

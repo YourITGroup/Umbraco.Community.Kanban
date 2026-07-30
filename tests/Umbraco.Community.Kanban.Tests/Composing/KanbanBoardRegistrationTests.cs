@@ -16,8 +16,10 @@ public class KanbanBoardRegistrationTests
         { typeof(IKanbanDataTypeConfigurationLookup), typeof(KanbanDataTypeConfigurationLookup) },
         { typeof(IKanbanBoardConfigurationResolver), typeof(KanbanBoardConfigurationResolver) },
         { typeof(IKanbanContentLoader), typeof(KanbanContentLoader) },
+        { typeof(IKanbanContentWriter), typeof(KanbanContentWriter) },
         { typeof(IKanbanPropertyValueReader), typeof(KanbanPropertyValueReader) },
         { typeof(IKanbanBoardService), typeof(KanbanBoardService) },
+        { typeof(IKanbanCardService), typeof(KanbanCardService) },
     };
 
     [Theory]

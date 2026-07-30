@@ -445,4 +445,36 @@ public class KanbanBoardServiceTests
         cards.Single(card => card.Name == "One").CanCreate.Should().BeTrue();
         cards.Single(card => card.Name == "Two").CanCreate.Should().BeFalse();
     }
+
+    [Fact]
+    public async Task Reports_allow_drag_from_the_configuration()
+    {
+        Harness harness = Configured(new KanbanBoardConfiguration
+        {
+            LaneProperty = "status",
+            CardProperties = CardPropertyList.Of("status"),
+            LanePageSize = 25,
+            AllowDrag = true,
+        });
+
+        KanbanBoardResult result = await harness.Service.GetBoardAsync(Request(), User);
+
+        result.Board!.AllowDrag.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Reports_allow_drag_off_when_the_configuration_disables_it()
+    {
+        Harness harness = Configured(new KanbanBoardConfiguration
+        {
+            LaneProperty = "status",
+            CardProperties = CardPropertyList.Of("status"),
+            LanePageSize = 25,
+            AllowDrag = false,
+        });
+
+        KanbanBoardResult result = await harness.Service.GetBoardAsync(Request(), User);
+
+        result.Board!.AllowDrag.Should().BeFalse();
+    }
 }

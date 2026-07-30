@@ -1,4 +1,9 @@
-import type { KanbanBoardLaneModel, KanbanBoardModel } from '../data/kanban-board.types.js';
+import type {
+  KanbanBoardLaneModel,
+  KanbanBoardModel,
+  KanbanCardModel,
+  KanbanCardState,
+} from '../data/kanban-board.types.js';
 
 /** What the board element holds between requests. */
 export interface KanbanBoardState {
@@ -6,6 +11,7 @@ export interface KanbanBoardState {
   truncated: boolean;
   childCount: number;
   showChildItems: boolean;
+  allowDrag: boolean;
 }
 
 export function toBoardState(board: KanbanBoardModel): KanbanBoardState {
@@ -14,6 +20,7 @@ export function toBoardState(board: KanbanBoardModel): KanbanBoardState {
     truncated: board.truncated,
     childCount: board.childCount,
     showChildItems: board.showChildItems,
+    allowDrag: board.allowDrag,
   };
 }
 
@@ -51,6 +58,7 @@ export function mergeLanePage(state: KanbanBoardState, page: KanbanBoardModel): 
     truncated: page.truncated,
     childCount: page.childCount,
     showChildItems: page.showChildItems,
+    allowDrag: page.allowDrag,
   };
 }
 
@@ -67,6 +75,105 @@ export function nextSkip(lane: KanbanBoardLaneModel): number {
 /** The lane header count: "12", or "120+" where the total is only a lower bound. */
 export function formatLaneTotal(lane: KanbanBoardLaneModel): string {
   return lane.totalIsExact ? `${lane.total}` : `${lane.total}+`;
+}
+
+/**
+ * Relocates a card from one lane to another, moving the lane totals with it. Pure; never mutates its
+ * input.
+ *
+ * The revert on a failed write is this same function with the lanes swapped back — there is deliberately
+ * no separate undo, because an undo that is not literally the inverse move is an undo that can drift.
+ * A move whose card, source lane or target lane cannot be found is a no-op rather than an error: the
+ * board hit-tests against what it is rendering, so a mismatch means the board reloaded mid-gesture and
+ * the safe answer is to leave the fresh state alone.
+ */
+export function moveCard(
+  state: KanbanBoardState,
+  cardKey: string,
+  fromLane: string,
+  toLane: string,
+): KanbanBoardState {
+  if (sameLane(fromLane, toLane)) return state;
+
+  const source = state.lanes.find((lane) => sameLane(lane.value, fromLane));
+  const target = state.lanes.find((lane) => sameLane(lane.value, toLane));
+
+  if (!source || !target) return state;
+
+  const moving = source.cards.find((card) => card.key === cardKey);
+
+  if (!moving) return state;
+
+  return {
+    ...state,
+    lanes: state.lanes.map((lane) => {
+      if (lane === source) {
+        return { ...lane, cards: lane.cards.filter((card) => card.key !== cardKey), total: lane.total - 1 };
+      }
+
+      if (lane === target) {
+        return { ...lane, cards: [...lane.cards, moving], total: lane.total + 1 };
+      }
+
+      return lane;
+    }),
+  };
+}
+
+/**
+ * The state a card takes on immediately after a save. A published card gains unpublished changes; a draft
+ * has no published version to diverge from, so nothing changes.
+ *
+ * This is the optimistic guess only — it is superseded by whatever the server reports the save actually
+ * persisted, which is why nothing else in the client derives a state this way.
+ */
+export function nextStateAfterSave(state: KanbanCardState): KanbanCardState {
+  return state === 'published' ? 'publishedPendingChanges' : state;
+}
+
+/** Replaces one card's publish state, wherever the card sits. Pure. */
+export function applyCardState(
+  state: KanbanBoardState,
+  cardKey: string,
+  cardState: KanbanCardState,
+): KanbanBoardState {
+  return mapCard(state, cardKey, (card) => ({ ...card, state: cardState }));
+}
+
+/**
+ * Flags a card as having a write in flight. Drives the dimmed treatment and stops a second drag starting
+ * before the first resolves.
+ */
+export function setCardSaving(state: KanbanBoardState, cardKey: string, saving: boolean): KanbanBoardState {
+  return mapCard(state, cardKey, (card) => ({ ...card, saving }));
+}
+
+/**
+ * Every loaded card with unpublished changes, in lane order.
+ *
+ * Deliberately scoped to what the board is holding in memory — the same scope core's own document bulk
+ * publish action has, which acts on `this.selection` and never queries for items that were never
+ * selected. A card in an unpaged lane page, or beyond the board's truncation cap, does not appear here
+ * until it is paged in. That makes "Publish pending changes" convenience-scoped to what is on screen
+ * rather than exhaustive, which is the backoffice's own convention.
+ */
+export function pendingCards(state: KanbanBoardState): KanbanCardModel[] {
+  return state.lanes.flatMap((lane) => lane.cards.filter((card) => card.state === 'publishedPendingChanges'));
+}
+
+function mapCard(
+  state: KanbanBoardState,
+  cardKey: string,
+  transform: (card: KanbanCardModel) => KanbanCardModel,
+): KanbanBoardState {
+  return {
+    ...state,
+    lanes: state.lanes.map((lane) =>
+      lane.cards.some((card) => card.key === cardKey)
+        ? { ...lane, cards: lane.cards.map((card) => (card.key === cardKey ? transform(card) : card)) }
+        : lane,
+    ),
+  };
 }
 
 function sameLane(left: string, right: string): boolean {

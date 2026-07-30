@@ -155,4 +155,11 @@ public sealed class KanbanBoardResponseModel
     /// that does not show them.
     /// </summary>
     public bool ShowChildItems { get; init; }
+
+    /// <summary>
+    /// Whether this board's configuration permits dragging cards between lanes. Board-wide, and paired
+    /// with each card's own <see cref="KanbanCardModel.CanUpdate" />: only the server knows both the
+    /// configuration and the per-card permission, so a host cannot supply this and does not try.
+    /// </summary>
+    public bool AllowDrag { get; init; }
 }

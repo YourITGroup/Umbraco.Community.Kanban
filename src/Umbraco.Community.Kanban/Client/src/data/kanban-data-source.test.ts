@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildBoardQuery } from './kanban-data-source.js';
+import { buildBoardQuery, buildLaneBody } from './kanban-data-source.js';
 
 describe('buildBoardQuery', () => {
   it('always sends the parent id', () => {
@@ -36,5 +36,36 @@ describe('buildBoardQuery', () => {
 
   it('omits an empty culture rather than asking for the empty culture', () => {
     expect('culture' in buildBoardQuery({ parentId: 'p1', culture: '' })).toBe(false);
+  });
+});
+
+describe('buildLaneBody', () => {
+  it('always sends the lane value', () => {
+    expect(buildLaneBody({ cardKey: 'c1', laneValue: 'doing' })).toEqual({ laneValue: 'doing' });
+  });
+
+  it('keeps an empty lane value, which clears the lane property', () => {
+    // Dragging into the unassigned lane writes the empty string; dropping it would leave the card put.
+    expect(buildLaneBody({ cardKey: 'c1', laneValue: '' })).toEqual({ laneValue: '' });
+  });
+
+  it('sends a culture when there is one', () => {
+    expect(buildLaneBody({ cardKey: 'c1', laneValue: 'doing', culture: 'da-DK' })).toEqual({
+      laneValue: 'doing',
+      culture: 'da-DK',
+    });
+  });
+
+  it('omits a null culture rather than sending null', () => {
+    expect('culture' in buildLaneBody({ cardKey: 'c1', laneValue: 'doing', culture: null })).toBe(false);
+  });
+
+  it('omits an empty culture rather than asking for the empty culture', () => {
+    // Matches buildBoardQuery: an empty culture means "no culture", not "the culture named ''".
+    expect('culture' in buildLaneBody({ cardKey: 'c1', laneValue: 'doing', culture: '' })).toBe(false);
+  });
+
+  it('never sends the card key in the body, because it is a path segment', () => {
+    expect('cardKey' in buildLaneBody({ cardKey: 'c1', laneValue: 'doing' })).toBe(false);
   });
 });

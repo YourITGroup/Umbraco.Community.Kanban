@@ -20,6 +20,12 @@ public interface IKanbanContentLoader
     IContent? GetById(Guid key);
 
     /// <summary>
+    /// A document by its integer id. Needed because a card resolves its own parent through
+    /// <see cref="IContent.ParentId" />, which is an int — there is no GUID parent reference on IContent.
+    /// </summary>
+    IContent? GetById(int id);
+
+    /// <summary>
     /// The parent's children in sort order, at most <paramref name="cap" /> of them, with the
     /// true total. Draft values, because a card moved but not yet published must show in its
     /// new lane.

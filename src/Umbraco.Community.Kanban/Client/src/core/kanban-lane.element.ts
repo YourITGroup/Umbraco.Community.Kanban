@@ -1,4 +1,4 @@
-import { css, customElement, html, nothing, property, repeat } from '@umbraco-cms/backoffice/external/lit';
+import { classMap, css, customElement, html, nothing, property, repeat } from '@umbraco-cms/backoffice/external/lit';
 import { UmbLitElement } from '@umbraco-cms/backoffice/lit-element';
 import { extractUmbColorVariable } from '@umbraco-cms/backoffice/resources';
 import { formatLaneTotal, laneHasMore, nextSkip } from './board.model.js';
@@ -12,8 +12,24 @@ export class UmbCommunityKanbanLaneElement extends UmbLitElement {
   @property({ attribute: false })
   lane?: KanbanBoardLaneModel;
 
-  @property({ type: Boolean })
-  readonly = true;
+  /**
+   * Whether this board's configuration permits dragging. Forwarded to each card, which pairs it with the
+   * card's own canUpdate. Replaces the milestone-2 `readonly` flag, which every host hardcoded true and
+   * nothing ever read — dragging is gated on server-supplied facts, not a host attribute.
+   */
+  @property({ type: Boolean, attribute: 'allow-drag' })
+  allowDrag = false;
+
+  /**
+   * Whether this lane is the one currently under a dragging pointer. Set by the board, because the board
+   * is the only element that can hit-test every lane at once, and only ever on one lane at a time.
+   */
+  @property({ type: Boolean, attribute: 'is-drop-target' })
+  isDropTarget = false;
+
+  /** Whether this lane would take the card if it were released now — the lane model's own acceptsDrops. */
+  @property({ type: Boolean, attribute: 'accepts-drop' })
+  acceptsDrop = false;
 
   @property({ type: Boolean, attribute: 'show-child-items' })
   showChildItems = false;
@@ -36,8 +52,14 @@ export class UmbCommunityKanbanLaneElement extends UmbLitElement {
     const colour = laneColourStyle(this.lane.colour, extractUmbColorVariable);
 
     return html`
-      <div class="lane">
-        <div class="header" style=${colour ? `--kanban-lane-colour: ${colour}` : ''}>
+      <div
+        class=${classMap({
+          lane: true,
+          'drop-target': this.isDropTarget && this.acceptsDrop,
+          'drop-reject': this.isDropTarget && !this.acceptsDrop,
+        })}
+        style=${colour ? `--kanban-lane-colour: ${colour}` : ''}>
+        <div class="header">
           ${this.lane.icon ? html`<umb-icon name=${this.lane.icon}></umb-icon>` : nothing}
           <span class="name">${this.lane.name}</span>
           <uui-badge look="secondary">${formatLaneTotal(this.lane)}</uui-badge>
@@ -48,6 +70,8 @@ export class UmbCommunityKanbanLaneElement extends UmbLitElement {
             (card) => card.key,
             (card) => html`<umb-community-kanban-card
               .card=${card}
+              lane-value=${this.lane!.value}
+              ?allow-drag=${this.allowDrag}
               ?show-child-items=${this.showChildItems}></umb-community-kanban-card>`,
           )}
           ${this.lane.cards.length === 0 ? html`<span class="empty">No cards</span>` : nothing}
@@ -71,6 +95,26 @@ export class UmbCommunityKanbanLaneElement extends UmbLitElement {
         min-width: 280px;
         max-width: 320px;
         flex: 0 0 auto;
+        /* A transparent border of the same width the highlight uses, so becoming a drop target changes
+           colour and nothing else — no reflow of the whole board mid-drag. */
+        border: 2px solid transparent;
+        border-radius: var(--uui-border-radius);
+      }
+
+      /* A variant of the lane's own colour, not a generic accent: a red "Blocked" lane highlights red and
+         a green "Done" lane green. Two strengths of the same colour so the border reads as the saturated
+         edge of the faint tint behind it. The fallback covers a lane with no resolved colour — reachable
+         today only via the (Unassigned) lane, which is pinned to neutral grey. */
+      .lane.drop-target {
+        background: color-mix(in srgb, var(--kanban-lane-colour, var(--uui-color-border)) 20%, transparent);
+        border-color: color-mix(in srgb, var(--kanban-lane-colour, var(--uui-color-border)) 80%, transparent);
+      }
+
+      /* Rejection reads as neutral and disabled, deliberately NOT as a variant of the lane's identity —
+         so a lane that will not take the card never looks like a lane that will. */
+      .lane.drop-reject {
+        border-style: dashed;
+        border-color: var(--uui-color-border);
       }
 
       .header {

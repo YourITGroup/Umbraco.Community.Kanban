@@ -28,7 +28,7 @@ export interface KanbanCardModel {
   /** Verbatim from the content type, colour suffix and all — umb-icon parses it. */
   icon?: string | null;
   state: KanbanCardState;
-  /** Populated by the server; unused until drag arrives in milestone 3. */
+  /** Whether the current user may update this card; with the board's allowDrag, gates dragging. */
   canUpdate: boolean;
   /** Whether the current user may create under this card; gates the add button. */
   canCreate: boolean;
@@ -41,6 +41,12 @@ export interface KanbanCardModel {
   /** False when the board hit its grandchild cap, making childTotal a lower bound. */
   childTotalIsExact: boolean;
   properties: KanbanCardPropertyModel[];
+  /**
+   * Client-only, never sent by the server: true while a lane write for this card is in flight. Lives on
+   * the card rather than in a separate set on the board so the lane can pass it straight down, the same
+   * way every other per-card value already reaches the card element.
+   */
+  saving?: boolean;
 }
 
 /** Mirrors KanbanBoardLaneModel. */
@@ -65,4 +71,6 @@ export interface KanbanBoardModel {
   childCount: number;
   /** Whether cards on this board list their children. Board-wide, so it is not on the card. */
   showChildItems: boolean;
+  /** Whether this board's configuration permits dragging cards between lanes. Board-wide. */
+  allowDrag: boolean;
 }

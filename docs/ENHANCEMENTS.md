@@ -64,6 +64,26 @@ Two things recorded here turned out to be wrong and are corrected in the design:
   added, reading the five fields off `IContent` rather than through `IKanbanPropertyDataTypeLookup`,
   which is deliberately not involved.
 
+---
+
+## Done: drag write-back, pending state, publish-all (milestone 3)
+
+**Built 2026-07-30**, from
+[its design](superpowers/specs/2026-07-30-milestone-3-drag-write-back-design.md). Dragging a card
+between lanes writes the board's lane property through `PUT /card/{key}/lane` — **save only**, so the
+move stays reversible — the moved card's badge flips to pending immediately and then reconciles to
+whatever the server persisted, and a board-level "Publish pending changes" action publishes them all in
+one confirmed step.
+
+Two scope lines worth keeping in view, both deliberate rather than discovered:
+
+- **Publishing has no server endpoint.** It loops Umbraco's own `UmbDocumentPublishingRepository`
+  client-side, one call per card, because core's document list-view bulk publish does exactly that and
+  has no bulk endpoint behind it either.
+- **"Pending" means loaded.** `pendingCards` filters what the board is holding in memory, the same way
+  core's bulk action is scoped to its own selection. A card in an unpaged lane page, or beyond the
+  board's truncation cap, does not count until it is paged in.
+
 ## 7. Board configuration picker: match core's picker styling
 
 The picker built on 2026-07-28 stacks its buttons in a column, which does not look like anything else
@@ -87,12 +107,13 @@ builds this should pick deliberately rather than discover the option late.
 *Nice to have.* An add panel at the head of each lane, creating a content item with the lane property
 already set to that lane's value — so "add to Confirmed" is one action rather than create-then-edit.
 
-Builds on item 5, now done (create in the workspace modal), and needs one thing verified first: whether a
-document's property values can be preset. `UMB_WORKSPACE_MODAL` takes a `preset`, and
-`entity-detail-workspace-base` applies it as `{...scaffold, ...preset}` — a **top-level spread**, so a
-preset `values` array replaces the scaffolded one outright rather than merging into it. Presetting one
-property therefore means constructing the whole `values` array, and the culture/segment of the entry
-has to be right for a varying document. Prove that on a real document type before designing the panel.
+Builds on item 5 (create in the workspace modal) and on milestone 3's drag, both now done, so nothing
+blocks it structurally. One thing still needs verifying first: whether a document's property values can
+be preset. `UMB_WORKSPACE_MODAL` takes a `preset`, and `entity-detail-workspace-base` applies it as
+`{...scaffold, ...preset}` — a **top-level spread**, so a preset `values` array replaces the scaffolded
+one outright rather than merging into it. Presetting one property therefore means constructing the whole
+`values` array, and the culture/segment of the entry has to be right for a varying document. Prove that
+on a real document type before designing the panel.
 
 Also unsettled: the unassigned lane has no value to preset, and a manual lane's value may not be a
 legal value for the property at all (nothing validates manual lanes against the editor's options), so

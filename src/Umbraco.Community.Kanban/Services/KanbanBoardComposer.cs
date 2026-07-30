@@ -14,6 +14,7 @@ public sealed record KanbanCardAssignment(string LaneValue, KanbanCardModel Card
 /// <param name="Lane">The single lane to return, or null for every lane. The empty string means the unassigned lane.</param>
 /// <param name="Skip">Cards to skip within <paramref name="Lane" />. Ignored when Lane is null.</param>
 /// <param name="ShowChildItems">Whether cards list their children, echoed to the client.</param>
+/// <param name="AllowDrag">Whether the board permits dragging cards between lanes, echoed to the client.</param>
 public sealed record KanbanBoardComposerRequest(
     IReadOnlyList<KanbanLane> Lanes,
     IReadOnlyList<KanbanCardAssignment> Cards,
@@ -22,7 +23,8 @@ public sealed record KanbanBoardComposerRequest(
     int PageSize,
     string? Lane,
     int Skip,
-    bool ShowChildItems = false);
+    bool ShowChildItems = false,
+    bool AllowDrag = false);
 
 /// <summary>
 /// Groups cards into lanes and pages each lane independently. Pure — every input is a
@@ -45,6 +47,7 @@ public static class KanbanBoardComposer
             Truncated = request.Truncated,
             ChildCount = request.ChildCount,
             ShowChildItems = request.ShowChildItems,
+            AllowDrag = request.AllowDrag,
             Lanes = lanes
                 .Select(lane => Project(lane, grouped[lane.Value], skip, request.PageSize, request.Truncated))
                 .ToList(),

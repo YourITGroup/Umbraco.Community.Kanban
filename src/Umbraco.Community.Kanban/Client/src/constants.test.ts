@@ -9,6 +9,7 @@ import {
   KANBAN_LANE_CONTENT_TYPE_KEY,
   KANBAN_API_PATH,
   KANBAN_LANES_PREVIEW_ENDPOINT,
+  KANBAN_CARD_LANE_ENDPOINT,
 } from './constants.js';
 
 describe('constants', () => {
@@ -35,5 +36,15 @@ describe('constants', () => {
 
   it('addresses the lane preview endpoint the LanesController exposes', () => {
     expect(KANBAN_LANES_PREVIEW_ENDPOINT).toBe('/umbraco/kanban/api/v1/lanes/preview');
+  });
+});
+
+describe('KANBAN_CARD_LANE_ENDPOINT', () => {
+  it("addresses one card's lane under the versioned api path", () => {
+    expect(KANBAN_CARD_LANE_ENDPOINT('abc-123')).toBe('/umbraco/kanban/api/v1/card/abc-123/lane');
+  });
+
+  it('encodes the key, so a key needing escaping cannot break the path', () => {
+    expect(KANBAN_CARD_LANE_ENDPOINT('a/b')).toBe('/umbraco/kanban/api/v1/card/a%2Fb/lane');
   });
 });
