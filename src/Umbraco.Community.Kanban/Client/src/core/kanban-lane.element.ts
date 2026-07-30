@@ -104,7 +104,7 @@ export class UmbCommunityKanbanLaneElement extends UmbLitElement {
       /* A variant of the lane's own colour, not a generic accent: a red "Blocked" lane highlights red and
          a green "Done" lane green. Two strengths of the same colour so the border reads as the saturated
          edge of the faint tint behind it. The fallback covers a lane with no resolved colour — reachable
-         today only via the (Unassigned) lane, which is pinned to neutral grey. */
+         today only via the Unassigned lane, which is pinned to neutral grey. */
       .lane.drop-target {
         background: color-mix(in srgb, var(--kanban-lane-colour, var(--uui-color-border)) 20%, transparent);
         border-color: color-mix(in srgb, var(--kanban-lane-colour, var(--uui-color-border)) 80%, transparent);

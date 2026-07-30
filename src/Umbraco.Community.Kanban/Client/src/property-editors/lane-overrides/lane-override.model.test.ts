@@ -32,7 +32,7 @@ describe('lane override model', () => {
     const rows = mergeOverridesWithLanes(
       [
         { value: 'open', name: 'Open', isUnassigned: false },
-        { value: '', name: '(Unassigned)', isUnassigned: true },
+        { value: '', name: 'Unassigned', isUnassigned: true },
       ],
       [],
     );

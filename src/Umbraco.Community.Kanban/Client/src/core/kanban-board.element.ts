@@ -25,7 +25,7 @@ import {
 import { boardViewportHeight, edgeScrollDelta } from './canvas.model.js';
 import './kanban-lane.element.js';
 import type { KanbanBoardQuery, KanbanDataSource } from '../data/kanban-data-source.js';
-import { panScrollOffset, shouldStartPan } from './pan.model.js';
+import { isPannablePath, panScrollOffset, shouldStartPan } from './pan.model.js';
 
 /** The host's own bottom padding (`--uui-size-layout-1`), so the viewport ends at the window's edge. */
 const VIEWPORT_GUTTER = 24;
@@ -202,25 +202,30 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
   }
 
   /**
-   * Starts a background pan. The background a user can actually press is `.canvas` — it fills at least
-   * the viewport — so the gate accepts either it or the viewport itself, and nothing else: a press on a
-   * lane or a card must never pan. Touch is excluded because `.viewport` already scrolls natively on a
-   * swipe, with momentum, for free.
+   * Starts a background pan. Anything that is not a card or a control counts as background — the canvas,
+   * a lane, a lane header, the empty space below a lane's cards — so the board can be grabbed from inside
+   * a lane and not only from the gaps between them. Touch is excluded because `.viewport` already scrolls
+   * natively on a swipe, with momentum, for free.
    */
   #onViewportPointerDown(event: PointerEvent) {
     if (this.#pan) return; // a pan is already in progress for another pointer
 
     const viewport = event.currentTarget as HTMLDivElement;
-    const canvas = viewport.querySelector('.canvas');
+    const rect = viewport.getBoundingClientRect();
 
     if (
       !shouldStartPan({
-        isSelfTarget: event.target === viewport || event.target === canvas,
+        isPannableTarget: isPannablePath(
+          event.composedPath().map((node) => (node as HTMLElement).localName ?? ''),
+        ),
         pointerType: event.pointerType,
         button: event.button,
         isPrimary: event.isPrimary,
-        offsetX: event.offsetX,
-        offsetY: event.offsetY,
+        // Measured against the viewport rather than taken from the event: `offsetX`/`offsetY` are
+        // relative to whatever was pressed, which is now usually a lane, so the event's own values
+        // would compare a lane-relative offset against the viewport's size.
+        offsetX: event.clientX - rect.left,
+        offsetY: event.clientY - rect.top,
         clientWidth: viewport.clientWidth,
         clientHeight: viewport.clientHeight,
       })
