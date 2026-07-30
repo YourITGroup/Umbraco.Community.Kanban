@@ -27,6 +27,7 @@ import {
   type KanbanLaneHitTarget,
 } from './drag.model.js';
 import { boardAvailableBottom, boardViewportHeight, edgeScrollDelta } from './canvas.model.js';
+import { KANBAN_BOARD_ACTIONS_CONTEXT, type UmbKanbanBoardActionsContext } from './board-actions.context.js';
 import './kanban-lane.element.js';
 import type { KanbanBoardQuery, KanbanDataSource } from '../data/kanban-data-source.js';
 import { isPannablePath, panScrollOffset, shouldStartPan } from './pan.model.js';
@@ -122,6 +123,12 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
   /** The live `requestAnimationFrame` handle for the drag loop, or undefined when it is not running. */
   #frame?: number;
 
+  /**
+   * The bridge to the action bar, which the collection layout renders into the footer slot. Undefined when
+   * the board is hosted somewhere that provides no such context — the board still works, it just has no bar.
+   */
+  #actions?: UmbKanbanBoardActionsContext;
+
   /** The in-progress pan, or undefined between drags. Keyed by pointerId so a second pointer is ignored. */
   #pan?: {
     pointerId: number;
@@ -138,6 +145,22 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
    * requested, otherwise an older, slower response could clobber a newer, faster one.
    */
   #loadToken = 0;
+
+  constructor() {
+    super();
+
+    // The layout provides this, so a board hosted anywhere else simply has no action bar.
+    this.consumeContext(KANBAN_BOARD_ACTIONS_CONTEXT, (context) => {
+      this.#actions = context ?? undefined;
+
+      this.#actions?.setHandlers({
+        publish: () => this.#onPublishPending(),
+        undo: () => this.#onUndo(),
+      });
+
+      this.#publishActionState();
+    });
+  }
 
   /** Reloads the whole board. Hosts call this when their own data changes. */
   async load() {
@@ -179,12 +202,23 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
     super.disconnectedCallback();
 
     window.removeEventListener('resize', this.#onWindowResize);
+
+    // The bar outlives this element — it belongs to the layout — so it has to be told the board is gone,
+    // or its buttons would sit there acting on nothing.
+    this.#actions?.clear();
   }
 
   override updated(changedProperties: PropertyValues<this>) {
     super.updated(changedProperties);
 
     this.#measureViewport();
+    this.#publishActionState();
+
+    // Again after the browser has laid out. The action bar lives in the layout's footer, so the board
+    // appearing or clearing pending changes resizes the container we measure against — and that reflow
+    // happens after this update, not during it. The measurement is idempotent and only assigns on a real
+    // change, so this settles in one extra frame rather than looping.
+    requestAnimationFrame(() => this.#measureViewport());
   }
 
   #query(extra?: Partial<KanbanBoardQuery>): KanbanBoardQuery {
@@ -317,9 +351,6 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
 
     if (!viewport) return;
 
-    // The action bar sits below the viewport inside this element, so its height is space the canvas
-    // cannot have. Measured rather than assumed — it holds a growing set of actions and may wrap.
-    const actions = this.renderRoot.querySelector<HTMLDivElement>('.actions');
     const rectTop = viewport.getBoundingClientRect().top;
 
     const height = boardViewportHeight({
@@ -329,9 +360,10 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
         rectTop,
         ancestors: this.#ancestorBoxes(),
       }),
-      // Only the action bar: this element has no padding of its own, and the container's padding is
-      // already excluded by measuring its content box.
-      gutter: actions?.getBoundingClientRect().height ?? 0,
+      // Nothing to reserve: this element has no padding of its own, the container's padding is already
+      // excluded by measuring its content box, and the action bar lives in the layout's footer — which the
+      // container's own height already accounts for.
+      gutter: 0,
       min: VIEWPORT_MIN_HEIGHT,
     });
 
@@ -682,45 +714,18 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
   }
 
   /**
-   * The board's action bar, pinned below the canvas. Deliberately shaped like core's own
-   * `umb-collection-selection-actions` — same background, contrast colour and space-between layout — so a
-   * board action reads as the same kind of thing as a list view's bulk action. Built to hold more than one
-   * action: further board-level actions belong in `.buttons` beside Publish.
+   * Pushes what the action bar should show up to the collection layout, which renders it into the footer
+   * slot. Called after every render because every input to it — the cards, the undo stack, whether a write
+   * is in flight — changes through a render.
    */
-  #renderActions() {
-    if (!this._board) return nothing;
+  #publishActionState() {
+    if (!this.#actions) return;
 
-    const pending = pendingCards(this._board);
-
-    if (pending.length === 0) return nothing;
-
-    return html`
-      <div class="actions">
-        <div class="summary">
-          ${pending.length} ${pending.length === 1 ? 'card has' : 'cards have'} pending changes
-        </div>
-        <div class="buttons">
-          <uui-button
-            look="secondary"
-            icon="icon-undo"
-            label="Undo the last move"
-            title="Undo the last move made on this board"
-            ?disabled=${this._moves.length === 0 || this._undoing || this._publishing}
-            @click=${this.#onUndo}>
-            Undo
-          </uui-button>
-          <uui-button
-            look="primary"
-            color="positive"
-            icon="icon-globe"
-            label="Publish pending changes"
-            ?disabled=${this._publishing || this._undoing}
-            @click=${this.#onPublishPending}>
-            Publish pending changes
-          </uui-button>
-        </div>
-      </div>
-    `;
+    this.#actions.setState({
+      pending: this._board ? pendingCards(this._board).length : 0,
+      canUndo: this._moves.length > 0,
+      busy: this._publishing || this._undoing,
+    });
   }
 
   /**
@@ -778,7 +783,7 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
           )}
         </div>
       </div>
-      ${this.#renderActions()} ${this.#renderGhost()}
+      ${this.#renderGhost()}
     `;
   }
 
@@ -843,25 +848,6 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
         color: var(--uui-color-text-alt);
       }
 
-      /* Matches core's umb-collection-selection-actions: the same surface, contrast colour and
-         space-between layout, so a board action reads as the same kind of control as a bulk action. */
-      .actions {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: var(--uui-size-3);
-        box-sizing: border-box;
-        padding: var(--uui-size-space-4) var(--uui-size-space-6);
-        background-color: var(--uui-color-selected);
-        color: var(--uui-color-selected-contrast);
-      }
-
-      .summary,
-      .buttons {
-        display: flex;
-        align-items: center;
-        gap: var(--uui-size-3);
-      }
     `,
   ];
 }

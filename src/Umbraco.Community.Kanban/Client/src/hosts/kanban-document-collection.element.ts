@@ -1,6 +1,7 @@
-import { customElement, html, state } from '@umbraco-cms/backoffice/external/lit';
+import { css, customElement, html, state } from '@umbraco-cms/backoffice/external/lit';
 import type { PropertyValues } from '@umbraco-cms/backoffice/external/lit';
 import { UMB_COLLECTION_CONTEXT, UmbCollectionDefaultElement } from '@umbraco-cms/backoffice/collection';
+import { UmbKanbanBoardActionsContext, type KanbanBoardActionsState } from '@/core/board-actions.context.js';
 import { isChromelessCollectionView } from './collection-chrome.model.js';
 
 /**
@@ -26,8 +27,26 @@ export class UmbCommunityKanbanDocumentCollectionElement extends UmbCollectionDe
   @state()
   private _chromeless = false;
 
+  /** What the board wants its action bar to show, or undefined while no board is reporting. */
+  @state()
+  private _actions?: KanbanBoardActionsState;
+
+  /**
+   * Provided here rather than in the board because only this element can render into the layout's footer
+   * slot — the same slot the native bulk-action bar uses, and why that bar spans the full width.
+   */
+  #boardActions = new UmbKanbanBoardActionsContext(this);
+
   constructor() {
     super();
+
+    this.observe(
+      this.#boardActions.state,
+      (state) => {
+        this._actions = state;
+      },
+      '_observeKanbanBoardActions',
+    );
 
     this.consumeContext(UMB_COLLECTION_CONTEXT, (context) => {
       this.observe(
@@ -78,9 +97,84 @@ export class UmbCommunityKanbanDocumentCollectionElement extends UmbCollectionDe
     return this._chromeless ? html`` : super.renderPagination();
   }
 
+  /**
+   * The board's action bar in place of the list view's, in the same footer slot — which is what lets it
+   * span the full width, since that slot sits outside the padded `#main` box.
+   *
+   * Styled to match `umb-collection-selection-actions` deliberately: a board action should read as the same
+   * kind of control as a bulk action, in the same place, so the two never look like different mechanisms.
+   */
   protected override renderSelectionActions() {
-    return this._chromeless ? html`` : super.renderSelectionActions();
+    if (!this._chromeless) return super.renderSelectionActions();
+
+    const actions = this._actions;
+
+    if (!actions || actions.pending === 0) return html``;
+
+    return html`
+      <div id="board-actions" slot="footer">
+        <div class="summary">
+          ${actions.pending} ${actions.pending === 1 ? 'card has' : 'cards have'} pending changes
+        </div>
+        <div class="buttons">
+          <uui-button
+            look="secondary"
+            icon="icon-undo"
+            label="Undo the last move"
+            title="Undo the last move made on this board"
+            ?disabled=${!actions.canUndo || actions.busy}
+            @click=${this.#onUndo}>
+            Undo
+          </uui-button>
+          <uui-button
+            look="primary"
+            color="positive"
+            icon="icon-globe"
+            label="Publish pending changes"
+            ?disabled=${actions.busy}
+            @click=${this.#onPublish}>
+            Publish pending changes
+          </uui-button>
+        </div>
+      </div>
+    `;
   }
+
+  #onUndo() {
+    void this.#boardActions.undo();
+  }
+
+  #onPublish() {
+    void this.#boardActions.publish();
+  }
+
+  static override styles = [
+    ...(Array.isArray(UmbCollectionDefaultElement.styles)
+      ? UmbCollectionDefaultElement.styles
+      : [UmbCollectionDefaultElement.styles]),
+    css`
+      /* Mirrors core's own selection-action bar: same surface, contrast colour, padding and
+         space-between layout, in the same slot. */
+      #board-actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--uui-size-3);
+        box-sizing: border-box;
+        width: 100%;
+        padding: var(--uui-size-space-4) var(--uui-size-space-6);
+        background-color: var(--uui-color-selected);
+        color: var(--uui-color-selected-contrast);
+      }
+
+      .summary,
+      .buttons {
+        display: flex;
+        align-items: center;
+        gap: var(--uui-size-3);
+      }
+    `,
+  ];
 }
 
 export { UmbCommunityKanbanDocumentCollectionElement as element };
