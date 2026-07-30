@@ -208,7 +208,6 @@ export class UmbCommunityKanbanCollectionViewBoardElement extends UmbLitElement 
         parent-id=${this._parentId}
         .culture=${this._culture}
         .datasource=${this.#datasource}
-        ?readonly=${true}
         @kanban-open-document=${this.#onOpenDocument}
         @kanban-create-child=${this.#onCreateChild}></umb-community-kanban-board>
     `;

@@ -1,6 +1,16 @@
 import { classMap, css, customElement, html, nothing, property, state } from '@umbraco-cms/backoffice/external/lit';
 import { UmbLitElement } from '@umbraco-cms/backoffice/lit-element';
-import { mergeLanePage, toBoardState, type KanbanBoardState } from './board.model.js';
+import { UMB_NOTIFICATION_CONTEXT } from '@umbraco-cms/backoffice/notification';
+import {
+  applyCardState,
+  mergeLanePage,
+  moveCard,
+  nextStateAfterSave,
+  setCardSaving,
+  toBoardState,
+  type KanbanBoardState,
+} from './board.model.js';
+import { laneAtPoint, moveFailureMessage, type KanbanLaneHitTarget } from './drag.model.js';
 import './kanban-lane.element.js';
 import type { KanbanBoardQuery, KanbanDataSource } from '../data/kanban-data-source.js';
 import { panScrollOffset, shouldStartPan } from './pan.model.js';
@@ -23,10 +33,6 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
   @property({ type: String })
   culture?: string | null;
 
-  /** Fixed true for this milestone; drag arrives in milestone 3. */
-  @property({ type: Boolean })
-  readonly = true;
-
   @property({ attribute: false })
   datasource?: KanbanDataSource;
 
@@ -39,6 +45,17 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
   /** True only while a background pan is live — drives the grabbing cursor and disables text selection. */
   @state()
   private _isPanning = false;
+
+  /**
+   * The live card drag, or undefined between gestures. `lane` is the source lane, captured at drag start
+   * so the revert on a failed write is the exact inverse move.
+   */
+  @state()
+  private _drag?: { key: string; lane: string };
+
+  /** The lane currently under the pointer, or undefined. Only ever one, which laneAtPoint guarantees. */
+  @state()
+  private _dropTarget?: { value: string; acceptsDrops: boolean };
 
   /** The in-progress pan, or undefined between drags. Keyed by pointerId so a second pointer is ignored. */
   #pan?: {
@@ -59,9 +76,10 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
   async load() {
     if (!this.parentId || !this.datasource) return;
 
-    // A reload swaps out `.lanes` for a loader, not a re-render in place — any in-progress pan
-    // would otherwise be stranded on the discarded div (see #endPan for why that's unsafe).
+    // A reload swaps out `.lanes` for a loader, not a re-render in place — any in-progress pan or card
+    // drag would otherwise be stranded on the discarded div (see #endPan for why that's unsafe).
     this.#endPan();
+    this.#onDragCancel();
 
     const token = ++this.#loadToken;
 
@@ -192,6 +210,98 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
     this._isPanning = false;
   }
 
+  #onDragStart(event: CustomEvent<{ key: string; lane: string }>) {
+    // A pan and a card drag cannot overlap: the pan only starts on `.lanes` itself, which a card is never.
+    this._drag = { key: event.detail.key, lane: event.detail.lane };
+    this._dropTarget = undefined;
+  }
+
+  #onDragMove(event: CustomEvent<{ clientX: number; clientY: number }>) {
+    if (!this._drag) return;
+
+    const hit = laneAtPoint(event.detail.clientX, event.detail.clientY, this.#laneTargets());
+
+    this._dropTarget = hit ? { value: hit.value, acceptsDrops: hit.acceptsDrops } : undefined;
+  }
+
+  #onDragCancel() {
+    this._drag = undefined;
+    this._dropTarget = undefined;
+  }
+
+  async #onDragEnd(event: CustomEvent<{ clientX: number; clientY: number }>) {
+    const drag = this._drag;
+    const hit = drag ? laneAtPoint(event.detail.clientX, event.detail.clientY, this.#laneTargets()) : undefined;
+
+    // Clear before awaiting anything, so the highlight never outlives the gesture.
+    this._drag = undefined;
+    this._dropTarget = undefined;
+
+    if (!drag || !hit || !hit.acceptsDrops || !this._board || !this.datasource) return;
+    if (hit.value.toLowerCase() === drag.lane.toLowerCase()) return;
+
+    const card = this.#findCard(drag.key);
+
+    if (!card) return;
+
+    // Optimistic: the card relocates, its badge flips, and it dims — all before the request is even sent.
+    let next = moveCard(this._board, drag.key, drag.lane, hit.value);
+    next = applyCardState(next, drag.key, nextStateAfterSave(card.state));
+    this._board = setCardSaving(next, drag.key, true);
+
+    const token = this.#loadToken;
+
+    const outcome = await this.datasource.setLane({
+      cardKey: drag.key,
+      laneValue: hit.value,
+      culture: this.culture,
+    });
+
+    // A full reload started meanwhile and owns `_board` now; its state came from the server, so it is
+    // already correct whether the write landed or not.
+    if (token !== this.#loadToken || !this._board) return;
+
+    if (outcome.kind === 'success') {
+      // What the server actually persisted, in place of the optimistic guess.
+      this._board = setCardSaving(applyCardState(this._board, drag.key, outcome.state), drag.key, false);
+      return;
+    }
+
+    // The same function with the lanes swapped: the card goes back exactly where it started.
+    let reverted = moveCard(this._board, drag.key, hit.value, drag.lane);
+    reverted = applyCardState(reverted, drag.key, card.state);
+    this._board = setCardSaving(reverted, drag.key, false);
+
+    const notifications = await this.getContext(UMB_NOTIFICATION_CONTEXT);
+
+    notifications?.peek('danger', {
+      data: { message: moveFailureMessage(card.name, outcome.status) },
+    });
+  }
+
+  /** Every rendered lane's identity and viewport rect — the board is the only element that can see them all. */
+  #laneTargets(): KanbanLaneHitTarget[] {
+    const elements = Array.from(this.renderRoot.querySelectorAll('umb-community-kanban-lane'));
+
+    return elements.flatMap((element) => {
+      if (!element.lane) return [];
+
+      const rect = element.getBoundingClientRect();
+
+      return [
+        {
+          value: element.lane.value,
+          acceptsDrops: element.lane.acceptsDrops,
+          rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom },
+        },
+      ];
+    });
+  }
+
+  #findCard(key: string) {
+    return this._board?.lanes.flatMap((lane) => lane.cards).find((card) => card.key === key);
+  }
+
   override render() {
     switch (this._status) {
       case 'idle':
@@ -224,6 +334,10 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
       <div
         class=${classMap({ lanes: true, panning: this._isPanning })}
         @kanban-load-more=${this.#onLoadMore}
+        @kanban-drag-start=${this.#onDragStart}
+        @kanban-drag-move=${this.#onDragMove}
+        @kanban-drag-end=${this.#onDragEnd}
+        @kanban-drag-cancel=${this.#onDragCancel}
         @pointerdown=${this.#onLanesPointerDown}
         @pointermove=${this.#onLanesPointerMove}
         @pointerup=${this.#onLanesPointerEnd}
@@ -232,6 +346,9 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
         ${this._board.lanes.map(
           (lane) => html`<umb-community-kanban-lane
             .lane=${lane}
+            ?allow-drag=${this._board?.allowDrag ?? false}
+            ?is-drop-target=${this._dropTarget?.value === lane.value}
+            ?accepts-drop=${this._dropTarget?.acceptsDrops ?? false}
             ?show-child-items=${this._board?.showChildItems ?? false}></umb-community-kanban-lane>`,
         )}
       </div>
