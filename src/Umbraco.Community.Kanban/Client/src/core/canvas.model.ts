@@ -22,7 +22,10 @@ export function boardViewportHeight(input: {
 
 /** One ancestor as the container search sees it. */
 export interface KanbanAncestorBox {
-  /** Its viewport-relative bottom edge. */
+  /**
+   * The viewport-relative bottom of its **content** box — padding and border excluded, since neither is
+   * space a child may occupy.
+   */
   bottom: number;
   /**
    * Whether it has a real box with a definite height. False for the layout's `router-slot` wrappers,

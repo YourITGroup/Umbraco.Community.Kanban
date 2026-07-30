@@ -31,9 +31,6 @@ import './kanban-lane.element.js';
 import type { KanbanBoardQuery, KanbanDataSource } from '../data/kanban-data-source.js';
 import { isPannablePath, panScrollOffset, shouldStartPan } from './pan.model.js';
 
-/** The host's own bottom padding (`--uui-size-layout-1`), so the viewport ends at the window's edge. */
-const VIEWPORT_GUTTER = 24;
-
 /** Below this a scrolling canvas is useless — roughly a lane header plus two cards. */
 const VIEWPORT_MIN_HEIGHT = 320;
 
@@ -332,7 +329,9 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
         rectTop,
         ancestors: this.#ancestorBoxes(),
       }),
-      gutter: VIEWPORT_GUTTER + (actions?.getBoundingClientRect().height ?? 0),
+      // Only the action bar: this element has no padding of its own, and the container's padding is
+      // already excluded by measuring its content box.
+      gutter: actions?.getBoundingClientRect().height ?? 0,
       min: VIEWPORT_MIN_HEIGHT,
     });
 
@@ -359,11 +358,16 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
     let element = this.#parentOf(this);
 
     while (element) {
-      const height = getComputedStyle(element).height;
+      const style = getComputedStyle(element);
 
       boxes.push({
-        bottom: element.getBoundingClientRect().bottom,
-        definiteHeight: height.endsWith('px') && element.clientHeight > 0,
+        // The *content* box: a container's padding and border are not space its children may occupy, and
+        // measuring to the border box is what let the board overhang by its container's bottom padding.
+        bottom:
+          element.getBoundingClientRect().bottom -
+          (parseFloat(style.paddingBottom) || 0) -
+          (parseFloat(style.borderBottomWidth) || 0),
+        definiteHeight: style.height.endsWith('px') && element.clientHeight > 0,
       });
 
       element = this.#parentOf(element);
@@ -372,8 +376,17 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
     return boxes;
   }
 
-  /** The next element up, hopping out of a shadow root to its host when there is no parent element. */
+  /**
+   * The next element up the **flattened** tree — what actually lays the board out.
+   *
+   * `assignedSlot` comes first, and is the whole point: our router-slot is slotted into
+   * `umb-body-layout`, so the box that clips the board is a div inside that component's shadow root and is
+   * not on the `parentElement`/host chain at all. Following only the logical tree measured the wrong box
+   * and left the board 24px too tall.
+   */
   #parentOf(element: Element): Element | null {
+    if (element.assignedSlot) return element.assignedSlot;
+
     if (element.parentElement) return element.parentElement;
 
     const root = element.getRootNode();
@@ -771,9 +784,11 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
 
   static override styles = [
     css`
+      /* No padding of its own: the layout's own #main already pads the region this element sits in, and
+         adding a second gutter both doubled the inset the list view has and pushed the board past the
+         bottom of that padded box. */
       :host {
         display: block;
-        padding: var(--uui-size-layout-1);
       }
 
       .viewport {
