@@ -61,8 +61,12 @@ export class UmbCommunityKanbanCardElement extends UmbLitElement {
   @state()
   private _dragging = false;
 
-  /** The live drag, or undefined between gestures. Keyed by pointerId so a second pointer is ignored. */
-  #drag?: { pointerId: number };
+  /**
+   * The live drag, or undefined between gestures. Keyed by pointerId so a second pointer is ignored, and
+   * holding the captured element so Escape — which arrives as a keyboard event with no pointer target of
+   * its own — can still release the capture.
+   */
+  #drag?: { pointerId: number; target: HTMLElement };
 
   /**
    * Whether the last gesture moved at all. A drag ends with a pointerup on the card, which the browser
@@ -82,6 +86,13 @@ export class UmbCommunityKanbanCardElement extends UmbLitElement {
     if (changedProperties.has('card')) {
       this.#entityContext.setUnique(this.card?.key ?? null);
     }
+  }
+
+  override disconnectedCallback() {
+    super.disconnectedCallback();
+
+    // A card removed from the DOM mid-drag would otherwise leave its Escape listener on the window.
+    window.removeEventListener('keydown', this.#onKeyDown);
   }
 
   #onOpen() {
@@ -125,7 +136,8 @@ export class UmbCommunityKanbanCardElement extends UmbLitElement {
     // of what is visually underneath — including over another lane, which is the whole point.
     element.setPointerCapture(event.pointerId);
 
-    this.#drag = { pointerId: event.pointerId };
+    this.#drag = { pointerId: event.pointerId, target: element };
+    window.addEventListener('keydown', this.#onKeyDown);
     this.#moved = false;
     this._dragging = true;
 
@@ -157,9 +169,7 @@ export class UmbCommunityKanbanCardElement extends UmbLitElement {
   #onPointerUp(event: PointerEvent) {
     if (!this.#drag || event.pointerId !== this.#drag.pointerId) return;
 
-    this.#releaseCapture(event);
-    this.#drag = undefined;
-    this._dragging = false;
+    this.#endDrag();
 
     this.#dispatch('kanban-drag-end', { clientX: event.clientX, clientY: event.clientY });
   }
@@ -172,19 +182,33 @@ export class UmbCommunityKanbanCardElement extends UmbLitElement {
   #onPointerCancel(event: PointerEvent) {
     if (!this.#drag || event.pointerId !== this.#drag.pointerId) return;
 
-    this.#releaseCapture(event);
-    this.#drag = undefined;
-    this._dragging = false;
+    this.#endDrag();
 
     this.#dispatch('kanban-drag-cancel', undefined);
   }
 
-  #releaseCapture(event: PointerEvent) {
-    const target = event.currentTarget as HTMLElement;
+  /**
+   * Escape abandons the gesture. Bound on `window` rather than the card because a card mid-drag does not
+   * necessarily hold focus — the pointer is captured, which is not the same thing. Purely local: the move
+   * is only applied on drop, so there is never a write in flight to unwind here.
+   */
+  #onKeyDown = (event: KeyboardEvent) => {
+    if (event.key !== 'Escape' || !this.#drag) return;
 
-    if (target.hasPointerCapture(event.pointerId)) {
-      target.releasePointerCapture(event.pointerId);
+    this.#endDrag();
+    this.#dispatch('kanban-drag-cancel', undefined);
+  };
+
+  /** Releases the capture and clears the gesture. Every exit path ends here. */
+  #endDrag() {
+    if (this.#drag?.target.hasPointerCapture(this.#drag.pointerId)) {
+      this.#drag.target.releasePointerCapture(this.#drag.pointerId);
     }
+
+    this.#drag = undefined;
+    this._dragging = false;
+
+    window.removeEventListener('keydown', this.#onKeyDown);
   }
 
   #dispatch(type: string, detail: unknown) {
