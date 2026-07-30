@@ -61,6 +61,7 @@ Configuration/KanbanOpenApiDocument.cs
 Constants.cs
 Controllers/
  BoardController.cs
+ CardController.cs
  ConfigurationsController.cs
  KanbanControllerBase.cs
  LanesController.cs
@@ -70,6 +71,7 @@ Lanes/
  IKanbanLaneSource.cs
  IKanbanPropertyDataTypeLookup.cs
  KanbanLaneColourAssigner.cs
+ KanbanLaneOrderApplier.cs
  KanbanLaneOverrideApplier.cs
  KanbanLanePalette.cs
  KanbanLaneResolver.cs
@@ -82,12 +84,15 @@ Lanes/
 Models/Api/
  KanbanBoardRequestModel.cs
  KanbanBoardResponseModel.cs
+ KanbanCardLaneRequestModel.cs
+ KanbanCardLaneResponseModel.cs
  KanbanConfigurationResponseModel.cs
  KanbanLanePreviewRequestModel.cs
  KanbanLanePreviewResponseModel.cs
 Models/
  KanbanBoardConfiguration.cs
  KanbanCalendarConfiguration.cs
+ KanbanCardProperty.cs
  KanbanLane.cs
  KanbanLaneOverride.cs
  KanbanManualLane.cs
@@ -102,27 +107,38 @@ PropertyEditors/
  KanbanCalendarPropertyEditor.cs
 Serialization/
  GuidArrayJsonConverter.cs
+ KanbanCardPropertyArrayJsonConverter.cs
  NullableGuidJsonConverter.cs
+ SingleSelectDropdownJsonConverter.cs
 Services/
  IKanbanBoardConfigurationResolver.cs
  IKanbanBoardService.cs
+ IKanbanCardService.cs
  IKanbanConfigurationService.cs
  IKanbanContentLoader.cs
  IKanbanContentTypeLookup.cs
+ IKanbanContentWriter.cs
  IKanbanDataTypeConfigurationLookup.cs
  IKanbanLaneContentTypeResolver.cs
+ IKanbanPropertyValueReader.cs
  KanbanBoardComposer.cs
  KanbanBoardConfigurationResolver.cs
  KanbanBoardService.cs
+ KanbanCardChildAssembler.cs
  KanbanCardMapper.cs
+ KanbanCardService.cs
  KanbanCardStateResolver.cs
+ KanbanChildOrdering.cs
  KanbanConfigurationService.cs
  KanbanConfigurationValueReader.cs
  KanbanContentLoader.cs
  KanbanContentTypeLookup.cs
+ KanbanContentWriter.cs
  KanbanDataTypeConfigurationLookup.cs
  KanbanLaneContentTypeResolver.cs
  KanbanLaneValueReader.cs
+ KanbanPropertyValueReader.cs
+ KanbanSystemProperty.cs
 
 [metadataReferences]
 <DOTNET>/packs/Microsoft.AspNetCore.App.Ref/10.0.9/ref/net10.0/
