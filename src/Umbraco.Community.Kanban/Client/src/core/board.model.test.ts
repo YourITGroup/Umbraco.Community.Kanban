@@ -2,7 +2,10 @@ import { describe, it, expect } from 'vitest';
 import {
   applyCardState,
   formatLaneTotal,
+  invertMove,
+  isMoveUndoable,
   laneHasMore,
+  laneOfCard,
   mergeLanePage,
   moveCard,
   nextSkip,
@@ -362,5 +365,61 @@ describe('pendingCards', () => {
     );
 
     expect(pendingCards(state)).toHaveLength(1);
+  });
+});
+
+describe('invertMove', () => {
+  it('swaps the lanes, so an undo is literally the move backwards', () => {
+    expect(invertMove({ key: 'a', from: 'todo', to: 'doing' })).toEqual({ key: 'a', from: 'doing', to: 'todo' });
+  });
+
+  it('round-trips to the original move', () => {
+    const move = { key: 'a', from: '', to: 'doing' };
+
+    expect(invertMove(invertMove(move))).toEqual(move);
+  });
+});
+
+describe('laneOfCard', () => {
+  const state = toBoardState(board([lane('todo', ['a']), lane('doing', ['b'])]));
+
+  it('finds the lane a card sits in', () => {
+    expect(laneOfCard(state, 'b')).toBe('doing');
+  });
+
+  it('is nothing for a card the board is not showing', () => {
+    expect(laneOfCard(state, 'nope')).toBeUndefined();
+  });
+
+  it('reports the unassigned lane by its empty value, not as absent', () => {
+    const withUnassigned = toBoardState(board([lane('', ['c']), lane('todo', [])]));
+
+    expect(laneOfCard(withUnassigned, 'c')).toBe('');
+  });
+});
+
+describe('isMoveUndoable', () => {
+  const move = { key: 'a', from: 'todo', to: 'doing' };
+
+  it('allows an undo while the card is still where the move put it', () => {
+    expect(isMoveUndoable(move, 'doing')).toBe(true);
+  });
+
+  it('refuses when the card has since moved elsewhere', () => {
+    // Another editor, or a later move of the same card: writing the old source lane back would undo
+    // something that is no longer there.
+    expect(isMoveUndoable(move, 'done')).toBe(false);
+  });
+
+  it('refuses when the board is no longer showing the card', () => {
+    expect(isMoveUndoable(move, undefined)).toBe(false);
+  });
+
+  it('compares lanes case-insensitively, as every other lane comparison does', () => {
+    expect(isMoveUndoable(move, 'Doing')).toBe(true);
+  });
+
+  it('allows an undo of a move out of the unassigned lane', () => {
+    expect(isMoveUndoable({ key: 'a', from: '', to: 'todo' }, 'todo')).toBe(true);
   });
 });

@@ -88,13 +88,22 @@ export class UmbCommunityKanbanLaneElement extends UmbLitElement {
 
   static override styles = [
     css`
+      /* The canvas stretches this host to the height of the tallest lane. Making the host a flex container
+         is what passes that height on to the .lane box: without it, .lane keeps its own content height, and
+         an empty lane's sticky header then has only those few pixels to stick within — which is exactly why
+         the Unassigned lane's header scrolled away while full lanes' headers appeared to pin. */
+      :host {
+        display: flex;
+      }
+
       .lane {
         display: flex;
+        flex: 1;
         flex-direction: column;
         gap: var(--uui-size-space-3);
         min-width: 280px;
         max-width: 320px;
-        flex: 0 0 auto;
+        box-sizing: border-box;
         /* A transparent border of the same width the highlight uses, so becoming a drop target changes
            colour and nothing else — no reflow of the whole board mid-drag. */
         border: 2px solid transparent;
@@ -104,7 +113,7 @@ export class UmbCommunityKanbanLaneElement extends UmbLitElement {
       /* A variant of the lane's own colour, not a generic accent: a red "Blocked" lane highlights red and
          a green "Done" lane green. Two strengths of the same colour so the border reads as the saturated
          edge of the faint tint behind it. The fallback covers a lane with no resolved colour — reachable
-         today only via the (Unassigned) lane, which is pinned to neutral grey. */
+         today only via the Unassigned lane, which is pinned to neutral grey. */
       .lane.drop-target {
         background: color-mix(in srgb, var(--kanban-lane-colour, var(--uui-color-border)) 20%, transparent);
         border-color: color-mix(in srgb, var(--kanban-lane-colour, var(--uui-color-border)) 80%, transparent);
@@ -129,6 +138,12 @@ export class UmbCommunityKanbanLaneElement extends UmbLitElement {
            value threaded through again. */
         border-top: 3px solid var(--kanban-lane-colour, var(--uui-color-border));
         border-radius: var(--uui-border-radius);
+        /* Resolves against the board's .viewport — the nearest scrolling ancestor — not against the
+           lane, so the header pins while the canvas scrolls under it. Without this, scrolling a tall
+           canvas leaves unlabelled columns and no way to tell what you are dropping into. */
+        position: sticky;
+        top: 0;
+        z-index: 1;
       }
 
       .name {

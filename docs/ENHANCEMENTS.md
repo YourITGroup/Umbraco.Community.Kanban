@@ -84,6 +84,46 @@ Two scope lines worth keeping in view, both deliberate rather than discovered:
   core's bulk action is scoped to its own selection. A card in an unpaged lane page, or beyond the
   board's truncation cap, does not count until it is paged in.
 
+---
+
+## Done: board canvas, equal-height lanes, drag ghost (milestone 4)
+
+**Built 2026-07-31**, from
+[its design](superpowers/specs/2026-07-31-milestone-4-canvas-and-drag-ghost-design.md). The board now owns
+a bounded `.viewport` wrapping a content-height `.canvas`, so every lane is as tall as the fullest one and
+a drop target is a whole column instead of the 82px stub an empty lane used to report. The dragged card
+follows the cursor as a full-fidelity ghost, holding a canvas edge auto-scrolls, and Escape abandons a
+drag.
+
+What this fixed, and what it cost:
+
+- **The real milestone-3 bug was geometry, not logic.** Hand-verification found an empty lane reporting a
+  rect of 82px against a full lane's 8032px. `laneAtPoint` was correct all along and is unchanged; the
+  rects it was given were the problem.
+- **Two elements, not one.** `align-items: stretch` on a *bounded* container stretches items to the
+  visible height and clips the fullest lane. Equal heights measured against the tallest lane need the
+  flex container to be content-height, nested inside the bounded scroller — so `.viewport` and `.canvas`
+  cannot be the same element.
+- **The drop target is computed per frame, not per pointer event.** Auto-scroll moves lane rects while the
+  pointer holds still, so a move-driven hit-test would go stale mid-gesture.
+- **The board is sized to its container, not the window.** The workspace footer holding Save sits below
+  the collection's container, so measuring `window.innerHeight` overhung it — 54px in a real layout — and
+  grew a second scrollbar. The container is found by climbing ancestors and ignoring the boxless
+  `router-slot` wrappers, whose percentage heights are the same broken chain that stops CSS sizing.
+- **A lane must fill its stretched host.** `align-items: stretch` sizes the lane *host*; the `.lane` box
+  inside its shadow root kept its own content height, so an empty lane's sticky header had only 82px to
+  stick within. Full lanes hid the bug by being tall anyway.
+
+**One change reaches beyond the board:** the document collection's manifest is re-registered at startup
+with its `element` swapped for `umb-community-kanban-document-collection`, so a Kanban view can hide the
+list view's pager and selection-action bar — neither can act on anything a board shows. The swap keeps
+core's own `api` and `meta` references untouched, because that `api` is the non-public
+`UmbDocumentCollectionContext` and it carries real behaviour (display-culture sequencing, and
+`requestItemHref` for item links). Every other view sees identical behaviour: the suppression is gated on
+the showing view's alias via `isChromelessCollectionView`, which is where the calendar view opts in later.
+There was no narrower seam — the collection layout is chosen per entity type from a fixed alias, so
+neither a collection view nor a data type's configuration can influence it.
+
 ## 7. Board configuration picker: match core's picker styling
 
 The picker built on 2026-07-28 stacks its buttons in a column, which does not look like anything else
@@ -142,14 +182,15 @@ never by looking *into* its shadow content, so the walk always found nothing and
 stayed horizontal-only. Same shadow-encapsulation problem the design meant to solve, one layer further
 in.
 
-**Backlog:** a real fix needs the board to own its own vertical scrolling rather than borrow an
-ancestor's — give `.lanes` `overflow-y: auto` and a genuine bounded height. That height can't come from
-a CSS percentage/flex chain either: walking that chain (`umb-collection-default` → `#router` →
-our host) shows `#router` has no explicit height of its own (`router-slot { height: 100% }` resolves
-against it to `auto`), and `#router` is itself shadow-sealed, so there's no ancestor CSS to fix. Filling
-the viewport reliably means measuring it in JS (`getBoundingClientRect()` + `window.innerHeight`,
-recomputed on resize) and setting an explicit pixel height — read-only geometry, not reaching into any
-other component's internals. Also worth deciding then: whether pagination/selection-action controls that
-render below the board in the same scroll region need a reserved buffer, and whether a fixed-transform 2D
-canvas (enabling zoom) is worth the bigger rewrite over this simpler self-scrolling box. Not spec'd out
-yet — pick this back up with superpowers:brainstorming when it's next in scope.
+**Closed by milestone 4.** The fix was the one this backlog note predicted: the board owns its own
+vertical scrolling instead of borrowing an ancestor's. `.viewport` has `overflow: auto` and an explicit
+pixel height measured from the window (`window.innerHeight - rectTop - gutter`, recomputed on resize),
+because no ancestor CSS can supply one — `#router` has no height of its own and is shadow-sealed. Pan now
+drives `scrollTop` alongside `scrollLeft`; `panScrollOffset` needed no change, having been written
+axis-agnostic for exactly this.
+
+Of the two open questions this note left, one is answered and one is not. The simpler self-scrolling box
+was chosen over a **fixed-transform 2D canvas**, so zoom is still unbuilt — and now costs more, since the
+ghost, the hit-test and the auto-scroll all work in viewport coordinates that a canvas transform would
+invalidate. Whether controls rendering below the board need a reserved buffer has not come up in practice;
+the measured gutter handles the padding, and nothing else renders in that region today.

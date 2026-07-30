@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { panScrollOffset, shouldStartPan } from './pan.model.js';
+import { isPannablePath, panScrollOffset, shouldStartPan } from './pan.model.js';
 
 describe('panScrollOffset', () => {
   it('decreases the offset when the pointer moves in the positive direction', () => {
@@ -17,9 +17,44 @@ describe('panScrollOffset', () => {
   });
 });
 
+describe('isPannablePath', () => {
+  // The composed path's local names, innermost first — what the board can see of a press that began
+  // inside a lane's shadow tree.
+  it('allows a press on the canvas itself', () => {
+    expect(isPannablePath(['div', 'div'])).toBe(true);
+  });
+
+  it('allows a press on a lane’s own background, so the board pans from inside a lane', () => {
+    expect(isPannablePath(['div', 'umb-community-kanban-lane', 'div', 'div'])).toBe(true);
+  });
+
+  it('allows a press on a lane header, which is not interactive', () => {
+    expect(isPannablePath(['span', 'div', 'umb-community-kanban-lane', 'div'])).toBe(true);
+  });
+
+  it('refuses a press on a card, which drags instead', () => {
+    expect(
+      isPannablePath(['div', 'umb-community-kanban-card', 'div', 'umb-community-kanban-lane', 'div']),
+    ).toBe(false);
+  });
+
+  it('refuses a press on a button, so Show more still just clicks', () => {
+    expect(isPannablePath(['uui-button', 'div', 'umb-community-kanban-lane', 'div'])).toBe(false);
+  });
+
+  it('refuses a press on a native button or link', () => {
+    expect(isPannablePath(['button', 'div'])).toBe(false);
+    expect(isPannablePath(['a', 'div'])).toBe(false);
+  });
+
+  it('ignores case, since composedPath local names are lowercase but callers may not be', () => {
+    expect(isPannablePath(['UMB-COMMUNITY-KANBAN-CARD', 'div'])).toBe(false);
+  });
+});
+
 describe('shouldStartPan', () => {
   const background = {
-    isSelfTarget: true,
+    isPannableTarget: true,
     pointerType: 'mouse',
     button: 0,
     isPrimary: true,
@@ -33,8 +68,8 @@ describe('shouldStartPan', () => {
     expect(shouldStartPan(background)).toBe(true);
   });
 
-  it('excludes a press that did not target the container itself (a card or a lane)', () => {
-    expect(shouldStartPan({ ...background, isSelfTarget: false })).toBe(false);
+  it('excludes a press on something that owns the gesture itself, such as a card', () => {
+    expect(shouldStartPan({ ...background, isPannableTarget: false })).toBe(false);
   });
 
   it('excludes touch, since native scrolling already handles it with momentum', () => {

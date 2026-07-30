@@ -120,6 +120,39 @@ export function moveCard(
   };
 }
 
+/** One completed move, kept so it can be undone. */
+export interface KanbanCardMove {
+  key: string;
+  /** The lane the card came from — where an undo puts it back. */
+  from: string;
+  /** The lane it went to, and where it must still be for an undo to be safe. */
+  to: string;
+}
+
+/**
+ * The same move, backwards. Undo writes this rather than computing a destination of its own: an undo that
+ * is not literally the inverse is an undo that can drift, which is the reasoning `moveCard` already records.
+ */
+export function invertMove(move: KanbanCardMove): KanbanCardMove {
+  return { key: move.key, from: move.to, to: move.from };
+}
+
+/** The value of the lane a card currently sits in, or undefined if the board is not showing it. */
+export function laneOfCard(state: KanbanBoardState, cardKey: string): string | undefined {
+  return state.lanes.find((lane) => lane.cards.some((card) => card.key === cardKey))?.value;
+}
+
+/**
+ * Whether a recorded move can still be undone, given where its card sits now.
+ *
+ * The card must still be in the lane the move put it in. Anything else means the world moved on — a
+ * reload, another editor, or a later move of the same card — and writing the old source lane back would
+ * undo something that is no longer there. Compared case-insensitively, as every other lane comparison is.
+ */
+export function isMoveUndoable(move: KanbanCardMove, currentLane: string | undefined): boolean {
+  return currentLane !== undefined && sameLane(currentLane, move.to);
+}
+
 /**
  * The state a card takes on immediately after a save. A published card gains unpublished changes; a draft
  * has no published version to diverge from, so nothing changes.

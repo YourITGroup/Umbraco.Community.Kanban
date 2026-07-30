@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   formatPublishSummary,
+  ghostPosition,
   laneAtPoint,
   moveFailureMessage,
   shouldStartCardDrag,
@@ -126,5 +127,29 @@ describe('formatPublishSummary', () => {
 
   it('reports a total failure the same way', () => {
     expect(formatPublishSummary(0, 3)).toBe('Published 0 of 3 — 3 failed.');
+  });
+});
+
+describe('ghostPosition', () => {
+  it('keeps the card under the point where it was grabbed', () => {
+    // Grabbed 30px in and 12px down from the card's own top-left; the ghost's corner sits there still.
+    expect(ghostPosition({ pointer: { x: 500, y: 400 }, grabOffset: { x: 30, y: 12 } })).toEqual({
+      left: 470,
+      top: 388,
+    });
+  });
+
+  it('places the corner at the pointer when the card was grabbed by its corner', () => {
+    expect(ghostPosition({ pointer: { x: 500, y: 400 }, grabOffset: { x: 0, y: 0 } })).toEqual({
+      left: 500,
+      top: 400,
+    });
+  });
+
+  it('allows negative coordinates, so a drag above or left of the window still tracks', () => {
+    expect(ghostPosition({ pointer: { x: 10, y: 5 }, grabOffset: { x: 40, y: 20 } })).toEqual({
+      left: -30,
+      top: -15,
+    });
   });
 });

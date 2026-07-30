@@ -26,7 +26,7 @@ public class KanbanLane
     public static KanbanLane Unassigned() => new()
     {
         Value = string.Empty,
-        Name = "(Unassigned)",
+        Name = "Unassigned",
         Colour = "grey",
         IsUnassigned = true,
         AcceptsDrops = false,

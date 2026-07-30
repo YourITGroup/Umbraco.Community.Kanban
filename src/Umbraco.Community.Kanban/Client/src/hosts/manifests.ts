@@ -1,9 +1,16 @@
 import {
   KANBAN_COLLECTION_VIEW_BOARD_ALIAS,
   KANBAN_DOCUMENT_COLLECTION_ALIAS,
+  KANBAN_ENTRY_POINT_ALIAS,
 } from '@/constants.js';
 
 export const manifests: Array<UmbExtensionManifest> = [
+  {
+    type: 'backofficeEntryPoint',
+    alias: KANBAN_ENTRY_POINT_ALIAS,
+    name: 'Kanban Entry Point',
+    js: () => import('./entry-point.js'),
+  },
   {
     type: 'collectionView',
     alias: KANBAN_COLLECTION_VIEW_BOARD_ALIAS,

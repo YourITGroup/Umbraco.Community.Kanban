@@ -48,3 +48,18 @@ export const KANBAN_COLLECTION_PROPERTY_EDITOR_UI_ALIAS = 'Umb.PropertyEditorUi.
 
 /** The document collection our board layout is offered for. */
 export const KANBAN_DOCUMENT_COLLECTION_ALIAS = 'Umb.Collection.Document';
+
+/** Our backoffice entry point, which swaps the document collection's element for ours. */
+export const KANBAN_ENTRY_POINT_ALIAS = 'Umb.Community.Kanban.EntryPoint';
+
+/**
+ * Views that supply their own chrome, so the collection layout hides its pager and selection-action bar
+ * while one of them is showing. A board pages its own lanes and has no checkbox selection, so neither
+ * control can act on anything it displays.
+ *
+ * The calendar collection view joins this list when it exists — it will have the same problem for the same
+ * reason.
+ */
+export const KANBAN_CHROMELESS_COLLECTION_VIEW_ALIASES: readonly string[] = [
+  KANBAN_COLLECTION_VIEW_BOARD_ALIAS,
+];
