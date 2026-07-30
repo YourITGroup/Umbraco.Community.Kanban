@@ -1,4 +1,5 @@
 import { classMap, css, customElement, html, nothing, property, state } from '@umbraco-cms/backoffice/external/lit';
+import type { PropertyValues } from '@umbraco-cms/backoffice/external/lit';
 import { UmbLitElement } from '@umbraco-cms/backoffice/lit-element';
 import { UMB_NOTIFICATION_CONTEXT } from '@umbraco-cms/backoffice/notification';
 import { UmbDocumentPublishingRepository } from '@umbraco-cms/backoffice/document';
@@ -20,9 +21,16 @@ import {
   moveFailureMessage,
   type KanbanLaneHitTarget,
 } from './drag.model.js';
+import { boardViewportHeight } from './canvas.model.js';
 import './kanban-lane.element.js';
 import type { KanbanBoardQuery, KanbanDataSource } from '../data/kanban-data-source.js';
 import { panScrollOffset, shouldStartPan } from './pan.model.js';
+
+/** The host's own bottom padding (`--uui-size-layout-1`), so the viewport ends at the window's edge. */
+const VIEWPORT_GUTTER = 24;
+
+/** Below this a scrolling canvas is useless — roughly a lane header plus two cards. */
+const VIEWPORT_MIN_HEIGHT = 320;
 
 type KanbanBoardStatus = 'idle' | 'loading' | 'ready' | 'not-configured' | 'error';
 
@@ -77,11 +85,20 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
   @state()
   private _publishing = false;
 
+  /**
+   * The viewport's height in pixels, measured from the window. Undefined until the first measurement,
+   * when the CSS `min-height` is what holds the box open.
+   */
+  @state()
+  private _viewportHeight?: number;
+
   /** The in-progress pan, or undefined between drags. Keyed by pointerId so a second pointer is ignored. */
   #pan?: {
     pointerId: number;
     startX: number;
+    startY: number;
     startScrollLeft: number;
+    startScrollTop: number;
   };
 
   /**
@@ -96,7 +113,7 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
   async load() {
     if (!this.parentId || !this.datasource) return;
 
-    // A reload swaps out `.lanes` for a loader, not a re-render in place — any in-progress pan or card
+    // A reload swaps out `.viewport` for a loader, not a re-render in place — any in-progress pan or card
     // drag would otherwise be stranded on the discarded div (see #endPan for why that's unsafe).
     this.#endPan();
     this.#onDragCancel();
@@ -117,6 +134,24 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
 
     this._board = undefined;
     this._status = outcome.kind === 'not-configured' ? 'not-configured' : 'error';
+  }
+
+  override connectedCallback() {
+    super.connectedCallback();
+
+    window.addEventListener('resize', this.#onWindowResize);
+  }
+
+  override disconnectedCallback() {
+    super.disconnectedCallback();
+
+    window.removeEventListener('resize', this.#onWindowResize);
+  }
+
+  override updated(changedProperties: PropertyValues<this>) {
+    super.updated(changedProperties);
+
+    this.#measureViewport();
   }
 
   #query(extra?: Partial<KanbanBoardQuery>): KanbanBoardQuery {
@@ -149,37 +184,40 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
   }
 
   /**
-   * Starts a background pan. Gated on `event.target === event.currentTarget`: the listener is bound
-   * directly on `.lanes`, so `currentTarget` is always that div, and the two are equal only when the
-   * pointer went down on the div itself — never a lane or a card inside it. Touch is excluded because
-   * `.lanes` already scrolls horizontally on a touch swipe, with native momentum, for free.
+   * Starts a background pan. The background a user can actually press is `.canvas` — it fills at least
+   * the viewport — so the gate accepts either it or the viewport itself, and nothing else: a press on a
+   * lane or a card must never pan. Touch is excluded because `.viewport` already scrolls natively on a
+   * swipe, with momentum, for free.
    */
-  #onLanesPointerDown(event: PointerEvent) {
+  #onViewportPointerDown(event: PointerEvent) {
     if (this.#pan) return; // a pan is already in progress for another pointer
 
-    const lanes = event.currentTarget as HTMLDivElement;
+    const viewport = event.currentTarget as HTMLDivElement;
+    const canvas = viewport.querySelector('.canvas');
 
     if (
       !shouldStartPan({
-        isSelfTarget: event.target === event.currentTarget,
+        isSelfTarget: event.target === viewport || event.target === canvas,
         pointerType: event.pointerType,
         button: event.button,
         isPrimary: event.isPrimary,
         offsetX: event.offsetX,
         offsetY: event.offsetY,
-        clientWidth: lanes.clientWidth,
-        clientHeight: lanes.clientHeight,
+        clientWidth: viewport.clientWidth,
+        clientHeight: viewport.clientHeight,
       })
     ) {
       return;
     }
 
-    lanes.setPointerCapture(event.pointerId);
+    viewport.setPointerCapture(event.pointerId);
 
     this.#pan = {
       pointerId: event.pointerId,
       startX: event.clientX,
-      startScrollLeft: lanes.scrollLeft,
+      startY: event.clientY,
+      startScrollLeft: viewport.scrollLeft,
+      startScrollTop: viewport.scrollTop,
     };
     this._isPanning = true;
 
@@ -189,16 +227,17 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
   }
 
   /**
-   * Once `.lanes` has captured the pointer, every subsequent event for it is retargeted here by the
+   * Once `.viewport` has captured the pointer, every subsequent event for it is retargeted here by the
    * Pointer Events spec regardless of what is visually underneath — so a drag that passes back over a
    * lane or a card mid-gesture never reaches that lane's or card's own handlers.
    */
-  #onLanesPointerMove(event: PointerEvent) {
+  #onViewportPointerMove(event: PointerEvent) {
     if (!this.#pan || event.pointerId !== this.#pan.pointerId) return;
 
-    const lanes = event.currentTarget as HTMLDivElement;
+    const viewport = event.currentTarget as HTMLDivElement;
 
-    lanes.scrollLeft = panScrollOffset(this.#pan.startScrollLeft, this.#pan.startX, event.clientX);
+    viewport.scrollLeft = panScrollOffset(this.#pan.startScrollLeft, this.#pan.startX, event.clientX);
+    viewport.scrollTop = panScrollOffset(this.#pan.startScrollTop, this.#pan.startY, event.clientY);
   }
 
   /**
@@ -206,21 +245,21 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
    * browser can fire without a pointerup ever arriving (losing window focus, an OS gesture
    * intercepting the drag), and without this the cursor could get stuck on "grabbing" forever.
    */
-  #onLanesPointerEnd(event: PointerEvent) {
+  #onViewportPointerEnd(event: PointerEvent) {
     if (!this.#pan || event.pointerId !== this.#pan.pointerId) return;
 
-    const lanes = event.currentTarget as HTMLDivElement;
+    const viewport = event.currentTarget as HTMLDivElement;
 
-    if (lanes.hasPointerCapture(event.pointerId)) {
-      lanes.releasePointerCapture(event.pointerId);
+    if (viewport.hasPointerCapture(event.pointerId)) {
+      viewport.releasePointerCapture(event.pointerId);
     }
 
     this.#endPan();
   }
 
   /**
-   * Clears in-progress pan state. Split out from `#onLanesPointerEnd` so `load()` can also call
-   * it: a reload swaps `.lanes` out for a loader rather than re-rendering it in place, so a pan
+   * Clears in-progress pan state. Split out from `#onViewportPointerEnd` so `load()` can also call
+   * it: a reload swaps `.viewport` out for a loader rather than re-rendering it in place, so a pan
    * left live across that swap would either go permanently dead (no pointerup ever reaches the
    * new div) or, worse, survive with a `startScrollLeft` captured from the discarded element and
    * jump the board on the next pointermove.
@@ -230,8 +269,34 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
     this._isPanning = false;
   }
 
+  /**
+   * Sets the viewport's height from the window. Called after every render because the publish toolbar
+   * and the truncation message both change where the viewport starts, and a stale height would leave it
+   * overhanging the window or short of it.
+   */
+  #measureViewport() {
+    const viewport = this.renderRoot.querySelector<HTMLDivElement>('.viewport');
+
+    if (!viewport) return;
+
+    const height = boardViewportHeight({
+      rectTop: viewport.getBoundingClientRect().top,
+      innerHeight: window.innerHeight,
+      gutter: VIEWPORT_GUTTER,
+      min: VIEWPORT_MIN_HEIGHT,
+    });
+
+    // Only assign on a real change: `updated()` calls this, so assigning unconditionally would
+    // schedule another update and loop forever. Sub-pixel jitter is not a real change.
+    if (this._viewportHeight === undefined || Math.abs(this._viewportHeight - height) >= 1) {
+      this._viewportHeight = height;
+    }
+  }
+
+  #onWindowResize = () => this.#measureViewport();
+
   #onDragStart(event: CustomEvent<{ key: string; lane: string }>) {
-    // A pan and a card drag cannot overlap: the pan only starts on `.lanes` itself, which a card is never.
+    // A pan and a card drag cannot overlap: the pan only starts on the canvas background, never a card.
     this._drag = { key: event.detail.key, lane: event.detail.lane };
     this._dropTarget = undefined;
   }
@@ -418,25 +483,28 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
           this.#renderMessage('Showing the first cards only — lane counts shown here are lower bounds.')
         : nothing}
       <div
-        class=${classMap({ lanes: true, panning: this._isPanning })}
+        class=${classMap({ viewport: true, panning: this._isPanning })}
+        style=${this._viewportHeight ? `height: ${this._viewportHeight}px` : ''}
         @kanban-load-more=${this.#onLoadMore}
         @kanban-drag-start=${this.#onDragStart}
         @kanban-drag-move=${this.#onDragMove}
         @kanban-drag-end=${this.#onDragEnd}
         @kanban-drag-cancel=${this.#onDragCancel}
-        @pointerdown=${this.#onLanesPointerDown}
-        @pointermove=${this.#onLanesPointerMove}
-        @pointerup=${this.#onLanesPointerEnd}
-        @pointercancel=${this.#onLanesPointerEnd}
-        @lostpointercapture=${this.#onLanesPointerEnd}>
-        ${this._board.lanes.map(
-          (lane) => html`<umb-community-kanban-lane
-            .lane=${lane}
-            ?allow-drag=${this._board?.allowDrag ?? false}
-            ?is-drop-target=${this._dropTarget?.value === lane.value}
-            ?accepts-drop=${this._dropTarget?.acceptsDrops ?? false}
-            ?show-child-items=${this._board?.showChildItems ?? false}></umb-community-kanban-lane>`,
-        )}
+        @pointerdown=${this.#onViewportPointerDown}
+        @pointermove=${this.#onViewportPointerMove}
+        @pointerup=${this.#onViewportPointerEnd}
+        @pointercancel=${this.#onViewportPointerEnd}
+        @lostpointercapture=${this.#onViewportPointerEnd}>
+        <div class="canvas">
+          ${this._board.lanes.map(
+            (lane) => html`<umb-community-kanban-lane
+              .lane=${lane}
+              ?allow-drag=${this._board?.allowDrag ?? false}
+              ?is-drop-target=${this._dropTarget?.value === lane.value}
+              ?accepts-drop=${this._dropTarget?.acceptsDrops ?? false}
+              ?show-child-items=${this._board?.showChildItems ?? false}></umb-community-kanban-lane>`,
+          )}
+        </div>
       </div>
     `;
   }
@@ -448,22 +516,39 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
         padding: var(--uui-size-layout-1);
       }
 
-      .lanes {
-        display: flex;
-        gap: var(--uui-size-space-4);
-        align-items: flex-start;
-        overflow-x: auto;
-        padding-bottom: var(--uui-size-space-3);
+      .viewport {
+        /* The real height comes from JS; this is the floor before the first measurement and in a
+           window too short to measure usefully. */
+        min-height: 320px;
+        overflow: auto;
         cursor: grab;
       }
 
-      .lanes > * {
-        cursor: auto;
-      }
-
-      .lanes.panning {
+      .viewport.panning {
         cursor: grabbing;
         user-select: none;
+      }
+
+      /* Content-height, so align-items: stretch sizes every lane to the TALLEST lane. A bounded flex
+         container would stretch them to the visible height instead and clip the fullest lane. The width
+         rules matter for the same reason in the other axis: lanes are flex: 0 0 auto, so without
+         max-content the canvas box stays viewport-width while its lanes overflow it, and the pan
+         gate — which tests against this element — would not cover the area the user sees. */
+      .canvas {
+        display: flex;
+        align-items: stretch;
+        gap: var(--uui-size-space-4);
+        width: max-content;
+        min-width: 100%;
+        min-height: 100%;
+        /* With min-height: 100% the padding must be inside the box, or it forces a scrollbar on a
+           board that fits. */
+        box-sizing: border-box;
+        padding-bottom: var(--uui-size-space-3);
+      }
+
+      .canvas > * {
+        cursor: auto;
       }
 
       .message {

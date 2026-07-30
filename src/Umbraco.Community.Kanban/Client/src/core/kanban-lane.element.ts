@@ -129,6 +129,12 @@ export class UmbCommunityKanbanLaneElement extends UmbLitElement {
            value threaded through again. */
         border-top: 3px solid var(--kanban-lane-colour, var(--uui-color-border));
         border-radius: var(--uui-border-radius);
+        /* Resolves against the board's .viewport — the nearest scrolling ancestor — not against the
+           lane, so the header pins while the canvas scrolls under it. Without this, scrolling a tall
+           canvas leaves unlabelled columns and no way to tell what you are dropping into. */
+        position: sticky;
+        top: 0;
+        z-index: 1;
       }
 
       .name {
