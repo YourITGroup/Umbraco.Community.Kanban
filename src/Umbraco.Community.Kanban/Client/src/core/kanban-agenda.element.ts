@@ -17,6 +17,10 @@ export class UmbCommunityKanbanAgendaElement extends UmbLitElement {
   @property({ attribute: false })
   appearanceFor: (category: string | null | undefined) => KanbanCategoryAppearance = () => ({});
 
+  /** Today's ISO date, for the date-rail badge. Supplied by the calendar so this stays pure. */
+  @property()
+  today?: string;
+
   #onItemClick(item: KanbanCalendarItemModel) {
     this.dispatchEvent(
       new CustomEvent('kanban-open-document', { detail: { key: item.card.key }, bubbles: true, composed: true }),
@@ -65,27 +69,36 @@ export class UmbCommunityKanbanAgendaElement extends UmbLitElement {
       }
     }
 
+    const { dayNumber, weekday } = dayParts(day.date);
+
     return html`
-      <section>
-        <h4>${day.date}</h4>
-        ${allDay.map((item) => this.#renderEntry(item, false))}
-        ${[...rows.values()].map(
-          (row) => html`
-            <div class="row">
-              ${row
-                .sort((a, b) => a.column - b.column)
-                .map((entry) => this.#renderEntry(entry.item, true))}
-            </div>
-          `,
-        )}
+      <section class="day">
+        <div class="date-rail">
+          <span class="day-number ${day.date === this.today ? 'today' : ''}">${dayNumber}</span>
+          <span class="weekday">${weekday}</span>
+        </div>
+        <div class="entries">
+          ${allDay.map((item) => this.#renderEntry(item, false))}
+          ${[...rows.values()].map(
+            (row) => html`
+              <div class="row">
+                ${row
+                  .sort((a, b) => a.column - b.column)
+                  .map((entry) => this.#renderEntry(entry.item, true))}
+              </div>
+            `,
+          )}
+        </div>
       </section>
     `;
   }
 
   override render() {
-    if (this.days.length === 0) return nothing;
+    if (this.days.length === 0) {
+      return html`<div class="empty">Nothing scheduled in this period.</div>`;
+    }
 
-    return html`${this.days.map((day) => this.#renderDay(day))}`;
+    return html`<div class="list">${this.days.map((day) => this.#renderDay(day))}</div>`;
   }
 
   static override styles = [
@@ -94,16 +107,65 @@ export class UmbCommunityKanbanAgendaElement extends UmbLitElement {
         display: block;
       }
 
-      h4 {
-        margin: var(--uui-size-space-4) 0 var(--uui-size-space-2);
+      .list {
+        border: 1px solid var(--uui-color-border);
+        border-radius: var(--uui-border-radius);
+        background: var(--uui-color-surface);
+        overflow: hidden;
+      }
+
+      .day {
+        display: flex;
+        gap: var(--uui-size-space-4);
+        padding: var(--uui-size-space-4);
+      }
+
+      .day + .day {
+        border-top: 1px solid var(--uui-color-border);
+      }
+
+      .date-rail {
+        flex: none;
+        width: 3.5em;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+      }
+
+      .day-number {
+        font-size: var(--uui-type-h4-size);
+        font-weight: 600;
+        line-height: 1;
+        min-width: 1.7em;
+        padding: 0.35em 0;
+        text-align: center;
+        border-radius: 999px;
+      }
+
+      .day-number.today {
+        background: var(--uui-color-current);
+        color: var(--uui-color-current-contrast);
+      }
+
+      .weekday {
         font-size: var(--uui-type-small-size);
         color: var(--uui-color-text-alt);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .entries {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: var(--uui-size-space-1);
       }
 
       .row {
         display: flex;
         gap: var(--uui-size-space-2);
-        margin-bottom: 2px;
       }
 
       .row .entry {
@@ -120,12 +182,11 @@ export class UmbCommunityKanbanAgendaElement extends UmbLitElement {
         border-inline-start: 3px solid transparent;
         border-radius: var(--uui-border-radius);
         background: var(--uui-color-surface-alt);
-        padding: var(--uui-size-space-1) var(--uui-size-space-2);
+        padding: var(--uui-size-space-2) var(--uui-size-space-3);
         font: inherit;
         font-size: var(--uui-type-small-size);
         text-align: start;
         cursor: pointer;
-        margin-bottom: 2px;
         box-sizing: border-box;
       }
 
@@ -133,10 +194,15 @@ export class UmbCommunityKanbanAgendaElement extends UmbLitElement {
         background: var(--uui-color-surface-emphasis);
       }
 
+      .entry umb-icon {
+        flex: none;
+      }
+
       .time {
         flex: none;
         color: var(--uui-color-text-alt);
-        min-width: 6em;
+        min-width: 6.5em;
+        font-variant-numeric: tabular-nums;
       }
 
       .name {
@@ -144,8 +210,26 @@ export class UmbCommunityKanbanAgendaElement extends UmbLitElement {
         white-space: nowrap;
         text-overflow: ellipsis;
       }
+
+      .empty {
+        border: 1px dashed var(--uui-color-border);
+        border-radius: var(--uui-border-radius);
+        padding: var(--uui-size-space-6);
+        text-align: center;
+        color: var(--uui-color-text-alt);
+        font-size: var(--uui-type-small-size);
+      }
     `,
   ];
+}
+
+const WEEKDAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/** Date-part arithmetic only: UTC construction and UTC getters, per the as-stored display rule. */
+function dayParts(date: string): { dayNumber: number; weekday: string } {
+  const [year, month, day] = date.split('-').map(Number);
+
+  return { dayNumber: day, weekday: WEEKDAY_NAMES[new Date(Date.UTC(year, month - 1, day)).getUTCDay()] };
 }
 
 /**

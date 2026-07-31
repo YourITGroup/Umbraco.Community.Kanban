@@ -257,7 +257,8 @@ export class UmbCommunityKanbanCalendarElement extends UmbLitElement {
       return html`
         <umb-community-kanban-agenda
           .days=${agendaDays(this._calendar?.items ?? [])}
-          .appearanceFor=${this.#appearanceFor}></umb-community-kanban-agenda>
+          .appearanceFor=${this.#appearanceFor}
+          today=${todayIso()}></umb-community-kanban-agenda>
       `;
     }
 
@@ -303,9 +304,7 @@ export class UmbCommunityKanbanCalendarElement extends UmbLitElement {
     return html`
       <div class="toolbar">
         <uui-button-group>
-          <uui-button label="Previous" compact @click=${() => this.#navigate(-1)}>
-            <uui-symbol-expand open></uui-symbol-expand>‹
-          </uui-button>
+          <uui-button label="Previous" compact @click=${() => this.#navigate(-1)}>‹</uui-button>
           <uui-button label="Today" compact @click=${this.#today}>Today</uui-button>
           <uui-button label="Next" compact @click=${() => this.#navigate(1)}>›</uui-button>
         </uui-button-group>
