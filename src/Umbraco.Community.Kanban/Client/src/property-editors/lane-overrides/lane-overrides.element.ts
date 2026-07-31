@@ -14,8 +14,10 @@ import {
   type KanbanLanePreviewInput,
 } from '@/data/kanban-lane-preview-data-source.js';
 import { previewLanes } from '@/data/kanban-lane-preview-server-data-source.js';
+import { kanbanSettingsRowStyles } from '../settings-row.styles.js';
 import { orderLaneRows, toLaneOrder } from './lane-order.model.js';
 import {
+  isEmptyOverride,
   mergeOverridesWithLanes,
   type KanbanLaneOverrideRow,
   type KanbanLaneOverrideValue,
@@ -265,15 +267,25 @@ export class UmbCommunityKanbanLaneOverridesElement extends UmbLitElement {
    * every field is empty so an untouched lane leaves no residue in the stored value.
    */
   #onFieldChange(row: KanbanLaneOverrideRow, field: 'colour' | 'icon' | 'label', fieldValue: string) {
-    const rest = (this.value ?? []).filter((o) => o.value.toLowerCase() !== row.value.toLowerCase());
-    const updated: KanbanLaneOverrideValue = {
-      ...row.override,
-      value: row.value,
-      [field]: fieldValue || undefined,
-    };
+    this.#writeOverride(row, { [field]: fieldValue || undefined });
+  }
 
-    const isEmpty = !updated.colour && !updated.icon && !updated.label;
-    const next = isEmpty ? rest : [...rest, updated];
+  /**
+   * Hides or shows the lane/category. Hiding takes its cards with it — the server drops the lane and
+   * everything in it, rather than tipping those cards into Unassigned.
+   */
+  #toggleHidden(row: KanbanLaneOverrideRow) {
+    this.#writeOverride(row, { hidden: row.override?.hidden ? undefined : true });
+  }
+
+  /**
+   * Writes a patch over one lane's override, dropping the override entirely once it says nothing, so an
+   * untouched lane leaves no residue in the stored value.
+   */
+  #writeOverride(row: KanbanLaneOverrideRow, patch: Partial<KanbanLaneOverrideValue>) {
+    const rest = (this.value ?? []).filter((o) => o.value.toLowerCase() !== row.value.toLowerCase());
+    const updated: KanbanLaneOverrideValue = { ...row.override, value: row.value, ...patch };
+    const next = isEmptyOverride(updated) ? rest : [...rest, updated];
 
     this.value = next;
     this.dispatchEvent(new UmbChangeEvent());
@@ -344,16 +356,23 @@ export class UmbCommunityKanbanLaneOverridesElement extends UmbLitElement {
   }
 
   #renderRow(row: KanbanLaneOverrideRow) {
+    const hidden = row.override?.hidden === true;
+
     return html`
-      <div class="row" data-lane-value=${row.value} ?data-orphaned=${row.orphaned}>
+      <div
+        class="row"
+        data-lane-value=${row.value}
+        ?data-orphaned=${row.orphaned}
+        ?data-hidden=${hidden}>
         ${this.#shape.orderAlias
           ? html`<uui-icon class="drag-handle" name="icon-grip" title="Drag to reorder"></uui-icon>`
           : ''}
-        <span class="name">
+        <span class="identity">
           ${row.name}
           ${row.orphaned
             ? html`<uui-tag color="warning" look="secondary">no longer resolves</uui-tag>`
             : ''}
+          ${hidden ? html`<uui-tag look="secondary">hidden</uui-tag>` : ''}
         </span>
         <uui-input
           label="Label"
@@ -379,31 +398,42 @@ export class UmbCommunityKanbanLaneOverridesElement extends UmbLitElement {
               'colour',
               (e.target as UmbCommunityKanbanLaneColourElement).value,
             )}></umb-community-kanban-lane-colour>
+        <div class="actions">
+          <uui-button
+            compact
+            look="outline"
+            label=${hidden ? `Show ${row.name}` : `Hide ${row.name}`}
+            title=${hidden
+              ? `Showing again puts ${row.name} and its items back`
+              : `Hiding removes ${row.name} and its items from the view`}
+            @click=${() => this.#toggleHidden(row)}>
+            <!-- The icon shows the state, the label the action. Umbraco's set has no crossed-out eye. -->
+            <uui-icon name=${hidden ? 'icon-block' : 'icon-eye'}></uui-icon>
+          </uui-button>
+        </div>
       </div>
     `;
   }
 
   static override styles = [
+    kanbanSettingsRowStyles,
     css`
-      .row {
-        display: flex;
-        align-items: center;
-        gap: var(--uui-size-space-4);
-        padding: var(--uui-size-space-2) 0;
-        border-bottom: 1px solid var(--uui-color-divider);
-      }
-      .drag-handle {
-        cursor: grab;
-        color: var(--uui-color-text-alt);
-      }
-      .row[data-orphaned] .name {
-        color: var(--uui-color-warning-emphasis);
-      }
-      .name {
-        flex: 1;
+      /* This editor's identity is static text plus a possible tag, so it lays them out itself. */
+      .identity {
         display: flex;
         align-items: center;
         gap: var(--uui-size-space-2);
+      }
+
+      .row[data-orphaned] .identity {
+        color: var(--uui-color-warning-emphasis);
+      }
+
+      /* Dimmed so a hidden row reads as inactive at a glance, without hiding its own controls. */
+      .row[data-hidden] .identity,
+      .row[data-hidden] uui-input,
+      .row[data-hidden] umb-community-kanban-lane-colour {
+        opacity: 0.5;
       }
     `,
   ];

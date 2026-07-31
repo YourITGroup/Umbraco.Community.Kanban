@@ -45,7 +45,7 @@ The package registers two content-editor-facing data types. Both are configured 
 | Lane property | The child-document property whose value decides which lane a card lands in. |
 | Define lanes manually | Off (default): lanes come from the lane property's own options — see "Where lanes come from" below. On: use the manual lane list below instead. |
 | Manual lanes | A hand-typed list of lane values, used only when "Define lanes manually" is on. |
-| Lane appearance | Per-lane colour/icon/label overrides, and drag-to-reorder the lane display order. |
+| Lane appearance | Per-lane colour/icon/label overrides, hide individual lanes, and drag-to-reorder the lane display order. Hiding a lane also hides the cards in it. |
 | Card properties | Which document properties appear as a summary on each card, and in what order. Defaults to "Created" and "Last edited". |
 | Show child items | Lists each card's own children on the card, with edit/add buttons. |
 | Sort child items by / direction | Controls the order children are listed in when "Show child items" is on (Sort order, Name, Last edited, or Created). |
@@ -62,7 +62,7 @@ The package registers two content-editor-facing data types. Both are configured 
 | End date property | Optional — gives a card a visible span in the week grid/agenda; falls back to a 1-hour block if absent or invalid. |
 | Category property | Optional property whose value colours/badges cards, the calendar equivalent of a board's lanes. |
 | Manual categories | Hand-typed category values, used when the category property has no built-in options. |
-| Category appearance | Per-category colour/icon/label overrides. |
+| Category appearance | Per-category colour/icon/label overrides, and hide individual categories. Hiding a category also hides the items carrying it. |
 | Card properties | Same mechanism as the board's card properties. |
 | Agenda view | Whether to offer an Agenda view alongside Month/Week (default on). |
 | Applies to content types | Optional document types that should show this calendar as a Content App tab. |

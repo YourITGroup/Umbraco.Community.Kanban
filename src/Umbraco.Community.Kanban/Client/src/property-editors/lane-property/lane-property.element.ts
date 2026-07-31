@@ -38,6 +38,10 @@ export class UmbCommunityKanbanLanePropertyElement extends UmbLitElement {
   @state()
   private _contentTypeName = '';
 
+  /** That content type's own icon, so the ref row is badged like every other picker's row. */
+  @state()
+  private _contentTypeIcon = '';
+
   #contentTypeKeyAlias: string = KANBAN_LANE_CONTENT_TYPE_KEY;
 
   #workspace?: typeof UMB_DATA_TYPE_WORKSPACE_CONTEXT.TYPE;
@@ -70,13 +74,15 @@ export class UmbCommunityKanbanLanePropertyElement extends UmbLitElement {
   async #loadContentTypeName(unique?: string) {
     if (!unique) {
       this._contentTypeName = '';
+      this._contentTypeIcon = '';
       return;
     }
 
-    // The item repository rather than the detail one: this only needs a name, and the name is all
-    // an item carries. A deleted content type simply yields nothing, leaving the alias on its own.
+    // The item repository rather than the detail one: this needs only a name and an icon, which is
+    // what an item carries. A deleted content type simply yields nothing, leaving the alias on its own.
     const { data } = await this.#documentTypeItems.requestItems([unique]);
     this._contentTypeName = data?.[0]?.name ?? '';
+    this._contentTypeIcon = data?.[0]?.icon ?? '';
   }
 
   async #pick() {
@@ -103,28 +109,46 @@ export class UmbCommunityKanbanLanePropertyElement extends UmbLitElement {
     this.dispatchEvent(new UmbChangeEvent());
   }
 
+  /**
+   * Structured the way core's own pickers are (compare `umb-input-document`): the chosen item is a
+   * ref node inside a `uui-ref-list`, its action a bare labelled button in a `uui-action-bar`, and
+   * the empty state a full-width placeholder button. The differences that remain are deliberate —
+   * there is only ever one value, so the ref node is always `standalone` and the placeholder button
+   * disappears once something is picked, and the row opens the picker again rather than navigating
+   * to the picked thing, because a property alias has nowhere to navigate to.
+   */
   override render() {
     if (!this.value) {
-      return html`<uui-button look="placeholder" label="Choose" @click=${this.#pick}></uui-button>`;
+      return html`<uui-button
+        id="btn-add"
+        look="placeholder"
+        label="Choose"
+        @click=${this.#pick}></uui-button>`;
     }
 
     return html`
-      <uui-ref-node
-        standalone
-        name=${this.value}
-        detail=${this._contentTypeName ? `from ${this._contentTypeName}` : ''}
-        @open=${this.#pick}>
-        <uui-icon slot="icon" name="icon-settings"></uui-icon>
-        <uui-action-bar slot="actions">
-          <uui-button label="Remove" @click=${this.#clear}>Remove</uui-button>
-        </uui-action-bar>
-      </uui-ref-node>
+      <uui-ref-list>
+        <uui-ref-node
+          standalone
+          name=${this.value}
+          detail=${this._contentTypeName ? `from ${this._contentTypeName}` : ''}
+          @open=${this.#pick}>
+          <uui-icon slot="icon" name=${this._contentTypeIcon || 'icon-document'}></uui-icon>
+          <uui-action-bar slot="actions">
+            <uui-button label="Remove" @click=${this.#clear}></uui-button>
+          </uui-action-bar>
+        </uui-ref-node>
+      </uui-ref-list>
     `;
   }
 
   static override styles = [
     css`
       :host {
+        display: block;
+      }
+
+      #btn-add {
         display: block;
       }
     `,

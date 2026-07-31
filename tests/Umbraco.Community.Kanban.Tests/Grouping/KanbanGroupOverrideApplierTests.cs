@@ -28,6 +28,31 @@ public class KanbanGroupOverrideApplierTests
     }
 
     [Fact]
+    public void Apply_HidesALane()
+    {
+        var lanes = Lanes();
+        KanbanGroupOverride[] overrides = [new() { Value = "done", Hidden = true }];
+
+        KanbanGroupOverrideApplier.Apply(lanes, overrides);
+
+        lanes[1].Hidden.Should().BeTrue();
+        lanes[0].Hidden.Should().BeFalse("a lane with no override of its own is never hidden");
+    }
+
+    [Fact]
+    public void Apply_LeavesALaneVisibleWhenTheOverrideOnlyStyles()
+    {
+        // Hidden is assigned rather than guarded, so an override that says nothing about it must still
+        // leave the lane visible — the default of the bool it carries.
+        var lanes = Lanes();
+        KanbanGroupOverride[] overrides = [new() { Value = "done", Colour = "brown" }];
+
+        KanbanGroupOverrideApplier.Apply(lanes, overrides);
+
+        lanes[1].Hidden.Should().BeFalse();
+    }
+
+    [Fact]
     public void Apply_BeatsAColourTheSourceSupplied()
     {
         var lanes = Lanes();

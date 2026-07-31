@@ -14,4 +14,11 @@ public class KanbanGroupOverride
 
     /// <summary>Replaces the label the source supplied.</summary>
     public string? Label { get; set; }
+
+    /// <summary>
+    /// Keeps this group off the board or calendar entirely — the lane is not rendered, and the cards
+    /// in it are not shown anywhere. Unlike the appearance fields, false is a meaningful value here
+    /// (shown), so it is applied rather than treated as "unset".
+    /// </summary>
+    public bool Hidden { get; set; }
 }

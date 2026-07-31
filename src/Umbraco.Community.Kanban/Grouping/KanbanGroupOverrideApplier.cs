@@ -51,6 +51,10 @@ public static class KanbanGroupOverrideApplier
             {
                 lane.Name = laneOverride.Label;
             }
+
+            // Assigned rather than guarded like the fields above: a bool has no "unset", and no source
+            // hides a group of its own accord, so the override is the only thing that can say either way.
+            lane.Hidden = laneOverride.Hidden;
         }
 
         return unmatched;

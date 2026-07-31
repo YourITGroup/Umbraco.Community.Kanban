@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mergeOverridesWithLanes } from './lane-override.model.js';
+import { isEmptyOverride, mergeOverridesWithLanes } from './lane-override.model.js';
 
 describe('lane override model', () => {
   it('pairs each resolved lane with its override', () => {
@@ -48,5 +48,33 @@ describe('lane override model', () => {
 
     expect(rows).toHaveLength(1);
     expect(rows[0].override?.colour).toBe('red');
+  });
+
+  it('carries a hidden override through to its row', () => {
+    const rows = mergeOverridesWithLanes(
+      [{ value: 'open', name: 'Open', isUnassigned: false, hidden: true }],
+      [{ value: 'open', hidden: true }],
+    );
+
+    expect(rows[0].override?.hidden).toBe(true);
+  });
+});
+
+describe('isEmptyOverride', () => {
+  it('is empty when nothing is set', () => {
+    expect(isEmptyOverride({ value: 'open' })).toBe(true);
+  });
+
+  it('is not empty when the lane is hidden', () => {
+    expect(isEmptyOverride({ value: 'open', hidden: true })).toBe(false);
+  });
+
+  it('is empty when hidden is explicitly false, which is the default anyway', () => {
+    // Otherwise un-hiding a lane would leave a row behind for every lane an editor ever toggled.
+    expect(isEmptyOverride({ value: 'open', hidden: false })).toBe(true);
+  });
+
+  it.each(['colour', 'icon', 'label'] as const)('is not empty when %s is set', (field) => {
+    expect(isEmptyOverride({ value: 'open', [field]: 'something' })).toBe(false);
   });
 });

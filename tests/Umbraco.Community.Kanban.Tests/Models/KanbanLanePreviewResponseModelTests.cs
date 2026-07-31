@@ -22,6 +22,20 @@ public class KanbanLanePreviewResponseModelTests
         lane.Icon.Should().Be("icon-box");
         lane.IsUnassigned.Should().BeFalse();
         lane.AcceptsDrops.Should().BeTrue();
+        lane.Hidden.Should().BeFalse();
+    }
+
+    [Fact]
+    public void From_StillListsAHiddenLane()
+    {
+        // The preview is the only place a hidden lane can be un-hidden from, so it must survive the trip.
+        var resolution = new KanbanGroupResolution(
+            [new KanbanGroup { Value = "archived", Name = "Archived", Hidden = true }],
+            []);
+
+        var model = KanbanLanePreviewResponseModel.From(resolution);
+
+        model.Lanes.Should().ContainSingle().Which.Hidden.Should().BeTrue();
     }
 
     [Fact]

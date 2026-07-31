@@ -50,7 +50,8 @@ export const manifests: Array<UmbExtensionManifest> = [
           {
             alias: 'laneOverrides',
             label: 'Lane appearance',
-            description: 'Override the colour, icon or label of individual lanes.',
+            description:
+              'Override the colour, icon or label of individual lanes, and hide the ones you do not want on the board. Hiding a lane hides its cards too.',
             propertyEditorUiAlias: KANBAN_LANE_OVERRIDES_UI_ALIAS,
           },
           {

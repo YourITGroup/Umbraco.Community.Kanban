@@ -249,6 +249,70 @@ public class KanbanCalendarServiceTests
     }
 
     [Fact]
+    public async Task Drops_a_hidden_category_and_the_items_carrying_it()
+    {
+        Harness harness = Configured(new KanbanCalendarConfiguration
+        {
+            DateProperty = "start",
+            CategoryProperty = "kind",
+        });
+        harness.LaneResolver.Groups.AddRange([
+            new KanbanGroup { Value = "workshop", Name = "Workshop" },
+            new KanbanGroup { Value = "private", Name = "Private", Hidden = true },
+            KanbanGroup.Unassigned(),
+        ]);
+        Child(harness, "Shown", """{"date":"2026-08-15T10:00:00"}""", kind: "workshop");
+        Child(harness, "Hidden", """{"date":"2026-08-15T11:00:00"}""", kind: "private");
+        Child(harness, "Uncategorised", """{"date":"2026-08-15T12:00:00"}""");
+
+        KanbanCalendarResult result = await harness.Service.GetCalendarAsync(Request(), User);
+
+        // An item with no category has no category to have hidden, so it stays.
+        result.Calendar!.Items.Select(i => i.Card.Name).Should().Equal("Shown", "Uncategorised");
+        result.Calendar.Categories.Select(c => c.Value).Should().Equal("workshop");
+    }
+
+    [Fact]
+    public async Task Matches_a_hidden_category_regardless_of_case()
+    {
+        Harness harness = Configured(new KanbanCalendarConfiguration
+        {
+            DateProperty = "start",
+            CategoryProperty = "kind",
+        });
+        harness.LaneResolver.Groups.AddRange([
+            new KanbanGroup { Value = "Private", Name = "Private", Hidden = true },
+            KanbanGroup.Unassigned(),
+        ]);
+        Child(harness, "Hidden", """{"date":"2026-08-15T11:00:00"}""", kind: "private");
+
+        KanbanCalendarResult result = await harness.Service.GetCalendarAsync(Request(), User);
+
+        result.Calendar!.Items.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_hidden_category_does_not_count_an_item_as_undated()
+    {
+        Harness harness = Configured(new KanbanCalendarConfiguration
+        {
+            DateProperty = "start",
+            CategoryProperty = "kind",
+        });
+        harness.LaneResolver.Groups.AddRange([
+            new KanbanGroup { Value = "private", Name = "Private", Hidden = true },
+            KanbanGroup.Unassigned(),
+        ]);
+        // Hidden and dateless: dropped for being hidden, so it is not also reported as an omitted date.
+        Child(harness, "Hidden", null, kind: "private");
+
+        KanbanCalendarResult result = await harness.Service.GetCalendarAsync(Request(), User);
+
+        result.Calendar!.Items.Should().BeEmpty();
+        result.Calendar.UndatedCount.Should().Be(0);
+    }
+
+    [Fact]
     public async Task Resolves_no_categories_when_no_category_property_is_configured()
     {
         Harness harness = Configured();
