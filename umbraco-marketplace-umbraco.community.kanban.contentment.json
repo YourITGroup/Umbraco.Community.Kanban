@@ -1,0 +1,9 @@
+{
+    "$schema": "https://marketplace.umbraco.com/umbraco-marketplace-schema.json",
+    "Category": "Editor Tools",
+    "IsSubPackageOf": "Umbraco.Community.Kanban",
+    "LicenseTypes": [
+        "Apache-2.0"
+    ],
+    "PackageType": "Package"
+}
