@@ -2,6 +2,44 @@ using Umbraco.Cms.Core.Models.Membership;
 
 namespace Umbraco.Community.Kanban.Services;
 
+public enum KanbanCardStatus
+{
+    Success,
+
+    /// <summary>
+    /// The document exists but is not a browseable child of the requested parent — moved elsewhere,
+    /// trashed, or browse-denied. One status for all three, deliberately: either way the client must
+    /// not show it, and distinguishing them would leak the existence of documents the user cannot see.
+    /// </summary>
+    NotChild,
+
+    /// <summary>No document with that key — deleted, or never existed.</summary>
+    CardNotFound,
+
+    /// <summary>No document with the requested parent key.</summary>
+    ParentNotFound,
+
+    /// <summary>The user may not browse the parent, so there is no board to reconcile against.</summary>
+    ParentAccessDenied,
+
+    /// <summary>A configuration was named, but it is missing or is not a Kanban Board.</summary>
+    ConfigurationNotFound,
+
+    /// <summary>The parent's collection names no Kanban configuration.</summary>
+    NotConfigured,
+}
+
+/// <param name="ConfigId">An explicit configuration, or null to resolve from the parent's list view.</param>
+/// <param name="Culture">The culture to read for, or null for invariant.</param>
+public sealed record KanbanCardRequest(Guid CardKey, Guid ParentId, Guid? ConfigId, string? Culture);
+
+/// <param name="LaneValue">
+/// The card's raw lane value, read the same way the board reads it — the client matches it to a lane
+/// case-insensitively, falling back to the unassigned lane. Null on any non-success status.
+/// </param>
+/// <param name="Card">The card as the board would compose it. Null on any non-success status.</param>
+public sealed record KanbanCardResult(KanbanCardStatus Status, string? LaneValue, Models.Api.KanbanCardModel? Card);
+
 public enum KanbanCardLaneStatus
 {
     Success,
@@ -56,4 +94,10 @@ public interface IKanbanCardService
     /// whole document and resending everything back.
     /// </remarks>
     Task<KanbanCardLaneResult> SetLaneAsync(KanbanCardLaneRequest request, IUser user);
+
+    /// <summary>
+    /// One card, composed exactly as <c>GET /board</c> would compose it, for real-time reconciliation:
+    /// a server event names a key, and this answers what that document is on this board now.
+    /// </summary>
+    Task<KanbanCardResult> GetCardAsync(KanbanCardRequest request, IUser user);
 }
