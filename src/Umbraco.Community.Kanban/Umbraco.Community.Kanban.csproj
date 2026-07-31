@@ -35,6 +35,13 @@
   </ItemGroup>
 
   <ItemGroup>
+		<None Include="..\..\README.md">
+			<Pack>True</Pack>
+			<PackagePath></PackagePath>
+		</None>
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- The client sources are built by Vite into wwwroot; they are not compiled or packed. -->
     <Content Remove="Client\**" />
     <None Include="Client\public\umbraco-package.json" Pack="false" />
