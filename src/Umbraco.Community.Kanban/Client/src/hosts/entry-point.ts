@@ -1,11 +1,16 @@
 import type { UmbEntryPointOnInit, UmbEntryPointOnUnload } from '@umbraco-cms/backoffice/extension-api';
 import type { ManifestCollection } from '@umbraco-cms/backoffice/collection';
 import { KANBAN_DOCUMENT_COLLECTION_ALIAS } from '@/constants.js';
+import { getBoardConfigurations } from '@/data/kanban-configuration-data-source.js';
+import { boardWorkspaceViewManifests, type KanbanBoardWorkspaceViewManifest } from './workspace-view.model.js';
 
 /**
  * Core's document collection manifest, exactly as it was registered, kept so `onUnload` can put it back.
  */
 let replaced: ManifestCollection | undefined;
+
+/** The per-configuration board tabs this entry point registered, kept so onUnload can remove them. */
+let registeredWorkspaceViews: Array<KanbanBoardWorkspaceViewManifest> = [];
 
 /**
  * Points the document collection at our own layout element, so a Kanban view can suppress the pager and
@@ -22,7 +27,12 @@ let replaced: ManifestCollection | undefined;
  * a fixed alias the workspace context supplies, so a collection *view* cannot influence it and the data
  * type's configuration cannot either.
  */
-export const onInit: UmbEntryPointOnInit = (_host, extensionRegistry) => {
+export const onInit: UmbEntryPointOnInit = (host, extensionRegistry) => {
+  // Board tabs are derived from server-side configurations, so registration is asynchronous. onInit
+  // itself must not await it: a slow or failing Kanban endpoint must never hold up or degrade the
+  // backoffice.
+  void registerBoardWorkspaceViews(host, extensionRegistry);
+
   const registered = extensionRegistry.getByAlias<ManifestCollection>(KANBAN_DOCUMENT_COLLECTION_ALIAS);
 
   if (!registered) {
@@ -51,7 +61,36 @@ export const onInit: UmbEntryPointOnInit = (_host, extensionRegistry) => {
  * Puts core's own manifest back. Without this, unregistering this package would leave every document
  * collection in the backoffice rendering an element from a package that is no longer loaded.
  */
+/**
+ * Fetches every board configuration and registers one workspace-view tab per applicable one.
+ * getBoardConfigurations returns [] on any request failure, so the common failure cannot throw;
+ * the try/catch covers the uncommon ones for the same reason — no Kanban problem may degrade the
+ * backoffice.
+ */
+async function registerBoardWorkspaceViews(
+  host: Parameters<UmbEntryPointOnInit>[0],
+  extensionRegistry: Parameters<UmbEntryPointOnInit>[1],
+): Promise<void> {
+  try {
+    const configurations = await getBoardConfigurations(host);
+
+    registeredWorkspaceViews = boardWorkspaceViewManifests(configurations);
+
+    if (registeredWorkspaceViews.length > 0) {
+      extensionRegistry.registerMany(registeredWorkspaceViews);
+    }
+  } catch (error) {
+    console.warn('[Kanban] Could not register board tabs from configurations.', error);
+    registeredWorkspaceViews = [];
+  }
+}
+
 export const onUnload: UmbEntryPointOnUnload = (_host, extensionRegistry) => {
+  for (const manifest of registeredWorkspaceViews) {
+    extensionRegistry.unregister(manifest.alias);
+  }
+  registeredWorkspaceViews = [];
+
   if (!replaced) return;
 
   extensionRegistry.unregister(KANBAN_DOCUMENT_COLLECTION_ALIAS);
