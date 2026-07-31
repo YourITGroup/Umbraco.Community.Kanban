@@ -1,4 +1,5 @@
 import type { KanbanBoardModel, KanbanCardModel, KanbanCardState } from './kanban-board.types.js';
+import type { KanbanCalendarModel } from './kanban-calendar.types.js';
 
 export interface KanbanBoardQuery {
   parentId: string;
@@ -56,10 +57,26 @@ export type KanbanCardOutcome =
   | { kind: 'gone' }
   | { kind: 'error' };
 
+/** The query for GET /calendar. from/to are inclusive 'yyyy-MM-dd' calendar dates. */
+export interface KanbanCalendarQuery {
+  parentId: string;
+  configId?: string;
+  culture?: string | null;
+  from: string;
+  to: string;
+}
+
+/** Same outcome philosophy as the board: not-configured is a normal state, not an error. */
+export type KanbanCalendarOutcome =
+  | { kind: 'success'; calendar: KanbanCalendarModel }
+  | { kind: 'not-configured' }
+  | { kind: 'error' };
+
 export interface KanbanDataSource {
   getBoard(query: KanbanBoardQuery): Promise<KanbanBoardOutcome>;
   setLane(command: KanbanCardLaneCommand): Promise<KanbanSetLaneOutcome>;
   getCard(query: KanbanCardQuery): Promise<KanbanCardOutcome>;
+  getCalendar(query: KanbanCalendarQuery): Promise<KanbanCalendarOutcome>;
 }
 
 /**
@@ -75,6 +92,19 @@ export function buildBoardQuery(query: KanbanBoardQuery): Record<string, string 
   if (query.lane !== undefined) built.lane = query.lane;
   if (query.skip !== undefined) built.skip = query.skip;
   if (query.take !== undefined) built.take = query.take;
+
+  return built;
+}
+
+/**
+ * Builds the query string for GET /calendar. Same empty-string rule as buildBoardQuery: an empty
+ * culture means "no culture" and must not be sent.
+ */
+export function buildCalendarQuery(query: KanbanCalendarQuery): Record<string, string> {
+  const built: Record<string, string> = { parentId: query.parentId, from: query.from, to: query.to };
+
+  if (query.configId) built.configId = query.configId;
+  if (query.culture) built.culture = query.culture;
 
   return built;
 }

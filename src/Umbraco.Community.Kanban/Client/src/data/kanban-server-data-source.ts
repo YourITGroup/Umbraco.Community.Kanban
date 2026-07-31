@@ -1,13 +1,21 @@
 import { umbHttpClient } from '@umbraco-cms/backoffice/http-client';
 import { tryExecute } from '@umbraco-cms/backoffice/resources';
 import type { UmbControllerHost } from '@umbraco-cms/backoffice/controller-api';
-import { KANBAN_BOARD_ENDPOINT, KANBAN_CARD_ENDPOINT, KANBAN_CARD_LANE_ENDPOINT } from '@/constants.js';
+import {
+  KANBAN_BOARD_ENDPOINT,
+  KANBAN_CALENDAR_ENDPOINT,
+  KANBAN_CARD_ENDPOINT,
+  KANBAN_CARD_LANE_ENDPOINT,
+} from '@/constants.js';
 import {
   buildBoardQuery,
+  buildCalendarQuery,
   buildCardQuery,
   buildLaneBody,
   type KanbanBoardOutcome,
   type KanbanBoardQuery,
+  type KanbanCalendarOutcome,
+  type KanbanCalendarQuery,
   type KanbanCardLaneCommand,
   type KanbanCardOutcome,
   type KanbanCardQuery,
@@ -15,6 +23,7 @@ import {
   type KanbanSetLaneOutcome,
 } from './kanban-data-source.js';
 import type { KanbanBoardModel, KanbanCardModel, KanbanCardState } from './kanban-board.types.js';
+import type { KanbanCalendarModel } from './kanban-calendar.types.js';
 
 /**
  * Response body of PUT /card/{key}/lane. Deliberately a named `interface` rather than an inline object
@@ -111,5 +120,24 @@ export class KanbanServerDataSource implements KanbanDataSource {
     return data.isChild && data.card
       ? { kind: 'child', laneValue: data.laneValue ?? '', card: data.card }
       : { kind: 'not-child' };
+  }
+
+  async getCalendar(query: KanbanCalendarQuery): Promise<KanbanCalendarOutcome> {
+    const { data, error } = await tryExecute(
+      this.#host,
+      umbHttpClient.get<KanbanCalendarModel>({
+        url: KANBAN_CALENDAR_ENDPOINT,
+        query: buildCalendarQuery(query),
+        security: [{ type: 'http', scheme: 'bearer' }],
+      }),
+      { disableNotifications: true },
+    );
+
+    if (error) {
+      // Same contract as the board: 400 is "not configured (yet)", a normal state with guidance.
+      return (error as { status?: number }).status === 400 ? { kind: 'not-configured' } : { kind: 'error' };
+    }
+
+    return data ? { kind: 'success', calendar: data } : { kind: 'error' };
   }
 }
