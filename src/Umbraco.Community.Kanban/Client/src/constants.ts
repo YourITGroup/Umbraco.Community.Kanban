@@ -19,6 +19,9 @@ export const KANBAN_LANES_PREVIEW_ENDPOINT = `${KANBAN_API_PATH}/lanes/preview`;
 export const KANBAN_CARD_LANE_ENDPOINT = (key: string): string =>
   `${KANBAN_API_PATH}/card/${encodeURIComponent(key)}/lane`;
 
+export const KANBAN_CARD_ENDPOINT = (key: string): string =>
+  `${KANBAN_API_PATH}/card/${encodeURIComponent(key)}`;
+
 export const KANBAN_COLLECTION_VIEW_BOARD_ALIAS = 'Umb.Community.Kanban.CollectionView.Board';
 export const KANBAN_DATA_TYPE_WORKSPACE_VIEW_ALIAS = 'Umb.Community.Kanban.WorkspaceView.DataType.Kanban';
 

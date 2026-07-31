@@ -1,17 +1,20 @@
 import { umbHttpClient } from '@umbraco-cms/backoffice/http-client';
 import { tryExecute } from '@umbraco-cms/backoffice/resources';
 import type { UmbControllerHost } from '@umbraco-cms/backoffice/controller-api';
-import { KANBAN_BOARD_ENDPOINT, KANBAN_CARD_LANE_ENDPOINT } from '@/constants.js';
+import { KANBAN_BOARD_ENDPOINT, KANBAN_CARD_ENDPOINT, KANBAN_CARD_LANE_ENDPOINT } from '@/constants.js';
 import {
   buildBoardQuery,
+  buildCardQuery,
   buildLaneBody,
   type KanbanBoardOutcome,
   type KanbanBoardQuery,
   type KanbanCardLaneCommand,
+  type KanbanCardOutcome,
+  type KanbanCardQuery,
   type KanbanDataSource,
   type KanbanSetLaneOutcome,
 } from './kanban-data-source.js';
-import type { KanbanBoardModel, KanbanCardState } from './kanban-board.types.js';
+import type { KanbanBoardModel, KanbanCardModel, KanbanCardState } from './kanban-board.types.js';
 
 /**
  * Response body of PUT /card/{key}/lane. Deliberately a named `interface` rather than an inline object
@@ -23,6 +26,16 @@ import type { KanbanBoardModel, KanbanCardState } from './kanban-board.types.js'
  */
 interface KanbanCardLaneResponseModel {
   state: KanbanCardState;
+}
+
+/**
+ * Response body of GET /card/{key}. An interface for the same RequestResult-collapse reason
+ * KanbanCardLaneResponseModel documents above.
+ */
+interface KanbanCardResponseModel {
+  isChild: boolean;
+  laneValue?: string | null;
+  card?: KanbanCardModel | null;
 }
 
 /**
@@ -74,5 +87,29 @@ export class KanbanServerDataSource implements KanbanDataSource {
     }
 
     return data ? { kind: 'success', state: data.state } : { kind: 'error' };
+  }
+
+  async getCard(query: KanbanCardQuery): Promise<KanbanCardOutcome> {
+    const { data, error } = await tryExecute(
+      this.#host,
+      umbHttpClient.get<KanbanCardResponseModel>({
+        url: KANBAN_CARD_ENDPOINT(query.key),
+        query: buildCardQuery(query),
+        security: [{ type: 'http', scheme: 'bearer' }],
+      }),
+      // Reconciliation is background work; a toast per failed background fetch would be noise.
+      { disableNotifications: true },
+    );
+
+    if (error) {
+      // 404 is an answer — the document is gone — not a fault. Everything else is transient.
+      return (error as { status?: number }).status === 404 ? { kind: 'gone' } : { kind: 'error' };
+    }
+
+    if (!data) return { kind: 'error' };
+
+    return data.isChild && data.card
+      ? { kind: 'child', laneValue: data.laneValue ?? '', card: data.card }
+      : { kind: 'not-child' };
   }
 }

@@ -34,6 +34,10 @@ export class UmbCommunityKanbanLaneElement extends UmbLitElement {
   @property({ type: Boolean, attribute: 'show-child-items' })
   showChildItems = false;
 
+  /** Cards to pulse as just-changed by a colleague. Owned by the board; the lane only passes it down. */
+  @property({ attribute: false })
+  highlightKeys?: ReadonlySet<string>;
+
   #onLoadMore() {
     if (!this.lane) return;
 
@@ -72,6 +76,7 @@ export class UmbCommunityKanbanLaneElement extends UmbLitElement {
               .card=${card}
               lane-value=${this.lane!.value}
               ?allow-drag=${this.allowDrag}
+              ?highlight=${this.highlightKeys?.has(card.key) ?? false}
               ?show-child-items=${this.showChildItems}></umb-community-kanban-card>`,
           )}
           ${this.lane.cards.length === 0 ? html`<span class="empty">No cards</span>` : nothing}

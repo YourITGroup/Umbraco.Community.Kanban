@@ -85,7 +85,8 @@ public class KanbanCardServiceTests
             loader,
             writer,
             new KanbanBoardConfigurationResolver(dataTypes, configurations),
-            permissions);
+            permissions,
+            new FakePropertyValueReader());
 
         return new Harness(service, loader, writer, permissions, dataTypes, configurations, cardContentType);
     }
@@ -289,5 +290,204 @@ public class KanbanCardServiceTests
 
         result.Status.Should().Be(KanbanCardLaneStatus.Success);
         harness.Writer.Writes.Single().LaneValue.Should().BeEmpty();
+    }
+
+    // ---- GetCardAsync -------------------------------------------------------------------------
+
+    private static KanbanCardRequest CardRequest(Guid cardKey, string? culture = null) =>
+        new(cardKey, ParentKey, null, culture);
+
+    [Fact]
+    public async Task Returns_the_card_and_its_lane_value_for_a_child_of_the_parent()
+    {
+        Harness harness = Configured();
+        Content card = Card(harness);
+        card.SetValue("status", "doing");
+
+        KanbanCardResult result = await harness.Service.GetCardAsync(CardRequest(card.Key), User);
+
+        result.Status.Should().Be(KanbanCardStatus.Success);
+        result.LaneValue.Should().Be("doing");
+        result.Card.Should().NotBeNull();
+        result.Card!.Name.Should().Be("Write the spec");
+    }
+
+    [Fact]
+    public async Task Reports_not_child_when_the_document_belongs_to_a_different_parent()
+    {
+        Harness harness = Configured();
+        var stranger = new Content("Elsewhere", 999, harness.CardContentType)
+        {
+            Id = 8888,
+            Key = Guid.Parse("77777777-7777-7777-7777-777777777777"),
+        };
+        harness.Loader.Content[stranger.Key] = stranger;
+
+        KanbanCardResult result = await harness.Service.GetCardAsync(CardRequest(stranger.Key), User);
+
+        result.Status.Should().Be(KanbanCardStatus.NotChild);
+        result.Card.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Reports_not_child_when_the_user_may_not_browse_the_card()
+    {
+        // Deliberately the SAME status as "different parent": distinguishing them would leak the
+        // existence of documents the user cannot browse.
+        Harness harness = Configured();
+        Content card = Card(harness);
+        harness.Permissions.Allowed[ActionBrowse.ActionLetter] = [ParentKey];
+
+        KanbanCardResult result = await harness.Service.GetCardAsync(CardRequest(card.Key), User);
+
+        result.Status.Should().Be(KanbanCardStatus.NotChild);
+    }
+
+    [Fact]
+    public async Task Reports_not_child_when_the_card_is_trashed()
+    {
+        Harness harness = Configured();
+        Content card = Card(harness);
+        card.Trashed = true;
+
+        KanbanCardResult result = await harness.Service.GetCardAsync(CardRequest(card.Key), User);
+
+        result.Status.Should().Be(KanbanCardStatus.NotChild);
+    }
+
+    [Fact]
+    public async Task Get_reports_card_not_found_for_an_unknown_key()
+    {
+        Harness harness = Configured();
+
+        KanbanCardResult result = await harness.Service.GetCardAsync(
+            CardRequest(Guid.Parse("99999999-9999-9999-9999-999999999999")), User);
+
+        result.Status.Should().Be(KanbanCardStatus.CardNotFound);
+    }
+
+    [Fact]
+    public async Task Reports_parent_not_found_for_an_unknown_parent()
+    {
+        Harness harness = Configured();
+        Content card = Card(harness);
+
+        KanbanCardResult result = await harness.Service.GetCardAsync(
+            new KanbanCardRequest(card.Key, Guid.Parse("88888888-8888-8888-8888-888888888888"), null, null), User);
+
+        result.Status.Should().Be(KanbanCardStatus.ParentNotFound);
+    }
+
+    [Fact]
+    public async Task Reports_access_denied_when_the_user_may_not_browse_the_parent()
+    {
+        Harness harness = Configured();
+        Content card = Card(harness);
+        harness.Permissions.Allowed[ActionBrowse.ActionLetter] = [card.Key];
+
+        KanbanCardResult result = await harness.Service.GetCardAsync(CardRequest(card.Key), User);
+
+        result.Status.Should().Be(KanbanCardStatus.ParentAccessDenied);
+    }
+
+    [Fact]
+    public async Task Reports_the_cards_update_and_create_permissions()
+    {
+        Harness harness = Configured();
+        Content card = Card(harness);
+        harness.Permissions.Allowed[ActionUpdate.ActionLetter] = [];
+        harness.Permissions.Allowed[ActionNew.ActionLetter] = [card.Key];
+
+        KanbanCardResult result = await harness.Service.GetCardAsync(CardRequest(card.Key), User);
+
+        result.Card!.CanUpdate.Should().BeFalse();
+        result.Card.CanCreate.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Reads_the_lane_value_for_the_requested_culture()
+    {
+        Harness harness = Configured(
+            documentVariations: ContentVariation.Culture,
+            propertyVariations: ContentVariation.Culture);
+        Content card = Card(harness);
+        card.SetCultureName("Write the spec", "en-US");
+        card.SetCultureName("Skriv spesifikasjonen", "nb-NO");
+        card.SetValue("status", "doing", "en-US");
+        card.SetValue("status", "done", "nb-NO");
+
+        KanbanCardResult result = await harness.Service.GetCardAsync(CardRequest(card.Key, "nb-NO"), User);
+
+        result.LaneValue.Should().Be("done");
+        result.Card!.Name.Should().Be("Skriv spesifikasjonen");
+    }
+
+    [Fact]
+    public async Task Composes_the_cards_children_when_the_board_shows_them()
+    {
+        Harness harness = Configured(new KanbanBoardConfiguration
+        {
+            LaneProperty = "status",
+            AllowDrag = true,
+            ShowChildItems = true,
+        });
+        Content card = Card(harness);
+        var child = new Content("Subtask", card.Id, harness.CardContentType)
+        {
+            Id = 5555,
+            Key = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+        };
+        harness.Loader.Grandchildren.Add(child);
+
+        KanbanCardResult result = await harness.Service.GetCardAsync(CardRequest(card.Key), User);
+
+        result.Card!.Children.Should().ContainSingle(c => c.Name == "Subtask");
+        harness.Loader.GrandchildRequests.Should().ContainSingle()
+            .Which.ParentId.Should().Be(card.Id);
+    }
+
+    [Fact]
+    public async Task Skips_the_child_query_when_the_board_does_not_show_children()
+    {
+        Harness harness = Configured();
+        Content card = Card(harness);
+
+        await harness.Service.GetCardAsync(CardRequest(card.Key), User);
+
+        harness.Loader.GrandchildRequests.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Get_reports_configuration_not_found_when_the_named_configuration_is_missing()
+    {
+        Harness harness = Configured();
+        Content card = Card(harness);
+        harness.Configurations.BoardConfigurations.Clear();
+
+        KanbanCardResult result = await harness.Service.GetCardAsync(CardRequest(card.Key), User);
+
+        result.Status.Should().Be(KanbanCardStatus.ConfigurationNotFound);
+    }
+
+    [Fact]
+    public async Task An_explicit_config_id_wins_over_the_parents_list_view()
+    {
+        // The same precedence GetBoardAsync has, through the same resolver — a board and its
+        // reconciliation fetches must never disagree about which configuration is in force.
+        Harness harness = Configured();
+        Content card = Card(harness);
+        var explicitKey = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        harness.Configurations.BoardConfigurations[explicitKey] = new KanbanBoardConfiguration
+        {
+            LaneProperty = "status",
+            AllowDrag = true,
+        };
+        harness.Configurations.BoardConfigurations.Remove(BoardConfigKey);
+
+        KanbanCardResult result = await harness.Service.GetCardAsync(
+            new KanbanCardRequest(card.Key, ParentKey, explicitKey, null), User);
+
+        // The list-view configuration is gone; only the explicit one can have satisfied this.
+        result.Status.Should().Be(KanbanCardStatus.Success);
     }
 }

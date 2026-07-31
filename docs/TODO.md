@@ -125,22 +125,28 @@ Nothing beyond the `Umbraco.Community.Kanban.Calendar` configuration property ed
 This is a full milestone of work, not a polish pass — it needs its own brainstorm → spec → plan cycle
 before implementation starts.
 
-## Milestone 5 — Content app host and real-time sync ❌ Not built
+## Milestone 5 — Content app host and real-time sync — 5a (real-time) ✅ done, 5b (content app) ❌ not built
 
-- [ ] **Content-app host.** The design's host #1: a `backofficeEntryPoint` that fetches
-  `GET /configurations` at startup and registers one `workspaceView` per configuration, conditioned on
-  each configuration's `appliesTo` content types, so a document type can carry one or more board tabs.
-  Confirmed absent: nothing in the client calls `GET /configurations` except the Data Type workspace
-  view used to configure a *collection* layout (host #2), and `appliesTo` is only read by the board/
-  calendar config editors themselves, never consumed to register a workspace view.
+- [x] **Real-time sync (5a).** Built 2026-07-31 from
+  [its design](superpowers/specs/2026-07-31-realtime-board-sync-design.md). `GET /card/{key}` answers
+  what a document is on this board now; `applyCardResult` (core/realtime.model.ts) folds it in;
+  `KanbanRealtimeController` subscribes to `UMB_MANAGEMENT_API_SERVER_EVENT_CONTEXT` (the public 18.x
+  token — the parent design's `UMB_SERVER_EVENT_CONTEXT` name was stale), coalesces in-flight keys,
+  queues events mid-drag (latest-per-key), and triggers a full reload on hub reconnect. Changed cards
+  pulse for ~2s (`prefers-reduced-motion` gets a steady border tint instead). Needs hand-verification
+  with two browser sessions: move/save/trash/delete/create in one, watch the other.
+- [ ] **Content-app host (5b) — awaiting its own spec.** The design's host #1: a `backofficeEntryPoint`
+  that fetches `GET /configurations` at startup and registers one `workspaceView` per configuration,
+  conditioned on each configuration's `appliesTo` content types, so a document type can carry one or
+  more board tabs. Confirmed absent: nothing in the client calls `GET /configurations` except the Data
+  Type workspace view used to configure a *collection* layout (host #2), and `appliesTo` is only read
+  by the board/calendar config editors themselves, never consumed to register a workspace view. Note
+  for the spec: core's `Umb.Condition.WorkspaceContentTypeAlias` matches *aliases*; `appliesTo` stores
+  *keys* — either a small custom condition or a key→alias lookup at registration time.
 - [ ] **Host #3 (injected)** is effectively available for free — `<umb-community-kanban-board>` already
   takes `config`/`parentId` directly (`core/kanban-board.element.ts`) — but it has never been exercised
   by a real external host (the planned Bookings-section workspace). Worth a smoke test once that
   consumer exists, not a build task in itself.
-- [ ] **Real-time sync.** No subscription to `UMB_SERVER_EVENT_CONTEXT`, no reconciliation reducer, no
-  single-item refetch-and-highlight on a matching `Document` event, no removal on delete/recycle. This
-  is the one item in the design's own "easy to get wrong and invisible when broken" test list
-  (§7 — "the server-event reconciliation reducer") with literally no code to test yet.
 
 ## Milestone 6 — Contentment Data List lane source package ✅ Done
 

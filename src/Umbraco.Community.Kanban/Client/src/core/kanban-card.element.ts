@@ -46,6 +46,13 @@ export class UmbCommunityKanbanCardElement extends UmbLitElement {
   allowDrag = false;
 
   /**
+   * True briefly after a colleague's change landed on this card, so the change is visible rather than
+   * silent. Reflected because the pulse is a :host([highlight]) CSS animation.
+   */
+  @property({ type: Boolean, reflect: true })
+  highlight = false;
+
+  /**
    * The value of the lane this card is currently in. Passed down rather than derived: a card has no view
    * of the board, and the drag's source lane has to travel with the gesture so the failure path can put
    * the card back exactly where it started.
@@ -345,6 +352,31 @@ export class UmbCommunityKanbanCardElement extends UmbLitElement {
       .card.saving {
         opacity: 0.6;
         cursor: progress;
+      }
+
+      /* A colleague's change just landed here. The animation restarts because the attribute drops
+         off and returns, which is why the board clears and re-adds the key rather than extending. */
+      :host([highlight]) .card {
+        animation: kanban-remote-change 1.6s ease-out;
+      }
+
+      @keyframes kanban-remote-change {
+        0% {
+          background-color: color-mix(in srgb, var(--uui-color-selected) 18%, var(--uui-color-surface));
+          border-color: var(--uui-color-selected);
+        }
+        100% {
+          background-color: var(--uui-color-surface);
+          border-color: var(--uui-color-border);
+        }
+      }
+
+      /* The same signal without motion: a steady tinted border for the highlight's duration. */
+      @media (prefers-reduced-motion: reduce) {
+        :host([highlight]) .card {
+          animation: none;
+          border-color: var(--uui-color-selected);
+        }
       }
 
       .header {

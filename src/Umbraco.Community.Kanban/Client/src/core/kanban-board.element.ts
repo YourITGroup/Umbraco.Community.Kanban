@@ -28,8 +28,10 @@ import {
 } from './drag.model.js';
 import { boardAvailableBottom, boardViewportHeight, edgeScrollDelta } from './canvas.model.js';
 import { KANBAN_BOARD_ACTIONS_CONTEXT, type UmbKanbanBoardActionsContext } from './board-actions.context.js';
+import { applyCardResult } from './realtime.model.js';
+import { KanbanRealtimeController } from './kanban-realtime.controller.js';
 import './kanban-lane.element.js';
-import type { KanbanBoardQuery, KanbanDataSource } from '../data/kanban-data-source.js';
+import type { KanbanBoardQuery, KanbanCardOutcome, KanbanDataSource } from '../data/kanban-data-source.js';
 import { isPannablePath, panScrollOffset, shouldStartPan } from './pan.model.js';
 
 /** Below this a scrolling canvas is useless — roughly a lane header plus two cards. */
@@ -117,6 +119,25 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
   @state()
   private _viewportHeight?: number;
 
+  /**
+   * Cards changed by a colleague in the last moment — drives the highlight pulse. Reassigned, never
+   * mutated, because Lit change-detects @state by reference.
+   */
+  @state()
+  private _recentlyChanged: ReadonlySet<string> = new Set();
+
+  /** The pending highlight-clear timers, so a card changed twice re-pulses instead of half-clearing. */
+  #highlightTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+  /**
+   * The server-event subscription. Lives on the board rather than a host so every host — collection
+   * view today, workspace view and injected later — gets sync without wiring of its own.
+   */
+  #realtime = new KanbanRealtimeController(this, {
+    onCardOutcome: (key, outcome) => this.#onRealtimeOutcome(key, outcome),
+    onResync: () => this.load(),
+  });
+
   /** The pointer's last known viewport position during a drag. Not `@state()` — the frame loop reads it. */
   #pointer?: { x: number; y: number };
 
@@ -166,6 +187,15 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
   async load() {
     if (!this.parentId || !this.datasource) return;
 
+    // Every load re-supplies the realtime coordinates, so parent, culture and configuration changes
+    // are picked up without a lifecycle of their own.
+    this.#realtime.configure({
+      parentId: this.parentId,
+      configId: this.configId,
+      culture: this.culture,
+      datasource: this.datasource,
+    });
+
     // A reload swaps out `.viewport` for a loader, not a re-render in place — any in-progress pan or card
     // drag would otherwise be stranded on the discarded div (see #endPan for why that's unsafe).
     this.#endPan();
@@ -206,6 +236,40 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
     // The bar outlives this element — it belongs to the layout — so it has to be told the board is gone,
     // or its buttons would sit there acting on nothing.
     this.#actions?.clear();
+
+    for (const timer of this.#highlightTimers.values()) clearTimeout(timer);
+    this.#highlightTimers.clear();
+  }
+
+  /** One reconciliation answer. The reducer decides everything; this applies it and pulses the card. */
+  #onRealtimeOutcome(key: string, outcome: KanbanCardOutcome): void {
+    if (!this._board) return;
+
+    const result = applyCardResult(this._board, key, outcome);
+
+    if (!result.changed) return;
+
+    this._board = result.state;
+    this.#markChanged(key);
+  }
+
+  /** Flags a card as just-changed for long enough for its pulse to read, then clears it. */
+  #markChanged(key: string): void {
+    const existing = this.#highlightTimers.get(key);
+
+    if (existing !== undefined) clearTimeout(existing);
+
+    this._recentlyChanged = new Set([...this._recentlyChanged, key]);
+
+    this.#highlightTimers.set(
+      key,
+      setTimeout(() => {
+        this.#highlightTimers.delete(key);
+        const next = new Set(this._recentlyChanged);
+        next.delete(key);
+        this._recentlyChanged = next;
+      }, 2000),
+    );
   }
 
   override updated(changedProperties: PropertyValues<this>) {
@@ -435,6 +499,8 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
     this._drag = { ...event.detail };
     this._dropTarget = undefined;
     this.#pointer = undefined;
+    // Server events queue for the gesture's duration — the board must never reorganise under the pointer.
+    this.#realtime.pause();
     this.#startDragLoop();
   }
 
@@ -455,6 +521,7 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
     this._dropTarget = undefined;
     this._ghost = undefined;
     this.#pointer = undefined;
+    this.#realtime.resume();
   }
 
   /** Runs for the whole gesture, not once per pointer event. See `#onDragFrame`. */
@@ -523,6 +590,10 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
     this._dropTarget = undefined;
     this._ghost = undefined;
     this.#pointer = undefined;
+
+    // Queued events flush before the write below is even sent — our own echo is what the reducer's
+    // saving guard exists for, so an early resume is safe and a colleague's change lands sooner.
+    this.#realtime.resume();
 
     if (!drag || !hit || !hit.acceptsDrops || !this._board || !this.datasource) return;
     if (hit.value.toLowerCase() === drag.lane.toLowerCase()) return;
@@ -776,6 +847,7 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
           ${this._board.lanes.map(
             (lane) => html`<umb-community-kanban-lane
               .lane=${lane}
+              .highlightKeys=${this._recentlyChanged}
               ?allow-drag=${this._board?.allowDrag ?? false}
               ?is-drop-target=${this._dropTarget?.value === lane.value}
               ?accepts-drop=${this._dropTarget?.acceptsDrops ?? false}

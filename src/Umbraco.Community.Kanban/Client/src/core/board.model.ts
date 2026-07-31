@@ -209,6 +209,7 @@ function mapCard(
   };
 }
 
-function sameLane(left: string, right: string): boolean {
+/** Lane values compare case-insensitively everywhere — the server matches them the same way. */
+export function sameLane(left: string, right: string): boolean {
   return left.toLowerCase() === right.toLowerCase();
 }
