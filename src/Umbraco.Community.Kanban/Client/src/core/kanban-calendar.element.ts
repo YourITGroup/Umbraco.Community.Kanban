@@ -5,6 +5,7 @@ import type { KanbanCalendarItemModel, KanbanCalendarModel } from '../data/kanba
 import {
   addDays,
   addMonths,
+  agendaDays,
   monthGrid,
   monthRange,
   placeByDay,
@@ -13,6 +14,8 @@ import {
 } from './calendar.model.js';
 import type { KanbanCategoryAppearance } from './kanban-month-grid.element.js';
 import './kanban-month-grid.element.js';
+import './kanban-week-grid.element.js';
+import './kanban-agenda.element.js';
 
 export type KanbanCalendarView = 'month' | 'week';
 
@@ -181,13 +184,38 @@ export class UmbCommunityKanbanCalendarElement extends UmbLitElement {
       return html`<div class="note">The calendar could not load. Navigate to retry.</div>`;
     }
 
+    const grid =
+      this._view === 'month'
+        ? html`
+            <umb-community-kanban-month-grid
+              .weeks=${this.#weeks}
+              .itemsByDay=${this.#itemsByDay}
+              .appearanceFor=${this.#appearanceFor}
+              ?disable-create=${!this._calendar?.datePropertyEditorAlias}></umb-community-kanban-month-grid>
+          `
+        : html`
+            <umb-community-kanban-week-grid
+              .days=${this.#weekDays}
+              .itemsByDay=${this.#itemsByDay}
+              .appearanceFor=${this.#appearanceFor}
+              ?disable-create=${!this._calendar?.datePropertyEditorAlias}></umb-community-kanban-week-grid>
+          `;
+
     return html`
-      <umb-community-kanban-month-grid
-        .weeks=${this.#weeks}
-        .itemsByDay=${this.#itemsByDay}
-        .appearanceFor=${this.#appearanceFor}
-        ?disable-create=${!this._calendar?.datePropertyEditorAlias}></umb-community-kanban-month-grid>
+      ${grid}
+      ${this._calendar?.showAgenda
+        ? html`<umb-community-kanban-agenda
+            .days=${agendaDays(this._calendar?.items ?? [])}
+            .appearanceFor=${this.#appearanceFor}></umb-community-kanban-agenda>`
+        : nothing}
     `;
+  }
+
+  /** The 7 dates of the visible week, in order. */
+  get #weekDays(): string[] {
+    const { from } = weekRange(this._anchor, FIRST_DAY_OF_WEEK);
+
+    return Array.from({ length: 7 }, (_, offset) => addDays(from, offset));
   }
 
   override render() {
