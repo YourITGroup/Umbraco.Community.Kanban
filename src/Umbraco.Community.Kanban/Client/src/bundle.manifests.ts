@@ -7,6 +7,10 @@ import { manifests as manualLaneManifests } from './property-editors/manual-lane
 import { manifests as collectionViewManifests } from './hosts/manifests.js';
 import { manifests as dataTypeWorkspaceViewManifests } from './workspace-views/manifests.js';
 
+// The importmap module doubles as the package's public API: importing it defines the standalone
+// board element, and the class is re-exported for consumers that want the type.
+export { UmbCommunityKanbanStandaloneBoardElement } from './hosts/kanban-standalone-board.element.js';
+
 export const manifests: Array<UmbExtensionManifest> = [
   ...boardManifests,
   ...calendarManifests,
