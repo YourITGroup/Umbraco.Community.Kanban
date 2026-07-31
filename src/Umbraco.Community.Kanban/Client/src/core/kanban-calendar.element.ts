@@ -21,6 +21,19 @@ import './kanban-agenda.element.js';
 
 export type KanbanCalendarView = 'month' | 'week';
 
+/**
+ * What a host needs to start a create from a slot: the slot itself plus the property/editor
+ * pair the preset targets and the parent's content type for the allowed-children lookup —
+ * all response data this element holds and its host deliberately does not.
+ */
+export interface KanbanCreateAtDetail {
+  date: string;
+  time?: string;
+  datePropertyAlias: string;
+  datePropertyEditorAlias: string;
+  parentContentTypeKey: string;
+}
+
 /** The view toggle survives navigation and reloads; a calendar is a habit, not a setting. */
 const VIEW_STORAGE_KEY = 'kanban-calendar-view';
 
@@ -176,6 +189,25 @@ export class UmbCommunityKanbanCalendarElement extends UmbLitElement {
     return (category) => (category ? (byValue.get(category) ?? {}) : {});
   }
 
+  /**
+   * The grids only know the slot; the response data a create needs lives here. Their event is
+   * swallowed and re-raised enriched, so hosts see exactly one create-at shape.
+   */
+  #onGridCreateAt(event: CustomEvent<{ date: string; time?: string }>) {
+    event.stopPropagation();
+
+    if (!this._calendar?.datePropertyEditorAlias) return;
+
+    const detail: KanbanCreateAtDetail = {
+      ...event.detail,
+      datePropertyAlias: this._calendar.datePropertyAlias,
+      datePropertyEditorAlias: this._calendar.datePropertyEditorAlias,
+      parentContentTypeKey: this._calendar.parentContentTypeKey,
+    };
+
+    this.dispatchEvent(new CustomEvent('kanban-create-at', { detail, bubbles: true, composed: true }));
+  }
+
   #renderNotes() {
     if (!this._calendar) return nothing;
 
@@ -209,14 +241,16 @@ export class UmbCommunityKanbanCalendarElement extends UmbLitElement {
               .weeks=${this.#weeks}
               .itemsByDay=${this.#itemsByDay}
               .appearanceFor=${this.#appearanceFor}
-              ?disable-create=${!this._calendar?.datePropertyEditorAlias}></umb-community-kanban-month-grid>
+              ?disable-create=${!this._calendar?.datePropertyEditorAlias}
+              @kanban-create-at=${this.#onGridCreateAt}></umb-community-kanban-month-grid>
           `
         : html`
             <umb-community-kanban-week-grid
               .days=${this.#weekDays}
               .itemsByDay=${this.#itemsByDay}
               .appearanceFor=${this.#appearanceFor}
-              ?disable-create=${!this._calendar?.datePropertyEditorAlias}></umb-community-kanban-week-grid>
+              ?disable-create=${!this._calendar?.datePropertyEditorAlias}
+              @kanban-create-at=${this.#onGridCreateAt}></umb-community-kanban-week-grid>
           `;
 
     return html`

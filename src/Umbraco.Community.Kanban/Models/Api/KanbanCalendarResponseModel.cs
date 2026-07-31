@@ -45,6 +45,12 @@ public sealed class KanbanCalendarResponseModel
     /// </summary>
     public string? DatePropertyEditorAlias { get; init; }
 
+    /// <summary>The configured date property alias — the property a slot-created document presets.</summary>
+    public required string DatePropertyAlias { get; init; }
+
+    /// <summary>The parent's content type key, which is what the allowed-child-types lookup needs.</summary>
+    public required Guid ParentContentTypeKey { get; init; }
+
     /// <summary>Whether the configuration shows the agenda list — echoed so hosts need only the config key.</summary>
     public bool ShowAgenda { get; init; }
 

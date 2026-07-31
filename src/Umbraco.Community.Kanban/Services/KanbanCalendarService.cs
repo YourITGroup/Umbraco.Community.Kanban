@@ -121,6 +121,8 @@ public sealed class KanbanCalendarService(
             Items = items,
             Categories = await ResolveCategoriesAsync(parent, configuration),
             DatePropertyEditorAlias = ResolveEditorAlias(page.Children, configuration.DateProperty),
+            DatePropertyAlias = configuration.DateProperty,
+            ParentContentTypeKey = parent.ContentType.Key,
             ShowAgenda = configuration.ShowAgenda,
             UndatedCount = undated,
             Truncated = truncatedByCap || page.TotalChildCount > page.Children.Count,

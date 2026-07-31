@@ -27,6 +27,10 @@ export interface KanbanCalendarModel {
   categories: KanbanCategoryModel[];
   /** Null for system date properties, which cannot be preset on creation. */
   datePropertyEditorAlias?: string | null;
+  /** The configured date property alias — the property a slot-created document presets. */
+  datePropertyAlias: string;
+  /** The parent's content type key, which is what the allowed-child-types lookup needs. */
+  parentContentTypeKey: string;
   /** Whether the configuration shows the agenda list — echoed so hosts need only the config key. */
   showAgenda?: boolean;
   undatedCount: number;
