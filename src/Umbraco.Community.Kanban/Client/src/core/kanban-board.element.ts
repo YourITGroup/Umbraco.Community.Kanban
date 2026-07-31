@@ -887,6 +887,11 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
         min-height: 320px;
         overflow: auto;
         cursor: grab;
+        /* Hosts can inset the lanes from the viewport's edges without moving its scrollbars: the
+           padding sits inside the scroll container, so the scrollbars stay flush with the board.
+           border-box because JS sets this element's height explicitly. */
+        box-sizing: border-box;
+        padding: var(--kanban-viewport-padding, 0);
       }
 
       .viewport.panning {
