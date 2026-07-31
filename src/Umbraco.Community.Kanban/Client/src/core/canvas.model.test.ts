@@ -25,6 +25,9 @@ describe('boardViewportHeight', () => {
 
 describe('boardAvailableBottom', () => {
   it('falls back to the window when no ancestor bounds the board', () => {
+    // Also what a measurement taken before the surrounding layout has settled lands on, which sizes the
+    // board taller than its region. Recovering from that is the element's resize observer, not this
+    // arithmetic — see `#resizeObserver` in kanban-board.element.ts.
     expect(boardAvailableBottom({ windowHeight: 1201, rectTop: 272, ancestors: [] })).toBe(1201);
   });
 

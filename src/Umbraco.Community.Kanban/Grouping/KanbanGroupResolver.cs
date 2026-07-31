@@ -9,7 +9,7 @@ public sealed class KanbanGroupResolver(
 {
     public async Task<KanbanGroupResolution> ResolveAsync(Guid contentTypeKey, KanbanBoardConfiguration configuration)
     {
-        var lanes = await GetGroupsAsync(contentTypeKey, configuration);
+        var (lanes, mandatory) = await GetGroupsAsync(contentTypeKey, configuration);
 
         // Apply runs before Assign, but under their current semantics the two are commutative:
         // Apply unconditionally overwrites a lane's colour whenever the override supplies one,
@@ -33,16 +33,22 @@ public sealed class KanbanGroupResolver(
         // Only the unassigned lane still needs a colour, and Assign is what knows it is neutral.
         KanbanGroupColourAssigner.Assign(ordered);
 
-        return new KanbanGroupResolution(ordered, unmatched);
+        return new KanbanGroupResolution(ordered, unmatched, mandatory);
     }
 
-    private async Task<List<KanbanGroup>> GetGroupsAsync(Guid contentTypeKey, KanbanBoardConfiguration configuration)
+    /// <summary>
+    /// The lanes, plus whether the property they came from is mandatory. Paired rather than looked up
+    /// twice because both answers come from the one property/data type read.
+    /// </summary>
+    private async Task<(List<KanbanGroup> Groups, bool Mandatory)> GetGroupsAsync(
+        Guid contentTypeKey,
+        KanbanBoardConfiguration configuration)
     {
         if (string.IsNullOrWhiteSpace(configuration.LaneProperty))
         {
             // A manual board does not need a lane property to produce lanes.
             var manualOnly = BuildContext(string.Empty, new Dictionary<string, object>(), configuration);
-            return await ResolveFromSourcesAsync(manualOnly);
+            return (await ResolveFromSourcesAsync(manualOnly), false);
         }
 
         var dataType = await lookup.GetAsync(contentTypeKey, configuration.LaneProperty);
@@ -54,12 +60,13 @@ public sealed class KanbanGroupResolver(
             // ManualGroupSource.CanHandle keys off configuration, not editor alias. A non-manual
             // board still collapses to the unassigned lane, since no source claims an empty
             // editor alias.
+            // Not mandatory as far as anyone here can tell: there is no property left to ask.
             var staleProperty = BuildContext(string.Empty, new Dictionary<string, object>(), configuration);
-            return await ResolveFromSourcesAsync(staleProperty);
+            return (await ResolveFromSourcesAsync(staleProperty), false);
         }
 
         var context = BuildContext(dataType.EditorAlias, dataType.ConfigurationData, configuration);
-        return await ResolveFromSourcesAsync(context);
+        return (await ResolveFromSourcesAsync(context), dataType.Mandatory);
     }
 
     private async Task<List<KanbanGroup>> ResolveFromSourcesAsync(KanbanGroupSourceContext context)

@@ -125,6 +125,7 @@ public sealed class KanbanBoardService(
             request.Lane,
             request.Skip ?? 0,
             configuration.ShowChildItems,
-            configuration.AllowDrag));
+            configuration.AllowDrag,
+            lanes.LanePropertyIsMandatory));
     }
 }

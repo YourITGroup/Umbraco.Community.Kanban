@@ -29,6 +29,6 @@ public sealed class KanbanPropertyDataTypeLookup(
 
         return dataType is null
             ? null
-            : new KanbanPropertyDataType(dataType.EditorAlias, dataType.ConfigurationData);
+            : new KanbanPropertyDataType(dataType.EditorAlias, dataType.ConfigurationData, propertyType.Mandatory);
     }
 }

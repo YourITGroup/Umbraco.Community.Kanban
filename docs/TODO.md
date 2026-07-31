@@ -264,16 +264,36 @@ element, never by looking *into* its shadow content — so the walk always found
 **Closed by the milestone-4 canvas work**, which gave the board its own bounded, scrolling `.viewport`
 instead of borrowing an ancestor's, so vertical pan needed no shadow-piercing walk at all.
 
-Of two open questions this left, one remains genuinely open: a **fixed-transform 2D pan/zoom canvas**
-was considered and deliberately not chosen in favour of the simpler self-scrolling box, so zoom is
-still unbuilt — and now costs more, since the ghost, hit-test and auto-scroll all work in viewport
-coordinates a canvas transform would invalidate. Whether controls rendering below the board need a
-reserved buffer has not come up in practice.
+Of two open questions this left, one has since been answered: a **fixed-transform 2D pan/zoom canvas**
+was considered and deliberately not chosen in favour of the simpler self-scrolling box, and zoom was
+noted as costing more for it, since the ghost, hit-test and auto-scroll all work in viewport coordinates
+a canvas transform would invalidate. Zoom was built in the end without paying that cost, by using CSS
+`zoom` instead of a transform — see the ctrl + wheel item below. Whether controls rendering below the
+board need a reserved buffer has not come up in practice.
 
 ---
 
 ## Known issues
 
+- [x] **A board on a hard reload could not be scrolled sideways, and showed no scrollbars until
+  something was resized.** Reported 2026-08-01 from the Bookings "Reservations" content app.
+  Root cause: the viewport's height is measured in JS, and the only things that triggered a
+  re-measurement were this element re-rendering and a `window` resize. On a hard reload the workspace
+  chrome around the board resolves *after* the board's last render, so the measurement ran while no
+  ancestor yet qualified as its container (no definite height, or a zero `clientHeight`).
+  `boardAvailableBottom` then fell back to the window — behaviour its own test already pinned — and the
+  board was sized taller than the region it sits in. Its bottom edge, and with it the horizontal
+  scrollbar belonging to `.viewport`, sat below the visible area: hence "no scrollbars" and no way to
+  scroll sideways, until resizing anything finally re-ran the measurement against a settled layout.
+  **Fixed** with a `ResizeObserver` (`#resizeObserver` in `core/kanban-board.element.ts`) over this
+  element and the ancestor chain the measurement reads, re-pointed after each render only when the chain
+  actually changes, coalesced to one measurement per frame. It cannot feed itself: the wrappers whose
+  size the board's own height changes are exactly the ones `boardAvailableBottom` filters out, and
+  `#measureViewport` assigns only on a change of a pixel or more. The ancestor walk was factored into
+  `#ancestorChain()`, now shared by the observer and `#ancestorBoxes()`.
+  - Verified by `tsc --noEmit`, 356 Vitest tests and `vite build`. The arithmetic was already covered;
+    the bug was in *when* it ran, which Vitest cannot reach with no DOM, so **this one needs a browser
+    check**: hard-reload a content-app board and confirm it can be scrolled sideways with no resize.
 - [x] **Card title click no longer opens the content item — grab/move takes precedence and blocks it.**
   Root cause: `#onPointerDown` (`core/kanban-card.element.ts`) didn't exclude the title button as a
   target, so a click on the title started pointer capture and a drag gesture like anywhere else on the
@@ -287,25 +307,56 @@ reserved buffer has not come up in practice.
 
 ## Open backlog items
 
+- [x] **Hide individual lanes or calendar categories from the configuration.** ✅ **done 2026-08-01.**
+  An eye toggle per row in the existing appearance editor — which the calendar's category settings
+  already reuse, so both got it from one change — storing `hidden` on the same override row that carries
+  colour/icon/label. `hidden: false` is treated as saying nothing, so un-hiding a lane leaves no residue
+  behind.
+  - **Hiding takes the contents with it.** A hidden lane drops its cards; a hidden category drops the
+    items carrying it. The alternative — dropping only the lane — would have been worse than useless:
+    the composer routes a card whose lane value matches nothing into Unassigned, so hiding a lane would
+    have *tipped its cards into Unassigned* rather than hiding them. Grouping therefore still runs
+    against every lane, hidden included, and hidden lanes are removed afterwards; a card whose value
+    genuinely matches nothing still lands in Unassigned, which is covered by a test so the distinction
+    cannot quietly regress.
+  - `Hidden` deliberately flows all the way through the resolver rather than being filtered where it is
+    first known, because the configuration UI resolves groups through that same pipeline and has to list
+    a hidden group in order to offer un-hiding it. Only the board composer and calendar service act on
+    it, and the preview DTO carries it so the toggle can show its state.
+  - Calendar detail worth knowing: categories are now resolved *before* the items, since a hidden
+    category has to be known before the item cap counts what is shown — and an item dropped for being
+    hidden is not also counted as undated.
+
 - **Board/calendar configuration picker styling: partially done.** The picker built 2026-07-28 originally
   stacked its buttons in a column, unlike anything else in the backoffice; it now uses the same
   ref-row/dashed-placeholder pattern as the Collection and "Allowed child node types" fields (a ref row
   with name + editor alias and **Choose**/**Remove** actions when set, a full-width dashed **Choose**
-  button when empty). Two related editors still need the same treatment:
-  - [ ] **Manual lanes editor** (`property-editors/manual-lanes/manual-lanes.element.ts`) still renders
-    its own ad-hoc row layout (a `uui-input` pair plus a colour picker per row, `+ Add lane` placeholder
-    button) rather than the row styling the **lane appearance (override)** editor already has
-    (`property-editors/lane-overrides/lane-overrides.element.ts`, which reuses
-    `<uui-color-swatches>` via `lane-colour.element.ts` and `UmbSorterController` for drag-reorder).
-    Worth checking whether the shared parts (colour swatch input, row shell) can be factored out for
-    both editors to reuse rather than duplicated a second time.
-  - [ ] **Lane property editor** (`property-editors/lane-property/lane-property.element.ts`) needs to
-    replicate the built-in Umbraco content picker's appearance more closely. It already uses
-    `uui-ref-node`/`uui-button look="placeholder"` for its chosen/empty states
-    (`lane-property.element.ts:80-95`), so the gap is in the details (icon, layout, action-bar
-    treatment) rather than the overall pattern — compare directly against a real
-    `Umbraco.PropertyEditorUi.DocumentPicker` field to find the specific differences before changing
-    anything.
+  button when empty). Both related editors have since had the same treatment:
+  - [x] **Manual lanes editor** ✅ **done 2026-08-01.** The row shell both appearance editors share now
+    lives in `property-editors/settings-row.styles.ts` (`.row`, `.identity`, `.drag-handle`,
+    `.actions`) rather than being written twice; the colour swatches were already shared through
+    `lane-colour.element.ts`. The manual editor gained the icon button the appearance editor has —
+    `KanbanManualGroup.Icon` and its client mirror always carried an `icon`, and `ManualGroupSource`
+    always passed it through, so the editor simply never offered it — and its move/remove glyphs became
+    real icons in a grouped action bar. The shared rule deliberately sizes `.identity` only, imposing
+    no `display`, because in this editor the identity is a `uui-input` whose host is the containing box
+    for its own shadow content.
+    - Reordering here stays button-driven rather than adopting `UmbSorterController`. A sorter needs a
+      stable unique per row, and these rows have none: their identity is the value being typed, blank
+      on a new row and briefly duplicated while one is edited. Object identity is no better — every
+      keystroke rebuilds the row objects. Order is load-bearing (it picks each uncoloured lane's
+      palette colour), so it keeps the mechanism that cannot mis-key rows.
+  - [x] **Lane property editor** ✅ **done 2026-08-01.** Compared against core's `umb-input-document`
+    first, as this item asked. Three real differences, all now closed: the chosen item sits in a
+    `uui-ref-list` (which core styles as a list, and which is what gives the row its correct margins),
+    the remove button is a bare labelled button in the `uui-action-bar` rather than one with duplicate
+    slot text, and the placeholder button is `display: block` so it fills the field like every other
+    picker's. The hardcoded `icon-settings` cog is now the picked document type's **own** icon, read
+    from the item repository that was already being called for its name (`UmbDocumentTypeItemModel`
+    carries `icon`), falling back to `icon-document`. Two differences from core remain and are
+    deliberate, noted in the element: there is only ever one value, so the ref node is always
+    `standalone` and the placeholder button disappears once set; and the row re-opens the picker on
+    `@open` rather than navigating, a property alias having nowhere to navigate to.
   - Also on record for this picker but not yet acted on: `UMB_DATA_TYPE_PICKER_MODAL` accepts a
     `createAction` (`UmbTreePickerModalCreateActionData`) — core's own way of offering *create* from
     **inside** a picker, which the document type picker token uses. That would move the create action
@@ -325,7 +376,29 @@ reserved buffer has not come up in practice.
   editor's options), so this needs to degrade to a plain create rather than write something the
   property will reject.
 
-- [ ] Only show the Unassigned lane if the lane property is optional and has children.
+- [x] **Only show the Unassigned lane if the lane property is optional and has children.** ✅ **done
+  2026-08-01.** It is a synthetic lane nobody configured and nothing can be dropped into, so an empty one
+  was a column of dead space on every board whose cards all have a value.
+  - **Cards decide it, in the composer** (`ShowsUnassigned` in `KanbanBoardComposer`), not the resolver:
+    the resolver has to keep producing the lane regardless, because it is the bucket the grouping step
+    routes unmatched values into. Any card grouped into it keeps the column, so nothing visible is ever
+    hidden.
+  - That includes the case the literal rule would have got wrong: a **mandatory** lane property only rules
+    out an *empty* value, while a value the lanes no longer offer (a removed dropdown item, a renamed lane)
+    still lands in Unassigned. Hiding the lane then would have lost those cards off the board entirely, so
+    the lane stays whenever it holds cards, mandatory or not. Covered by a test.
+  - Mandatory is therefore load-bearing in exactly one case — **truncation**, where the read window stops
+    short of the children that would have filled the lane and the cards cannot decide. An optional property
+    keeps the empty lane (unassigned cards are ordinary, and likely past the window); a mandatory one drops
+    it, unmatched values being too rare to reserve a column for on a guess.
+  - The flag travels `IPropertyType.Mandatory` → `KanbanPropertyDataType.Mandatory` →
+    `KanbanGroupResolution.LanePropertyIsMandatory` → `KanbanBoardComposerRequest`. Read from the *property
+    type*, not the data type, since mandatory is set per property and the same data type may be optional
+    elsewhere. It is false whenever there is no usable lane property to ask about (none configured, or one
+    that no longer resolves), so a board with nothing to go on keeps the lane.
+  - The lane-preview DTO the configuration UI reads deliberately still lists Unassigned: the editor is
+    choosing lanes there, not looking at cards, and the appearance editor already excludes it from
+    overrides.
 
 ### Requested 2026-08-01 (not yet designed)
 
@@ -337,43 +410,91 @@ reserved buffer has not come up in practice.
   date rather than a month. Note the stored-view fallback (`#effectiveView`) and the reload key already
   key on the fetched range, so both should cope; and `VIEW_STORAGE_KEY` is shared across every calendar,
   so a stored `'day'` must degrade like `'agenda'` does today.
-- [ ] **Calendar cards should have a white background.** Month chips, week blocks/all-day chips and
-  agenda entries all use `--uui-color-surface-alt` today, which reads as grey against the grid. Switch
-  to `--uui-color-surface` — checking the hover state still reads as a state change, and that a white
-  card stays visible against the month grid's own white cells (it may need its border to carry more of
-  the work).
-- [ ] **Zoom the board with Ctrl + mouse wheel.** Nothing in `kanban-board.element.ts` handles `wheel`
-  or any scale today; the canvas work only pans. Needs a scale transform on the lanes canvas with the
-  pointer as the origin, `event.ctrlKey` to distinguish zoom from a normal scroll (trackpad pinch also
-  arrives as a ctrl-wheel event, which is the behaviour we want), `preventDefault` to stop the browser's
-  own page zoom, and a decision on whether the scale persists like the view toggle does. Worth checking
-  it does not fight the drag ghost, which positions itself in viewport coordinates.
-- [ ] **1rem padding for both views as a Content App.** The board and calendar sit flush against the
-  content app edge; the workspace-view hosts (`hosts/kanban-workspace-view-board.element.ts` and its
-  calendar equivalent) are where to add it, not the views themselves, which must stay layout-neutral
-  for the collection and standalone hosts.
-- [ ] **1rem padding on the x-axis for both views in a List View.** Same fix, different host:
-  `hosts/collection-view-board.element.ts` and `hosts/collection-view-calendar.element.ts`. Horizontal
-  only — the collection already provides vertical spacing.
+- [x] **Calendar cards should have a white background.** ✅ **done 2026-08-01.** Month chips, week
+  blocks and all-day chips, and agenda entries now use `--uui-color-surface`. White-on-white did need
+  the border to carry the work, as suspected: the month chip and the week all-day chip both had
+  `border: none` and are now bordered, and every card keeps `border-inline-start` declared *after* the
+  shorthand so the category accent still overrides that one edge. Hover stays
+  `--uui-color-surface-emphasis`, which still reads as a change from white.
+- [x] **Zoom the board with Ctrl + mouse wheel.** ✅ **done 2026-08-01.** `core/zoom.model.ts` holds the
+  arithmetic (gesture test, wheel-unit normalisation, the scale step, the pointer anchor) and
+  `kanban-board.element.ts` holds the one `wheel` listener and a `_zoom` state driving the canvas.
+  - **CSS `zoom` on the canvas, not a `transform: scale`** — which is what let this cost far less than the
+    milestone-4 note above predicted. `zoom` scales *layout*: the canvas' scroll extent grows and shrinks
+    with the scale, and `getBoundingClientRect` keeps reporting where lanes really are on screen, so the
+    drag hit-test, the ghost and the edge auto-scroll all keep working in viewport coordinates with no
+    changes at all. A transform would have left the scroll extent at 100% and moved every lane out from
+    under those measurements.
+  - Two details it does cost. The canvas' `min-width`/`min-height: 100%` resolve against the *unzoomed*
+    viewport and are then multiplied by the zoom, so both divide it back out — otherwise a zoomed-out board
+    stops short of the viewport (shrinking the background the pan gesture is grabbed from) and a zoomed-in
+    one grows scrollbars it does not need. And the ghost is `position: fixed`, so it sits outside the zoomed
+    canvas and re-applies the scale to an inner box, with its width divided by the zoom: `_drag.width` is an
+    on-screen width, which inside a zoomed box would be multiplied again.
+  - The step is **proportional** (an exponential of the wheel delta), so a notch in and the same notch out
+    cancel out and the same notch does not feel coarse zoomed out and glacial zoomed in. Clamped to
+    0.5–2. Line- and page-mode deltas are normalised to pixels, Firefox reporting lines.
+  - Anchored on the pointer, so zooming in on a lane at the right of the board does not send it off-screen.
+    The new scroll offsets are computed from the *old* scale — the pointer's canvas coordinate can only be
+    recovered while the old scale is in effect — and applied after the re-render, since until the canvas has
+    been laid out at the new scale the scroll extent is the old one and the assignment gets clamped.
+  - `ctrlKey || metaKey`, so a trackpad pinch (which arrives as a ctrl-wheel event) zooms the board, and
+    Cmd + wheel on a Mac zooms the board instead of the whole backoffice. `preventDefault` runs *before*
+    the early return on an unchanged scale, or the browser would page-zoom at either end of the range.
+    The listener is on the element rather than `.viewport` — a reload replaces the viewport — and is
+    explicitly `{ passive: false }`, since a passive listener cannot preventDefault.
+  - **The scale is not persisted**, unlike the calendar's view toggle: a zoom is a look at this board now,
+    and returning tomorrow to a board someone left at half scale reads as a rendering fault rather than as
+    a remembered preference.
+  - 16 new Vitest cases cover the model. Nothing in the suite can see layout, so **this needs a browser
+    check**: ctrl-wheel over a lane at the right of a wide board and confirm it stays under the pointer,
+    then drag a card while zoomed out and confirm the ghost matches the card's size.
+- [x] **1rem padding for both views as a Content App.** ✅ **done 2026-08-01.** In the hosts, as
+  planned. The board could *not* take ordinary padding, though: it sizes its viewport in JS from its own
+  top to the bottom of the window, so padding around it pushes the board past the bottom of its region —
+  a mistake its own styles already record having made once. It turned out the board element already
+  exposed `--kanban-viewport-padding`, which pads inside the border-box, JS-sized scroll container and
+  so costs no height and leaves the scrollbars flush; nothing had ever set it. The content-app board
+  host now sets it to `1rem`. The calendar is a plain block that measures nothing, so its host takes
+  real `padding: 1rem`.
+- [x] **1rem padding on the x-axis for both views in a List View.** ✅ **done 2026-08-01.** Same split:
+  `--kanban-viewport-padding: 0 1rem` on the collection board host, `padding: 0 1rem` on the collection
+  calendar host. Horizontal only, both because the collection already spaces the view vertically and
+  because the board's styles record that a second full gutter doubled the list view's inset.
 - [ ] **Optionally confirm a card move before committing it.** A board setting (so it needs a field on
   `KanbanBoardConfiguration` plus a row in `property-editors/board/manifests.ts`) that makes a drop ask
   before it writes. The interesting part is the interaction, not the dialog: the board currently commits
   optimistically and reconciles from the server, so a cancel has to put the card back where it came from
   without the reconciliation treating that as a second move. Core's `UMB_CONFIRM_MODAL` is the dialog.
-- [ ] **Sticky calendar date headings on scroll.** The week grid's `.header-row` (and its all-day row)
-  should stay put while the 24-hour body scrolls; the same applies to a day view. Discovered while
-  writing this up: **month view renders no weekday headings at all** — `kanban-month-grid.element.ts`
-  draws only cells, so there is nothing there to make sticky. Decide whether that is a separate gap to
-  fill (month grids normally label their columns) before treating this as purely a CSS change.
+- [x] **Sticky calendar date headings on scroll.** ✅ **done 2026-08-01.** Not purely a CSS change, for
+  two reasons.
+  - `overflow: hidden` on the week grid host (and the agenda's list) made each of them a *scroll
+    container*, and a scroll container is what a sticky element sticks to — the headings would have
+    stuck to a box that never scrolls, which looks identical to doing nothing. Both are now
+    `overflow: clip`, which clips the rounded corners the same way but creates no scroll container, so
+    the headings stick to the page. (Chrome 90+/Firefox 81+/Safari 16+.)
+  - The month grid had no weekday headings to stick, so it got them: a sticky row whose labels are read
+    off the first rendered week rather than a first-day-of-week setting, so they cannot disagree with
+    the cells beneath them.
+  - The week grid's two heading rows are wrapped in one sticky box rather than stuck individually,
+    which avoids hard-coding the header row's height as the all-day row's offset. The agenda's date
+    rail is sticky within its own day (`align-self: flex-start`, or it would stretch and have nothing to
+    move within).
+  - Needs a browser check: sticky depends on the whole ancestor chain, and nothing in the test suite
+    can see layout.
+- [x] **Sticky calendar toolbar on scroll.** ✅ **done 2026-08-01.** The month/week/agenda toggle and
+  previous/today/next now stay visible while the grid scrolls, so the title never names a month you
+  can no longer see. Two details make it work with the date headings above:
+  - The headings were already sticky at `top: 0`, so a sticky toolbar would have covered them. The
+    calendar measures its toolbar with a `ResizeObserver` and publishes the height as
+    `--kanban-calendar-sticky-top` on its host; the three grids stick at that offset instead of `0`.
+    Measured, not a constant, because the toolbar wraps at narrow widths — and a custom property
+    because it inherits through shadow roots, so no grid needs to know the calendar element.
+  - The toolbar's spacing below the buttons became `padding-bottom` rather than `margin-bottom`: a
+    margin is transparent, so cards surfaced in the gap before sliding under the bar.
+  - Same browser-check caveat as the headings above: nothing in the test suite can see layout.
 
 ## Non-goals (explicitly out of v1 per the design — not gaps)
 
-- Section dashboard host (architecture must not preclude it; not being built now)
-- Week/day time-gridded calendar views
-- Event durations or end dates
 - Custom SignalR hub, presence indicators, "who is editing" avatars
-- Card reordering within a lane via `sortOrder` — deliberately deferred out of the canvas/drag-ghost
-  work to its own spec (`2026-07-31-milestone-4-canvas-and-drag-ghost.md:24`); still needs that spec
-  written
-- 2D pan/zoom canvas (fixed-transform) — considered and deliberately not chosen in favour of a
-  self-scrolling `.viewport`/`.canvas` pair (see "Grab the board to pan it sideways" above)
+- Card reordering within a lane via `sortOrder` — deliberately deferred out of the canvas/drag-ghost work to its own spec (`2026-07-31-milestone-4-canvas-and-drag-ghost.md:24`); still needs that spec written

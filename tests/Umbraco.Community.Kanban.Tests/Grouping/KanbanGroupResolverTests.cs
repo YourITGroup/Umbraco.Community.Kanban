@@ -210,4 +210,41 @@ public class KanbanGroupResolverTests
 
         result.Groups.Where(x => x.IsUnassigned == false).Select(x => x.Value).Should().Equal("custom");
     }
+
+    [Fact]
+    public async Task Resolve_ReportsAMandatoryLaneProperty()
+    {
+        var lookup = new FakePropertyDataTypeLookup()
+            .Add(
+                "status",
+                "Umbraco.DropDown.Flexible",
+                new Dictionary<string, object> { ["items"] = new[] { "Open" } },
+                mandatory: true);
+
+        var result = await Resolver(lookup)
+            .ResolveAsync(ContentTypeKey, new KanbanBoardConfiguration { LaneProperty = "status" });
+
+        result.LanePropertyIsMandatory.Should().BeTrue();
+
+        // Still resolved: the composer needs it as the bucket for values matching no lane, and only
+        // drops the column when nothing landed in it.
+        result.Groups.Should().Contain(x => x.IsUnassigned);
+    }
+
+    [Fact]
+    public async Task Resolve_ReportsAnOptionalLanePropertyAndAMissingOneAsNotMandatory()
+    {
+        var lookup = new FakePropertyDataTypeLookup()
+            .Add("status", "Umbraco.DropDown.Flexible", new Dictionary<string, object> { ["items"] = new[] { "Open" } });
+
+        var optional = await Resolver(lookup)
+            .ResolveAsync(ContentTypeKey, new KanbanBoardConfiguration { LaneProperty = "status" });
+        var missing = await Resolver(new FakePropertyDataTypeLookup())
+            .ResolveAsync(ContentTypeKey, new KanbanBoardConfiguration { LaneProperty = "gone" });
+        var unconfigured = await Resolver(lookup).ResolveAsync(ContentTypeKey, new KanbanBoardConfiguration());
+
+        optional.LanePropertyIsMandatory.Should().BeFalse();
+        missing.LanePropertyIsMandatory.Should().BeFalse();
+        unconfigured.LanePropertyIsMandatory.Should().BeFalse();
+    }
 }
