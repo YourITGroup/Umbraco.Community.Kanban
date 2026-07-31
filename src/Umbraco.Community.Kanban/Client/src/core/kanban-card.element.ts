@@ -4,9 +4,19 @@ import { UmbLitElement } from '@umbraco-cms/backoffice/lit-element';
 import { UmbEntityContext } from '@umbraco-cms/backoffice/entity';
 import '@umbraco-cms/backoffice/ufm';
 import { cardStateTag } from './card.model.js';
-import { shouldStartCardDrag } from './drag.model.js';
+import { dragDisabledReason, isCardDragBlockingPath, shouldStartCardDrag, type KanbanDragDisabledReason } from './drag.model.js';
 import './kanban-card-children.element.js';
 import type { KanbanCardModel, KanbanCardPropertyModel } from '../data/kanban-board.types.js';
+
+/**
+ * Icon and tooltip for each reason a card cannot be dragged — the only visible difference otherwise is
+ * the grab cursor silently not appearing, which gives an editor no way to tell "this board doesn't drag"
+ * apart from "you can't move this one".
+ */
+const DRAG_DISABLED_COPY: Record<KanbanDragDisabledReason, { icon: string; title: string }> = {
+  boardDisabled: { icon: 'icon-block', title: 'Dragging is disabled for this board.' },
+  noPermission: { icon: 'icon-lock', title: 'You don’t have permission to move this card.' },
+};
 
 /**
  * One card on a board. Read-only in this milestone: it reports its title being clicked and nothing
@@ -125,6 +135,9 @@ export class UmbCommunityKanbanCardElement extends UmbLitElement {
         pointerType: event.pointerType,
         button: event.button,
         isPrimary: event.isPrimary,
+        blockingTarget: isCardDragBlockingPath(
+          event.composedPath().map((node) => (node as HTMLElement).localName ?? ''),
+        ),
       })
     ) {
       return;
@@ -219,6 +232,11 @@ export class UmbCommunityKanbanCardElement extends UmbLitElement {
     if (!this.card) return nothing;
 
     const tag = cardStateTag(this.card.state);
+    const disabledReason = dragDisabledReason({
+      allowDrag: this.allowDrag,
+      canUpdate: this.card.canUpdate,
+      saving: this.card.saving === true,
+    });
 
     return html`
       <div
@@ -236,6 +254,12 @@ export class UmbCommunityKanbanCardElement extends UmbLitElement {
         <div class="header">
           ${this.card.icon ? html`<umb-icon name=${this.card.icon}></umb-icon>` : nothing}
           <button type="button" class="name" @click=${this.#onOpen}>${this.card.name}</button>
+          ${disabledReason
+            ? html`<umb-icon
+                class="drag-disabled"
+                name=${DRAG_DISABLED_COPY[disabledReason].icon}
+                title=${DRAG_DISABLED_COPY[disabledReason].title}></umb-icon>`
+            : nothing}
           <umb-entity-actions-bundle .label=${this.card.name}></umb-entity-actions-bundle>
         </div>
         ${this.card.properties.length
@@ -327,6 +351,11 @@ export class UmbCommunityKanbanCardElement extends UmbLitElement {
         display: flex;
         align-items: center;
         gap: var(--uui-size-space-2);
+      }
+
+      .drag-disabled {
+        color: var(--uui-color-text-alt);
+        cursor: help;
       }
 
       .name {

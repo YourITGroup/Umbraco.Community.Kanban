@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
+  dragDisabledReason,
   formatPublishSummary,
   ghostPosition,
+  isCardDragBlockingPath,
   laneAtPoint,
   moveFailureMessage,
   shouldStartCardDrag,
@@ -46,6 +48,55 @@ describe('shouldStartCardDrag', () => {
 
   it('refuses a pointer that is not the primary pointer of its type', () => {
     expect(shouldStartCardDrag({ ...draggable, isPrimary: false })).toBe(false);
+  });
+
+  it('refuses a press on something that owns its own click, like the title button', () => {
+    expect(shouldStartCardDrag({ ...draggable, blockingTarget: true })).toBe(false);
+  });
+});
+
+describe('dragDisabledReason', () => {
+  const draggable = { allowDrag: true, canUpdate: true, saving: false };
+
+  it('gives no reason when the card can be dragged', () => {
+    expect(dragDisabledReason(draggable)).toBeUndefined();
+  });
+
+  it('blames the board when its configuration disables dragging', () => {
+    expect(dragDisabledReason({ ...draggable, allowDrag: false })).toBe('boardDisabled');
+  });
+
+  it('blames permission when the board allows dragging but this user cannot update the card', () => {
+    expect(dragDisabledReason({ ...draggable, canUpdate: false })).toBe('noPermission');
+  });
+
+  it('checks the board setting before the per-card permission', () => {
+    // A board with dragging off has nothing card-specific to explain, regardless of canUpdate.
+    expect(dragDisabledReason({ allowDrag: false, canUpdate: false, saving: false })).toBe('boardDisabled');
+  });
+
+  it('gives no reason while saving, which already reads as provisional on its own', () => {
+    expect(dragDisabledReason({ allowDrag: false, canUpdate: false, saving: true })).toBeUndefined();
+  });
+});
+
+describe('isCardDragBlockingPath', () => {
+  it('allows a press on the card’s plain background', () => {
+    expect(isCardDragBlockingPath(['div', 'umb-community-kanban-card'])).toBe(false);
+  });
+
+  it('refuses a press that started on the title button', () => {
+    expect(isCardDragBlockingPath(['button', 'div', 'umb-community-kanban-card'])).toBe(true);
+  });
+
+  it('refuses a press inside the entity actions bundle’s own shadow tree', () => {
+    // The composed path crosses into <umb-entity-actions-bundle>'s shadow root, so its internal
+    // button is excluded the same way the title is, with no special case for that element needed.
+    expect(isCardDragBlockingPath(['uui-button', 'umb-entity-actions-bundle', 'div'])).toBe(true);
+  });
+
+  it('is case-insensitive, matching how custom element names arrive from localName', () => {
+    expect(isCardDragBlockingPath(['BUTTON'])).toBe(true);
   });
 });
 

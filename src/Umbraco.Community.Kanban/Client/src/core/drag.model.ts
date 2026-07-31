@@ -1,4 +1,26 @@
 /**
+ * Elements that own a press themselves, so a card drag must not also start from one — the title button
+ * opens the document on click, and any entity-action control (rendered inside
+ * `<umb-entity-actions-bundle>`) owns its own click too. Without this, grabbing the title starts a drag
+ * gesture like anywhere else on the card, and the very next `pointermove` — even a sub-pixel jitter —
+ * marks the gesture as "moved", which is exactly what makes `#onOpen` swallow the click afterwards.
+ */
+const DRAG_BLOCKING_ELEMENTS = ['button', 'uui-button', 'a', 'input', 'textarea', 'select'];
+
+/**
+ * Whether a press that travelled this composed path may start a card drag, given the path's local
+ * element names innermost-first.
+ *
+ * A composed path rather than the event's target: `event.currentTarget` inside the pointerdown handler
+ * is always the card itself, which cannot tell a press on its title button apart from one on its plain
+ * background. The path crosses into `<umb-entity-actions-bundle>`'s own shadow tree too, so its internal
+ * buttons are excluded the same way the title is, with no special case for that element needed.
+ */
+export function isCardDragBlockingPath(path: readonly string[]): boolean {
+  return path.some((name) => DRAG_BLOCKING_ELEMENTS.includes(name.toLowerCase()));
+}
+
+/**
  * Whether a pointerdown on a card should start a drag.
  *
  * Takes plain values rather than a PointerEvent for the same reason `shouldStartPan` does: the decision
@@ -7,7 +29,8 @@
  * Both `allowDrag` (the board's configuration) and `canUpdate` (this user, this card) are required, and
  * both come from the server — only the server knows either one, so no host attribute can supply them.
  * Touch is excluded because the board already scrolls horizontally on a touch swipe, with native
- * momentum; hijacking that to drag a card would cost more than it buys.
+ * momentum; hijacking that to drag a card would cost more than it buys. `blockingTarget` is computed by
+ * the caller from the pointer event's composed path via `isCardDragBlockingPath`.
  */
 export function shouldStartCardDrag(input: {
   allowDrag: boolean;
@@ -16,7 +39,9 @@ export function shouldStartCardDrag(input: {
   pointerType: string;
   button: number;
   isPrimary: boolean;
+  blockingTarget?: boolean;
 }): boolean {
+  if (input.blockingTarget) return false;
   if (!input.allowDrag || !input.canUpdate) return false;
   if (input.saving) return false;
   if (input.pointerType === 'touch') return false;
@@ -75,6 +100,26 @@ export function formatPublishSummary(succeeded: number, total: number): string {
   }
 
   return `Published ${succeeded} of ${total} — ${total - succeeded} failed.`;
+}
+
+/**
+ * Why a card cannot be dragged right now, or `undefined` when it can. Ordered to match
+ * `shouldStartCardDrag`'s own checks: a board-wide setting is checked before a per-card permission,
+ * because a board with dragging off has nothing card-specific to explain. `saving` yields no reason —
+ * a card mid-write already reads as provisional (opacity, `cursor: progress`) and needs no further
+ * explanation, and the state is momentary rather than something worth a persistent icon.
+ */
+export type KanbanDragDisabledReason = 'boardDisabled' | 'noPermission';
+
+export function dragDisabledReason(input: {
+  allowDrag: boolean;
+  canUpdate: boolean;
+  saving: boolean;
+}): KanbanDragDisabledReason | undefined {
+  if (input.saving) return undefined;
+  if (!input.allowDrag) return 'boardDisabled';
+  if (!input.canUpdate) return 'noPermission';
+  return undefined;
 }
 
 /** Where the ghost's top-left corner goes. */
