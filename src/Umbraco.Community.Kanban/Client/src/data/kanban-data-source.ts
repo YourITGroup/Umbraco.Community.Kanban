@@ -1,4 +1,4 @@
-import type { KanbanBoardModel, KanbanCardState } from './kanban-board.types.js';
+import type { KanbanBoardModel, KanbanCardModel, KanbanCardState } from './kanban-board.types.js';
 
 export interface KanbanBoardQuery {
   parentId: string;
@@ -37,9 +37,29 @@ export type KanbanSetLaneOutcome =
   | { kind: 'success'; state: KanbanCardState }
   | { kind: 'error'; status?: number };
 
+/** Identifies one card on one board — the same coordinates GET /board uses, plus the card's key. */
+export interface KanbanCardQuery {
+  key: string;
+  parentId: string;
+  configId?: string;
+  culture?: string | null;
+}
+
+/**
+ * What a document is on this board now. `not-child` and `gone` both mean "remove it if held" — the
+ * server deliberately does not distinguish moved-away from not-browseable, and a 404 adds deleted.
+ * `error` is transient and must change nothing: a failed fetch never removes a card.
+ */
+export type KanbanCardOutcome =
+  | { kind: 'child'; laneValue: string; card: KanbanCardModel }
+  | { kind: 'not-child' }
+  | { kind: 'gone' }
+  | { kind: 'error' };
+
 export interface KanbanDataSource {
   getBoard(query: KanbanBoardQuery): Promise<KanbanBoardOutcome>;
   setLane(command: KanbanCardLaneCommand): Promise<KanbanSetLaneOutcome>;
+  getCard(query: KanbanCardQuery): Promise<KanbanCardOutcome>;
 }
 
 /**
@@ -70,4 +90,14 @@ export function buildLaneBody(command: KanbanCardLaneCommand): { laneValue: stri
   if (command.culture) body.culture = command.culture;
 
   return body;
+}
+
+/** Builds the query string for GET /card/{key}. The key travels in the route, never the query. */
+export function buildCardQuery(query: KanbanCardQuery): Record<string, string> {
+  const built: Record<string, string> = { parentId: query.parentId };
+
+  if (query.configId) built.configId = query.configId;
+  if (query.culture) built.culture = query.culture;
+
+  return built;
 }

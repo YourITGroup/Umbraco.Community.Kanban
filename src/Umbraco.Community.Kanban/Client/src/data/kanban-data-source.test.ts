@@ -1,5 +1,27 @@
 import { describe, it, expect } from 'vitest';
-import { buildBoardQuery, buildLaneBody } from './kanban-data-source.js';
+import { buildBoardQuery, buildCardQuery, buildLaneBody } from './kanban-data-source.js';
+
+describe('buildCardQuery', () => {
+  it('sends the parent and omits everything optional that is absent', () => {
+    expect(buildCardQuery({ key: 'k1', parentId: 'p1' })).toEqual({ parentId: 'p1' });
+  });
+
+  it('sends configId and culture when present', () => {
+    expect(buildCardQuery({ key: 'k1', parentId: 'p1', configId: 'c1', culture: 'nb-NO' })).toEqual({
+      parentId: 'p1',
+      configId: 'c1',
+      culture: 'nb-NO',
+    });
+  });
+
+  it('omits an empty culture, which means "no culture", not a culture named empty string', () => {
+    expect(buildCardQuery({ key: 'k1', parentId: 'p1', culture: '' })).toEqual({ parentId: 'p1' });
+  });
+
+  it('does not put the key in the query string — it is a route value', () => {
+    expect(Object.keys(buildCardQuery({ key: 'k1', parentId: 'p1' }))).not.toContain('key');
+  });
+});
 
 describe('buildBoardQuery', () => {
   it('always sends the parent id', () => {
