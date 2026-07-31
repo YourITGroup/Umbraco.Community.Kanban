@@ -125,7 +125,7 @@ Nothing beyond the `Umbraco.Community.Kanban.Calendar` configuration property ed
 This is a full milestone of work, not a polish pass — it needs its own brainstorm → spec → plan cycle
 before implementation starts.
 
-## Milestone 5 — Content app host and real-time sync ✅ Done (5a real-time 2026-07-31, 5b content app 2026-07-31)
+## Milestone 5 — Content app host and real-time sync ✅ Done (5a real-time, 5b content app, injected host — all 2026-07-31)
 
 - [x] **Real-time sync (5a).** Built 2026-07-31 from
   [its design](superpowers/specs/2026-07-31-realtime-board-sync-design.md). `GET /card/{key}` answers
@@ -145,10 +145,15 @@ before implementation starts.
   Calendar-kind and empty-`appliesTo` configurations register nothing. Needs hand-verification:
   tab appears/labels/routes per configuration, two configurations on one type give two tabs, no tab
   on unlisted types or unsaved documents, publish/undo from the tab, collection view bar unchanged.
-- [ ] **Host #3 (injected)** is effectively available for free — `<umb-community-kanban-board>` already
-  takes `config`/`parentId` directly (`core/kanban-board.element.ts`) — but it has never been exercised
-  by a real external host (the planned Bookings-section workspace). Worth a smoke test once that
-  consumer exists, not a build task in itself.
+- [x] **Host #3 (injected).** Built 2026-07-31 from
+  [its design](superpowers/specs/2026-07-31-standalone-board-host-design.md). The importmap module
+  (`@umbraco-community/kanban`) now exports `UmbCommunityKanbanStandaloneBoardElement`
+  (`hosts/kanban-standalone-board.element.ts`): `<umb-community-kanban-standalone-board parent-id
+  config-id .culture>` carries the datasource, actions context, Publish/Undo bar with measured
+  bottom inset, and workspace-modal wiring; the 5b workspace-view host is now a thin wrapper around
+  it. First consumer: the your-it-team-cloud Bookings "Reservations" workspace. Needs
+  hand-verification there (board loads, drag, publish/undo, open card) plus a regression check that
+  existing document workspace tabs still behave after the wrapper refactor.
 
 ## Milestone 6 — Contentment Data List lane source package ✅ Done
 
