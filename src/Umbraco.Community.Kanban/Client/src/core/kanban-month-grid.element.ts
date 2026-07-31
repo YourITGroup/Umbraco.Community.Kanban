@@ -66,15 +66,14 @@ export class UmbCommunityKanbanMonthGridElement extends UmbLitElement {
     const appearance = this.appearanceFor(item.category);
 
     return html`
-      <button
-        class="chip"
-        style=${appearance.colour ? `border-inline-start-color: ${appearance.colour}` : ''}
-        title=${item.card.name}
-        @click=${(event: Event) => this.#onChipClick(event, item)}>
+      <button class="chip" title=${item.card.name} @click=${(event: Event) => this.#onChipClick(event, item)}>
         <umb-icon .name=${item.card.icon ?? 'icon-document'}></umb-icon>
         <span class="chip-name">${item.card.name}</span>
         ${item.time ? html`<span class="chip-time">${item.time}</span>` : nothing}
         ${appearance.icon ? html`<umb-icon class="chip-category" .name=${appearance.icon}></umb-icon>` : nothing}
+        ${appearance.colour
+          ? html`<span class="chip-dot" style="background: ${appearance.colour}"></span>`
+          : nothing}
       </button>
     `;
   }
@@ -160,7 +159,6 @@ export class UmbCommunityKanbanMonthGridElement extends UmbLitElement {
         align-items: center;
         gap: var(--uui-size-space-1);
         border: none;
-        border-inline-start: 3px solid transparent;
         border-radius: var(--uui-border-radius);
         background: var(--uui-color-surface-alt);
         padding: 1px var(--uui-size-space-2);
@@ -194,6 +192,20 @@ export class UmbCommunityKanbanMonthGridElement extends UmbLitElement {
 
       .chip-category {
         flex: none;
+      }
+
+      .chip-dot {
+        flex: none;
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        margin-inline-start: auto;
+      }
+
+      /* When a time already claims the right edge, the dot follows it without a second auto-margin. */
+      .chip-time ~ .chip-dot,
+      .chip-category ~ .chip-dot {
+        margin-inline-start: 0;
       }
 
       .more {

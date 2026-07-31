@@ -3,6 +3,7 @@ import { UmbLitElement } from '@umbraco-cms/backoffice/lit-element';
 import type { KanbanCalendarItemModel } from '../data/kanban-calendar.types.js';
 import { blockGeometry, layoutSpans, toDaySpan } from './overlap.model.js';
 import type { KanbanCategoryAppearance } from './kanban-month-grid.element.js';
+import './kanban-card-property-list.element.js';
 
 const HOUR_HEIGHT_REM = 3;
 
@@ -61,8 +62,15 @@ export class UmbCommunityKanbanWeekGridElement extends UmbLitElement {
               style=${appearance.colour ? `border-inline-start-color: ${appearance.colour}` : ''}
               title=${item.card.name}
               @click=${(event: Event) => this.#onBlockClick(event, item)}>
-              <umb-icon .name=${item.card.icon ?? 'icon-document'}></umb-icon>
-              <span class="chip-name">${item.card.name}</span>
+              <div class="chip-header">
+                <umb-icon .name=${item.card.icon ?? 'icon-document'}></umb-icon>
+                <span class="chip-name">${item.card.name}</span>
+              </div>
+              ${item.card.properties.length
+                ? html`<umb-community-kanban-card-property-list
+                    wrap
+                    .properties=${item.card.properties}></umb-community-kanban-card-property-list>`
+                : nothing}
             </button>
           `;
         })}
@@ -94,10 +102,17 @@ export class UmbCommunityKanbanWeekGridElement extends UmbLitElement {
                 : ''}"
               title=${entry.item.card.name}
               @click=${(event: Event) => this.#onBlockClick(event, entry.item)}>
-              <span class="block-time">${entry.item.time}</span>
-              <umb-icon .name=${entry.item.card.icon ?? 'icon-document'}></umb-icon>
-              <span class="chip-name">${entry.item.card.name}</span>
-              ${appearance.icon ? html`<umb-icon .name=${appearance.icon}></umb-icon>` : nothing}
+              <div class="block-header">
+                <span class="block-time">${entry.item.time}</span>
+                <umb-icon .name=${entry.item.card.icon ?? 'icon-document'}></umb-icon>
+                <span class="chip-name">${entry.item.card.name}</span>
+                ${appearance.icon ? html`<umb-icon .name=${appearance.icon}></umb-icon>` : nothing}
+              </div>
+              ${entry.item.card.properties.length
+                ? html`<umb-community-kanban-card-property-list
+                    wrap
+                    .properties=${entry.item.card.properties}></umb-community-kanban-card-property-list>`
+                : nothing}
             </button>
           `;
         })}
@@ -200,8 +215,9 @@ export class UmbCommunityKanbanWeekGridElement extends UmbLitElement {
       .block {
         position: absolute;
         display: flex;
-        align-items: flex-start;
-        gap: var(--uui-size-space-1);
+        flex-direction: column;
+        align-items: stretch;
+        gap: 2px;
         overflow: hidden;
         border: 1px solid var(--uui-color-border);
         border-inline-start: 3px solid var(--uui-color-interactive);
@@ -220,6 +236,19 @@ export class UmbCommunityKanbanWeekGridElement extends UmbLitElement {
         z-index: 1;
       }
 
+      .block-header,
+      .chip-header {
+        display: flex;
+        align-items: center;
+        gap: var(--uui-size-space-1);
+        min-width: 0;
+      }
+
+      .block-header umb-icon,
+      .chip-header umb-icon {
+        flex: none;
+      }
+
       .block-time {
         flex: none;
         color: var(--uui-color-text-alt);
@@ -227,8 +256,9 @@ export class UmbCommunityKanbanWeekGridElement extends UmbLitElement {
 
       .chip {
         display: flex;
-        align-items: center;
-        gap: var(--uui-size-space-1);
+        flex-direction: column;
+        align-items: stretch;
+        gap: 2px;
         border: none;
         border-inline-start: 3px solid transparent;
         border-radius: var(--uui-border-radius);

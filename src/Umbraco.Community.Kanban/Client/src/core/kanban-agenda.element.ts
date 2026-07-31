@@ -3,6 +3,7 @@ import { UmbLitElement } from '@umbraco-cms/backoffice/lit-element';
 import type { KanbanCalendarItemModel } from '../data/kanban-calendar.types.js';
 import { layoutSpans, toDaySpan, type LaidOutItem } from './overlap.model.js';
 import type { KanbanCategoryAppearance } from './kanban-month-grid.element.js';
+import './kanban-card-property-list.element.js';
 
 /**
  * The agenda list: day-by-day, chronological. Date-only items lead each day full-width; timed
@@ -36,12 +37,19 @@ export class UmbCommunityKanbanAgendaElement extends UmbLitElement {
         style=${appearance.colour ? `border-inline-start-color: ${appearance.colour}` : ''}
         title=${item.card.name}
         @click=${() => this.#onItemClick(item)}>
-        ${timed
-          ? html`<span class="time">${item.time}${item.endTime ? html`–${item.endTime}` : nothing}</span>`
-          : html`<span class="time">all-day</span>`}
-        <umb-icon .name=${item.card.icon ?? 'icon-document'}></umb-icon>
-        <span class="name">${item.card.name}</span>
-        ${appearance.icon ? html`<umb-icon .name=${appearance.icon}></umb-icon>` : nothing}
+        <div class="entry-header">
+          ${timed
+            ? html`<span class="time">${item.time}${item.endTime ? html`–${item.endTime}` : nothing}</span>`
+            : html`<span class="time">all-day</span>`}
+          <umb-icon .name=${item.card.icon ?? 'icon-document'}></umb-icon>
+          <span class="name">${item.card.name}</span>
+          ${appearance.icon ? html`<umb-icon .name=${appearance.icon}></umb-icon>` : nothing}
+        </div>
+        ${item.card.properties.length
+          ? html`<umb-community-kanban-card-property-list
+              class="entry-properties"
+              .properties=${item.card.properties}></umb-community-kanban-card-property-list>`
+          : nothing}
       </button>
     `;
   }
@@ -175,8 +183,8 @@ export class UmbCommunityKanbanAgendaElement extends UmbLitElement {
 
       .entry {
         display: flex;
-        align-items: center;
-        gap: var(--uui-size-space-2);
+        flex-direction: column;
+        gap: var(--uui-size-space-1);
         width: 100%;
         border: none;
         border-inline-start: 3px solid transparent;
@@ -194,8 +202,20 @@ export class UmbCommunityKanbanAgendaElement extends UmbLitElement {
         background: var(--uui-color-surface-emphasis);
       }
 
-      .entry umb-icon {
+      .entry-header {
+        display: flex;
+        align-items: center;
+        gap: var(--uui-size-space-2);
+        width: 100%;
+      }
+
+      .entry-header umb-icon {
         flex: none;
+      }
+
+      /* Aligned under the name: the time column's width plus the header's gap. */
+      .entry-properties {
+        margin-inline-start: calc(6.5em + var(--uui-size-space-2));
       }
 
       .time {

@@ -1,12 +1,12 @@
-import { classMap, css, customElement, html, nothing, property, repeat, state } from '@umbraco-cms/backoffice/external/lit';
+import { classMap, css, customElement, html, nothing, property, state } from '@umbraco-cms/backoffice/external/lit';
 import type { PropertyValues } from '@umbraco-cms/backoffice/external/lit';
 import { UmbLitElement } from '@umbraco-cms/backoffice/lit-element';
 import { UmbEntityContext } from '@umbraco-cms/backoffice/entity';
-import '@umbraco-cms/backoffice/ufm';
+import './kanban-card-property-list.element.js';
 import { cardStateTag } from './card.model.js';
 import { dragDisabledReason, isCardDragBlockingPath, shouldStartCardDrag, type KanbanDragDisabledReason } from './drag.model.js';
 import './kanban-card-children.element.js';
-import type { KanbanCardModel, KanbanCardPropertyModel } from '../data/kanban-board.types.js';
+import type { KanbanCardModel } from '../data/kanban-board.types.js';
 
 /**
  * Icon and tooltip for each reason a card cannot be dragged — the only visible difference otherwise is
@@ -270,13 +270,8 @@ export class UmbCommunityKanbanCardElement extends UmbLitElement {
           <umb-entity-actions-bundle .label=${this.card.name}></umb-entity-actions-bundle>
         </div>
         ${this.card.properties.length
-          ? html`<div class="properties">
-              ${repeat(
-                this.card.properties,
-                (item) => item.alias,
-                (item) => this.#renderProperty(item),
-              )}
-            </div>`
+          ? html`<umb-community-kanban-card-property-list
+              .properties=${this.card.properties}></umb-community-kanban-card-property-list>`
           : nothing}
         ${this.#renderChildren()}
         <div class="footer">
@@ -293,29 +288,6 @@ export class UmbCommunityKanbanCardElement extends UmbLitElement {
     if (this.card.children.length === 0 && this.card.canCreate === false) return nothing;
 
     return html`<umb-community-kanban-card-children .card=${this.card}></umb-community-kanban-card-children>`;
-  }
-
-  #renderProperty(item: KanbanCardPropertyModel) {
-    return html`
-      <div class="property">
-        <span class="label">${item.name}</span>
-        ${item.nameTemplate
-          ? // The backoffice's own UFM renderer, and the same syntax a List View column template uses,
-            // so a template copied from one behaves identically here.
-            //
-            // The value is wrapped in an object rather than passed raw, which is what core's own
-            // document collection card and table column do. `umb-ufm-js-expression` builds its
-            // evaluation scope by *spreading* this value — `{...model, ...filters}` — so a template
-            // referring to `value` only resolves if the model has a `value` property. Passing the raw
-            // value spread its characters instead, leaving `value` undefined and every template empty.
-            html`<umb-ufm-render inline .markdown=${item.nameTemplate} .value=${{ value: item.value }}></umb-ufm-render>`
-          : // No template: the summary extension is what makes a picker or a dropdown render sensibly
-            // with no configuration at all, which is why both paths are kept.
-            html`<umb-value-summary-extension
-              .valueType=${item.editorAlias}
-              .value=${item.value}></umb-value-summary-extension>`}
-      </div>
-    `;
   }
 
   static override styles = [
@@ -412,21 +384,6 @@ export class UmbCommunityKanbanCardElement extends UmbLitElement {
         text-decoration: underline;
       }
 
-      .properties {
-        display: flex;
-        flex-direction: column;
-        gap: var(--uui-size-space-1);
-        font-size: var(--uui-type-small-size);
-      }
-
-      .property {
-        display: flex;
-        gap: var(--uui-size-space-2);
-      }
-
-      .label {
-        color: var(--uui-color-text-alt);
-      }
     `,
   ];
 }
