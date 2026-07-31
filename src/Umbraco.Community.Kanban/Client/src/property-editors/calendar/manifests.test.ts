@@ -15,8 +15,9 @@ describe('calendar property editor manifests', () => {
     const ui = manifests.find((m) => m.type === 'propertyEditorUi') as any;
     const aliases = ui.meta.settings.properties.map((p: { alias: string }) => p.alias).sort();
 
+    // `categoryContentTypeKey` is deliberately absent: the category property picker writes it as a
+    // sibling value, the same way the board's lane picker writes `laneContentTypeKey`.
     expect(aliases).toEqual([
-      'allowDrag',
       'appliesTo',
       'cardProperties',
       'categoryManualValues',
@@ -30,13 +31,15 @@ describe('calendar property editor manifests', () => {
     ]);
   });
 
-  it('defaults the date property to updateDate and shows the agenda', () => {
+  it('defaults the agenda on, and deliberately leaves the date property unset', () => {
     const ui = manifests.find((m) => m.type === 'propertyEditorUi') as any;
     const defaults = Object.fromEntries(
       ui.meta.settings.defaultData.map((d: { alias: string; value: unknown }) => [d.alias, d.value]),
     );
 
-    expect(defaults.dateProperty).toBe('updateDate');
+    // No dateProperty default: the picker cannot browse to a system property, so "unset" is the
+    // representation of updateDate — the server model falls back to it, covered by its own test.
+    expect(defaults.dateProperty).toBeUndefined();
     expect(defaults.showAgenda).toBe(true);
   });
 });

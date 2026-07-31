@@ -3,27 +3,42 @@ import { UmbLitElement } from '@umbraco-cms/backoffice/lit-element';
 import { UmbChangeEvent } from '@umbraco-cms/backoffice/event';
 import { UmbDocumentTypeItemRepository } from '@umbraco-cms/backoffice/document-type';
 import { UMB_DATA_TYPE_WORKSPACE_CONTEXT } from '@umbraco-cms/backoffice/data-type';
+import type { UmbPropertyEditorConfigCollection } from '@umbraco-cms/backoffice/property-editor';
 import { KANBAN_LANE_CONTENT_TYPE_KEY } from '@/constants.js';
 import { pickContentTypeProperty } from '../content-type-property/content-type-property.picker.js';
 
 /**
- * Picks the property whose value decides which lane a card sits in, by browsing to it: choose a
- * document type, then choose one of its properties. The same sequence Umbraco itself uses to add a
- * column to a Collection, so an editor cannot mistype an alias that resolves to no lanes at all.
+ * Picks a content type property by browsing to it: choose a document type, then choose one of its
+ * properties. The same sequence Umbraco itself uses to add a column to a Collection, so an editor
+ * cannot mistype an alias that resolves to nothing. The board's lane property, and the calendar's
+ * date, end-date and category properties, all pick through this one editor.
  *
- * The stored value is only the property alias, because a board resolves lanes against the content
+ * The stored value is only the property alias, because everything resolves against the content
  * type of whatever document is being viewed, not the one browsed here. The content type browsed to
- * is written alongside it under `laneContentTypeKey` — the configuration editor needs it to say
- * where the property came from, and to preview lanes at all, having no document of its own.
+ * is *optionally* written alongside it under a sibling key — the board's lane property and the
+ * calendar's category property need it so their preview-driven editors can resolve real values,
+ * having no document of their own. Which key comes from the setting's `contentTypeKeyAlias`
+ * config; unset keeps the board's historic `laneContentTypeKey`, the empty string writes none.
  */
 @customElement('umb-community-kanban-lane-property')
 export class UmbCommunityKanbanLanePropertyElement extends UmbLitElement {
   @property({ type: String })
   value = '';
 
+  /** Per-usage settings config; see the class comment. */
+  @property({ attribute: false })
+  set config(config: UmbPropertyEditorConfigCollection | undefined) {
+    const configured = config?.getValueByAlias<string>('contentTypeKeyAlias');
+
+    this.#contentTypeKeyAlias = configured === undefined ? KANBAN_LANE_CONTENT_TYPE_KEY : configured;
+    this.#observeContentTypeKey();
+  }
+
   /** The name of the content type the property was picked from, for display only. */
   @state()
   private _contentTypeName = '';
+
+  #contentTypeKeyAlias: string = KANBAN_LANE_CONTENT_TYPE_KEY;
 
   #workspace?: typeof UMB_DATA_TYPE_WORKSPACE_CONTEXT.TYPE;
   #documentTypeItems = new UmbDocumentTypeItemRepository(this);
@@ -31,17 +46,25 @@ export class UmbCommunityKanbanLanePropertyElement extends UmbLitElement {
   constructor() {
     super();
 
-    this.consumeContext(UMB_DATA_TYPE_WORKSPACE_CONTEXT, async (context) => {
+    this.consumeContext(UMB_DATA_TYPE_WORKSPACE_CONTEXT, (context) => {
       this.#workspace = context;
-
-      if (!context) return;
-
-      // Observed rather than read once: the stored configuration arrives asynchronously, and the
-      // content type can also change from under us when the editor re-picks.
-      const value = await context.propertyValueByAlias<string>(KANBAN_LANE_CONTENT_TYPE_KEY);
-
-      this.observe(value, (unique) => this.#loadContentTypeName(unique), '_kanbanLaneContentTypeKey');
+      this.#observeContentTypeKey();
     });
+  }
+
+  /**
+   * (Re)observes the sibling key. Called from both the context callback and the config setter
+   * because they arrive in no guaranteed order; the alias-scoped observer key makes re-runs
+   * replace rather than stack.
+   */
+  async #observeContentTypeKey() {
+    if (!this.#workspace || !this.#contentTypeKeyAlias) return;
+
+    // Observed rather than read once: the stored configuration arrives asynchronously, and the
+    // content type can also change from under us when the editor re-picks.
+    const value = await this.#workspace.propertyValueByAlias<string>(this.#contentTypeKeyAlias);
+
+    this.observe(value, (unique) => this.#loadContentTypeName(unique), '_kanbanPickerContentTypeKey');
   }
 
   async #loadContentTypeName(unique?: string) {
@@ -63,14 +86,18 @@ export class UmbCommunityKanbanLanePropertyElement extends UmbLitElement {
     // Awaited before the change event: the sibling key and this element's own value are two writes
     // into the same configuration value list, and letting them overlap lets the second read the
     // list as it was before the first, dropping one of them.
-    await this.#workspace?.setPropertyValue(KANBAN_LANE_CONTENT_TYPE_KEY, picked.contentTypeUnique);
+    if (this.#contentTypeKeyAlias) {
+      await this.#workspace?.setPropertyValue(this.#contentTypeKeyAlias, picked.contentTypeUnique);
+    }
 
     this.value = picked.alias;
     this.dispatchEvent(new UmbChangeEvent());
   }
 
   async #clear() {
-    await this.#workspace?.setPropertyValue(KANBAN_LANE_CONTENT_TYPE_KEY, undefined);
+    if (this.#contentTypeKeyAlias) {
+      await this.#workspace?.setPropertyValue(this.#contentTypeKeyAlias, undefined);
+    }
 
     this.value = '';
     this.dispatchEvent(new UmbChangeEvent());

@@ -25,7 +25,7 @@ public class KanbanCalendarPropertyEditorTests
             "categoryOverrides",
             "cardProperties",
             "showAgenda",
-            "allowDrag",
+            "categoryContentTypeKey",
             "appliesTo",
             "tabName",
             "tabIcon");
@@ -41,27 +41,12 @@ public class KanbanCalendarPropertyEditorTests
     }
 
     [Fact]
-    public void DragIsUnsupported_WhenTheDateSourceIsLastUpdated()
+    public void DateProperty_ClearedInThePickerFallsBackToLastUpdated()
     {
-        var configuration = new KanbanCalendarConfiguration { AllowDrag = true };
+        // The picker's Remove writes an empty string; a calendar always has something to place by.
+        var configuration = new KanbanCalendarConfiguration { DateProperty = "" };
 
-        configuration.IsDragSupported.Should().BeFalse();
-    }
-
-    [Fact]
-    public void DragIsSupported_ForARealDateProperty()
-    {
-        var configuration = new KanbanCalendarConfiguration { DateProperty = "eventDate", AllowDrag = true };
-
-        configuration.IsDragSupported.Should().BeTrue();
-    }
-
-    [Fact]
-    public void DragIsUnsupported_WhenTheEditorTurnedItOff()
-    {
-        var configuration = new KanbanCalendarConfiguration { DateProperty = "eventDate", AllowDrag = false };
-
-        configuration.IsDragSupported.Should().BeFalse();
+        configuration.DateProperty.Should().Be("updateDate");
     }
 
     [Fact]

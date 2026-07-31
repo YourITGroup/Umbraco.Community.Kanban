@@ -3,8 +3,16 @@ import {
   KANBAN_CALENDAR_EDITOR_UI_ALIAS,
   KANBAN_CARD_PROPERTIES_UI_ALIAS,
   KANBAN_LANE_OVERRIDES_UI_ALIAS,
+  KANBAN_LANE_PROPERTY_UI_ALIAS,
   KANBAN_MANUAL_LANES_UI_ALIAS,
 } from '@/constants.js';
+
+/**
+ * The date and end-date pickers browse to a property like the board's lane property does, but
+ * write no sibling content-type key — nothing previews off them. An explicit empty string, not an
+ * omission: omitted, the picker defaults to the board's historic `laneContentTypeKey`.
+ */
+const NO_SIBLING_KEY = [{ alias: 'contentTypeKeyAlias', value: '' }];
 
 export const manifests: Array<UmbExtensionManifest> = [
   {
@@ -30,21 +38,26 @@ export const manifests: Array<UmbExtensionManifest> = [
           {
             alias: 'dateProperty',
             label: 'Date property',
-            description: 'The child property that places a card on a day. Leave as updateDate for last-updated, which makes the calendar read-only.',
-            propertyEditorUiAlias: 'Umb.PropertyEditorUi.TextBox',
+            description:
+              'The child property that places a card on a day. Defaults to updateDate (last-updated) when left unset.',
+            propertyEditorUiAlias: KANBAN_LANE_PROPERTY_UI_ALIAS,
+            config: NO_SIBLING_KEY,
           },
           {
             alias: 'endDateProperty',
             label: 'End date property',
             description:
               'Optional. Gives cards a span for the week grid and agenda; items without a valid end use a one-hour block.',
-            propertyEditorUiAlias: 'Umb.PropertyEditorUi.TextBox',
+            propertyEditorUiAlias: KANBAN_LANE_PROPERTY_UI_ALIAS,
+            config: NO_SIBLING_KEY,
           },
           {
             alias: 'categoryProperty',
             label: 'Category property',
             description: 'Optional. Its values colour and badge cards, like lanes colour a board.',
-            propertyEditorUiAlias: 'Umb.PropertyEditorUi.TextBox',
+            propertyEditorUiAlias: KANBAN_LANE_PROPERTY_UI_ALIAS,
+            // The category appearance editor previews real values off this pair.
+            config: [{ alias: 'contentTypeKeyAlias', value: 'categoryContentTypeKey' }],
           },
           {
             alias: 'categoryManualValues',
@@ -57,6 +70,16 @@ export const manifests: Array<UmbExtensionManifest> = [
             label: 'Category appearance',
             description: 'Override the colour, icon or label of individual categories.',
             propertyEditorUiAlias: KANBAN_LANE_OVERRIDES_UI_ALIAS,
+            // Point the shared overrides editor at the calendar's own settings: categories have no
+            // manual toggle (a non-empty list is the toggle) and no stored order.
+            config: [
+              { alias: 'propertyAlias', value: 'categoryProperty' },
+              { alias: 'contentTypeKeyAlias', value: 'categoryContentTypeKey' },
+              { alias: 'manualAlias', value: 'categoryManualValues' },
+              { alias: 'useManualAlias', value: '' },
+              { alias: 'orderAlias', value: '' },
+              { alias: 'subject', value: 'category' },
+            ],
           },
           {
             alias: 'cardProperties',
@@ -67,12 +90,6 @@ export const manifests: Array<UmbExtensionManifest> = [
           {
             alias: 'showAgenda',
             label: 'Show agenda list',
-            propertyEditorUiAlias: 'Umb.PropertyEditorUi.Toggle',
-          },
-          {
-            alias: 'allowDrag',
-            label: 'Allow drag',
-            description: 'Ignored: the calendar is read-only.',
             propertyEditorUiAlias: 'Umb.PropertyEditorUi.Toggle',
           },
           {
@@ -91,11 +108,7 @@ export const manifests: Array<UmbExtensionManifest> = [
             propertyEditorUiAlias: 'Umb.PropertyEditorUi.IconPicker',
           },
         ],
-        defaultData: [
-          { alias: 'dateProperty', value: 'updateDate' },
-          { alias: 'showAgenda', value: true },
-          { alias: 'allowDrag', value: true },
-        ],
+        defaultData: [{ alias: 'showAgenda', value: true }],
       },
     },
   },

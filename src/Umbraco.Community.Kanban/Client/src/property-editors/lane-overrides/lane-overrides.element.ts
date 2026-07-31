@@ -5,6 +5,7 @@ import { umbOpenModal } from '@umbraco-cms/backoffice/modal';
 import { UMB_ICON_PICKER_MODAL } from '@umbraco-cms/backoffice/icon';
 import { UMB_DATA_TYPE_WORKSPACE_CONTEXT } from '@umbraco-cms/backoffice/data-type';
 import { UmbSorterController } from '@umbraco-cms/backoffice/sorter';
+import type { UmbPropertyEditorConfigCollection } from '@umbraco-cms/backoffice/property-editor';
 import { KANBAN_LANE_CONTENT_TYPE_KEY, KANBAN_LANE_ORDER_KEY } from '@/constants.js';
 import '@/core/lane-colour/lane-colour.element.js';
 import type { UmbCommunityKanbanLaneColourElement } from '@/core/lane-colour/lane-colour.element.js';
@@ -22,7 +23,33 @@ import {
 } from './lane-override.model.js';
 
 /**
- * Edits per-lane appearance overrides.
+ * Which sibling settings feed the preview, and what the rows are called. The board's historic
+ * aliases are the defaults; the calendar's category appearance passes its own through the
+ * setting's config. An empty `useManualAlias` means "manual whenever the manual list has rows"
+ * (the calendar has no toggle), and an empty `orderAlias` disables reordering entirely.
+ */
+interface OverridesShape {
+  propertyAlias: string;
+  contentTypeKeyAlias: string;
+  manualAlias: string;
+  useManualAlias: string;
+  orderAlias: string;
+  subject: string;
+}
+
+const BOARD_SHAPE: OverridesShape = {
+  propertyAlias: 'laneProperty',
+  contentTypeKeyAlias: KANBAN_LANE_CONTENT_TYPE_KEY,
+  manualAlias: 'manualLanes',
+  useManualAlias: 'useManualLanes',
+  orderAlias: KANBAN_LANE_ORDER_KEY,
+  subject: 'lane',
+};
+
+/**
+ * Edits per-lane appearance overrides — and, configured with the calendar's aliases, per-category
+ * ones: the resolution, precedence and editing are identical, only which settings feed the
+ * preview differs.
  *
  * Lanes come from the server rather than being typed by hand, so the editor
  * cannot mistype a lane value and silently lose the styling.
@@ -79,35 +106,80 @@ export class UmbCommunityKanbanLaneOverridesElement extends UmbLitElement {
    */
   #requestId = 0;
 
+  #shape: OverridesShape = BOARD_SHAPE;
+
+  /** Per-usage settings config selecting the shape; see OverridesShape. */
+  @property({ attribute: false })
+  set config(config: UmbPropertyEditorConfigCollection | undefined) {
+    const read = (alias: string, fallback: string) => {
+      const value = config?.getValueByAlias<string>(alias);
+      return value === undefined ? fallback : value;
+    };
+
+    this.#shape = {
+      propertyAlias: read('propertyAlias', BOARD_SHAPE.propertyAlias),
+      contentTypeKeyAlias: read('contentTypeKeyAlias', BOARD_SHAPE.contentTypeKeyAlias),
+      manualAlias: read('manualAlias', BOARD_SHAPE.manualAlias),
+      useManualAlias: read('useManualAlias', BOARD_SHAPE.useManualAlias),
+      orderAlias: read('orderAlias', BOARD_SHAPE.orderAlias),
+      subject: read('subject', BOARD_SHAPE.subject),
+    };
+    void this.#setupObservations();
+  }
+
   constructor() {
     super();
 
-    this.consumeContext(UMB_DATA_TYPE_WORKSPACE_CONTEXT, async (context) => {
+    this.consumeContext(UMB_DATA_TYPE_WORKSPACE_CONTEXT, (context) => {
       this.#workspace = context;
-
-      if (!context) return;
-
-      // Observed rather than read once: stored configuration arrives asynchronously, and every one
-      // of these can change while this editor is on screen.
-      await this.#observeValue<string>('laneProperty', (value) => (this.#observed.laneProperty = value));
-      await this.#observeValue<string>(
-        KANBAN_LANE_CONTENT_TYPE_KEY,
-        (value) => (this.#observed.laneContentTypeKey = value),
-      );
-      await this.#observeValue<boolean>('useManualLanes', (value) => (this.#observed.useManualLanes = value));
-      await this.#observeValue<unknown[]>('manualLanes', (value) => (this.#observed.manualLanes = value));
-      await this.#observeValue<string>('laneSource', (value) => (this.#observed.laneSource = value));
-
-      // Also recomputes the rows directly: unlike the values above, the order changes what the editor
-      // shows without changing which lanes exist, so it must not wait for a round trip to take effect.
-      await this.#observeValue<string[]>('laneOrder', (value) => {
-        this.#observed.laneOrder = value;
-        this.#recomputeRows();
-      });
+      void this.#setupObservations();
     });
   }
 
-  async #observeValue<T>(alias: string, apply: (value: T | undefined) => void) {
+  /**
+   * (Re)observes the shape's aliases. Runs from both the context callback and the config setter —
+   * they arrive in no guaranteed order — with role-keyed observers so a re-run replaces the
+   * previous observation rather than stacking a stale one.
+   */
+  async #setupObservations() {
+    if (!this.#workspace) return;
+
+    // Observed rather than read once: stored configuration arrives asynchronously, and every one
+    // of these can change while this editor is on screen.
+    await this.#observeValue<string>('property', this.#shape.propertyAlias, (value) => {
+      this.#observed.laneProperty = value;
+    });
+    await this.#observeValue<string>('contentTypeKey', this.#shape.contentTypeKeyAlias, (value) => {
+      this.#observed.laneContentTypeKey = value;
+    });
+    await this.#observeValue<boolean>('useManual', this.#shape.useManualAlias, (value) => {
+      this.#observed.useManualLanes = value;
+    });
+    await this.#observeValue<unknown[]>('manual', this.#shape.manualAlias, (value) => {
+      this.#observed.manualLanes = value;
+
+      // With no toggle setting (the calendar), a non-empty manual list IS the toggle.
+      if (!this.#shape.useManualAlias) {
+        this.#observed.useManualLanes = (value?.length ?? 0) > 0;
+      }
+    });
+    await this.#observeValue<string>('source', 'laneSource', (value) => (this.#observed.laneSource = value));
+
+    // Also recomputes the rows directly: unlike the values above, the order changes what the editor
+    // shows without changing which lanes exist, so it must not wait for a round trip to take effect.
+    await this.#observeValue<string[]>('order', this.#shape.orderAlias, (value) => {
+      this.#observed.laneOrder = value;
+      this.#recomputeRows();
+    });
+  }
+
+  async #observeValue<T>(role: string, alias: string, apply: (value: T | undefined) => void) {
+    // An empty alias means this shape has no such setting; make sure nothing stale survives.
+    if (!alias) {
+      this.observe(undefined, () => {}, `_kanbanLanePreview_${role}`);
+      return;
+    }
+
     const observable = await this.#workspace!.propertyValueByAlias<T>(alias);
 
     this.observe(
@@ -116,7 +188,7 @@ export class UmbCommunityKanbanLaneOverridesElement extends UmbLitElement {
         apply(value);
         this.#scheduleReload();
       },
-      `_kanbanLanePreview_${alias}`,
+      `_kanbanLanePreview_${role}`,
     );
   }
 
@@ -228,13 +300,15 @@ export class UmbCommunityKanbanLaneOverridesElement extends UmbLitElement {
    * arithmetic here — which is why `moveItem` is no longer used for lanes.
    */
   async #onSorted(rows: KanbanLaneOverrideRow[]) {
+    if (!this.#shape.orderAlias) return;
+
     this._rows = rows;
 
     // Awaited before the change event for the same reason the lane property picker awaits its sibling
-    // write: laneOrder and laneOverrides land in the same configuration value list, and overlapping
+    // write: the order and the overrides land in the same configuration value list, and overlapping
     // them lets one read the list as it was before the other.
     this.#observed.laneOrder = toLaneOrder(rows);
-    await this.#workspace?.setPropertyValue(KANBAN_LANE_ORDER_KEY, this.#observed.laneOrder);
+    await this.#workspace?.setPropertyValue(this.#shape.orderAlias, this.#observed.laneOrder);
 
     this.dispatchEvent(new UmbChangeEvent());
   }
@@ -256,21 +330,25 @@ export class UmbCommunityKanbanLaneOverridesElement extends UmbLitElement {
   }
 
   #emptyMessage() {
+    const subject = this.#shape.subject;
+
     switch (this._laneStatus) {
       case 'empty':
-        return `This configuration resolves no lanes. The lane property's editor may have no options
-          this package can read, or "Define lanes manually" is on with no lanes defined yet.`;
+        return `This configuration resolves no ${subject}s. The ${subject} property's editor may have no
+          options this package can read, or the manual ${subject} list is in use but still empty.`;
       case 'error':
-        return 'The lanes could not be loaded. Appearance can be edited once they load.';
+        return `The ${subject}s could not be loaded. Appearance can be edited once they load.`;
       default:
-        return 'Choose a lane property first, then lanes will appear here.';
+        return `Choose a ${subject} property first, then ${subject}s will appear here.`;
     }
   }
 
   #renderRow(row: KanbanLaneOverrideRow) {
     return html`
       <div class="row" data-lane-value=${row.value} ?data-orphaned=${row.orphaned}>
-        <uui-icon class="drag-handle" name="icon-grip" title="Drag to reorder"></uui-icon>
+        ${this.#shape.orderAlias
+          ? html`<uui-icon class="drag-handle" name="icon-grip" title="Drag to reorder"></uui-icon>`
+          : ''}
         <span class="name">
           ${row.name}
           ${row.orphaned

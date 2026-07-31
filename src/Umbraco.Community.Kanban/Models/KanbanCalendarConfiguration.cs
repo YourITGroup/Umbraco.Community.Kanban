@@ -12,8 +12,18 @@ public class KanbanCalendarConfiguration
     /// <summary>The system property meaning "last updated", which cannot be written to.</summary>
     public const string UpdateDateAlias = "updateDate";
 
+    /// <summary>
+    /// Unset — absent or cleared in the picker — means last-updated: a calendar always has
+    /// *something* to place cards by.
+    /// </summary>
     [ConfigurationField("dateProperty")]
-    public string DateProperty { get; set; } = UpdateDateAlias;
+    public string DateProperty
+    {
+        get => string.IsNullOrWhiteSpace(dateProperty) ? UpdateDateAlias : dateProperty;
+        set => dateProperty = value;
+    }
+
+    private string dateProperty = UpdateDateAlias;
 
     /// <summary>
     /// Optional end-date property giving cards a span. Absent or invalid values fall back to a
@@ -25,6 +35,16 @@ public class KanbanCalendarConfiguration
     /// <summary>Optional property whose values categorise cards (colour/icon accents).</summary>
     [ConfigurationField("categoryProperty")]
     public string? CategoryProperty { get; set; }
+
+    /// <summary>
+    /// The content type the category property was picked from — configuration-time data, written by
+    /// the picker so the category appearance editor can preview real values, exactly as the board's
+    /// <c>laneContentTypeKey</c> works. Not used when resolving a real calendar: that resolves
+    /// against the parent's own content type.
+    /// </summary>
+    [ConfigurationField("categoryContentTypeKey")]
+    [JsonConverter(typeof(NullableGuidJsonConverter))]
+    public Guid? CategoryContentTypeKey { get; set; }
 
     /// <summary>Manual category values, used when the category property's editor has no source.</summary>
     [ConfigurationField("categoryManualValues")]
@@ -45,10 +65,6 @@ public class KanbanCalendarConfiguration
     [ConfigurationField("showAgenda")]
     public bool ShowAgenda { get; set; } = true;
 
-    /// <summary>Ignored: the calendar is read-only. Kept so stored configurations keep binding.</summary>
-    [ConfigurationField("allowDrag")]
-    public bool AllowDrag { get; set; } = true;
-
     [ConfigurationField("appliesTo")]
     [JsonConverter(typeof(GuidArrayJsonConverter))]
     public Guid[] AppliesTo { get; set; } = [];
@@ -58,12 +74,4 @@ public class KanbanCalendarConfiguration
 
     [ConfigurationField("tabIcon")]
     public string? TabIcon { get; set; }
-
-    /// <summary>
-    /// False when the date source is the last-updated timestamp, which is maintained by
-    /// Umbraco and cannot be set, so the calendar has to be read-only.
-    /// </summary>
-    [JsonIgnore]
-    public bool IsDragSupported =>
-        AllowDrag && string.Equals(DateProperty, UpdateDateAlias, StringComparison.OrdinalIgnoreCase) == false;
 }
