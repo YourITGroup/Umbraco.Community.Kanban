@@ -196,6 +196,35 @@ Contentment's `IContentmentDataSource`, so a board can group by a booking's `sta
 
 Smaller pieces of work that landed outside the design's own milestone list.
 
+### Lanes from picked documents, and "group source" — done 2026-08-01
+
+Two changes, one vocabulary.
+
+`ContentInstanceGroupSource` resolves lanes/categories from the documents a picker property is
+restricted to: a "Resource" content picker (or multi node tree picker) accepting "Meeting Room" gives
+a lane per room, named after the document and badged with its type's icon. A group's value is the
+document's UDI, because that is exactly what the picker stores on the card — anything else would match
+no card, and it is also what a drag writes back. `IContentService` sits behind the
+`IKanbanContentInstanceLookup` seam, so the source's rules are tested against a fake. Deliberate
+limits, all covered by tests: an *unrestricted* picker offers nothing rather than the whole site;
+trashed documents are excluded but unpublished ones are not; 200 groups maximum, logged when it bites;
+media/member-rooted tree pickers are ignored.
+
+The extension point it plugs into was renamed at the same time: `Lanes/` → `Grouping/`, and
+`IKanbanLaneSource` → `IKanbanGroupSource.GetGroupsAsync`, along with the model and pipeline it feeds
+(`KanbanGroup`, `KanbanManualGroup`, `KanbanGroupOverride`, `KanbanGroupResolver`). It never was
+lane-specific — a calendar has always reused it for categories — so naming it after one of its two
+consumers made that reuse read like a workaround. Persisted configuration keys (`laneSource`,
+`laneProperty`, `manualLanes`, `laneOverrides`, `laneOrder`), the wire contract (`KanbanLaneModel`, the
+board response's `lanes` array) and the board's own client-side lane elements were all left alone, so
+nothing a site has saved needs migrating; only a third-party source implementing the old interface
+needs the new name.
+
+- [ ] **Needs hand-verification.** A board grouped by a restricted content picker: lanes appear per
+  document with the right names/icons, cards land in the right lane, dragging between lanes writes the
+  picker value and survives a reload, and the lane appearance editor's preview lists the same lanes.
+  Same again for a calendar's category property.
+
 ### Cards open, list their children, and create them — done 2026-07-29
 
 From [their design](superpowers/specs/2026-07-29-card-workspace-modal-and-child-items-design.md). A
@@ -297,6 +326,45 @@ reserved buffer has not come up in practice.
   property will reject.
 
 - [ ] Only show the Unassigned lane if the lane property is optional and has children.
+
+### Requested 2026-08-01 (not yet designed)
+
+- [ ] **A "Day" view: one day, laid out like the week view.** Overlapping cards side by side. Most of
+  this already exists: `overlap.model.ts` (`layoutSpans`) already gives overlapping items their columns
+  per day, and `kanban-week-grid.element.ts` already renders an all-day strip over 24 hour rows — a day
+  view is that grid with a single column. The work is in `kanban-calendar.element.ts`: add `'day'` to
+  `KanbanCalendarView`, give `#range` a single-day range, step `#navigate` by ±1 day, and title it as a
+  date rather than a month. Note the stored-view fallback (`#effectiveView`) and the reload key already
+  key on the fetched range, so both should cope; and `VIEW_STORAGE_KEY` is shared across every calendar,
+  so a stored `'day'` must degrade like `'agenda'` does today.
+- [ ] **Calendar cards should have a white background.** Month chips, week blocks/all-day chips and
+  agenda entries all use `--uui-color-surface-alt` today, which reads as grey against the grid. Switch
+  to `--uui-color-surface` — checking the hover state still reads as a state change, and that a white
+  card stays visible against the month grid's own white cells (it may need its border to carry more of
+  the work).
+- [ ] **Zoom the board with Ctrl + mouse wheel.** Nothing in `kanban-board.element.ts` handles `wheel`
+  or any scale today; the canvas work only pans. Needs a scale transform on the lanes canvas with the
+  pointer as the origin, `event.ctrlKey` to distinguish zoom from a normal scroll (trackpad pinch also
+  arrives as a ctrl-wheel event, which is the behaviour we want), `preventDefault` to stop the browser's
+  own page zoom, and a decision on whether the scale persists like the view toggle does. Worth checking
+  it does not fight the drag ghost, which positions itself in viewport coordinates.
+- [ ] **1rem padding for both views as a Content App.** The board and calendar sit flush against the
+  content app edge; the workspace-view hosts (`hosts/kanban-workspace-view-board.element.ts` and its
+  calendar equivalent) are where to add it, not the views themselves, which must stay layout-neutral
+  for the collection and standalone hosts.
+- [ ] **1rem padding on the x-axis for both views in a List View.** Same fix, different host:
+  `hosts/collection-view-board.element.ts` and `hosts/collection-view-calendar.element.ts`. Horizontal
+  only — the collection already provides vertical spacing.
+- [ ] **Optionally confirm a card move before committing it.** A board setting (so it needs a field on
+  `KanbanBoardConfiguration` plus a row in `property-editors/board/manifests.ts`) that makes a drop ask
+  before it writes. The interesting part is the interaction, not the dialog: the board currently commits
+  optimistically and reconciles from the server, so a cancel has to put the card back where it came from
+  without the reconciliation treating that as a second move. Core's `UMB_CONFIRM_MODAL` is the dialog.
+- [ ] **Sticky calendar date headings on scroll.** The week grid's `.header-row` (and its all-day row)
+  should stay put while the 24-hour body scrolls; the same applies to a day view. Discovered while
+  writing this up: **month view renders no weekday headings at all** — `kanban-month-grid.element.ts`
+  draws only cells, so there is nothing there to make sticky. Decide whether that is a separate gap to
+  fill (month grids normally label their columns) before treating this as purely a CSS change.
 
 ## Non-goals (explicitly out of v1 per the design — not gaps)
 
