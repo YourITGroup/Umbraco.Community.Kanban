@@ -25,6 +25,13 @@ export const KANBAN_CARD_ENDPOINT = (key: string): string =>
 export const KANBAN_COLLECTION_VIEW_BOARD_ALIAS = 'Umb.Community.Kanban.CollectionView.Board';
 export const KANBAN_DATA_TYPE_WORKSPACE_VIEW_ALIAS = 'Umb.Community.Kanban.WorkspaceView.DataType.Kanban';
 
+/** Per-configuration workspace views append the configuration key to this. */
+export const KANBAN_WORKSPACE_VIEW_BOARD_ALIAS_PREFIX = 'Umb.Community.Kanban.WorkspaceView.Board.';
+
+/** Our own condition: the open document's content type key is in a configuration's appliesTo list. */
+export const KANBAN_DOCUMENT_TYPE_APPLIES_CONDITION_ALIAS =
+  'Umb.Community.Kanban.Condition.DocumentTypeApplies';
+
 /** Our own condition: the open Data Type workspace edits a Collection data type. */
 export const KANBAN_DATA_TYPE_IS_COLLECTION_CONDITION_ALIAS =
   'Umb.Community.Kanban.Condition.DataTypeIsCollection';

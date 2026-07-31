@@ -125,7 +125,7 @@ Nothing beyond the `Umbraco.Community.Kanban.Calendar` configuration property ed
 This is a full milestone of work, not a polish pass — it needs its own brainstorm → spec → plan cycle
 before implementation starts.
 
-## Milestone 5 — Content app host and real-time sync — 5a (real-time) ✅ done, 5b (content app) ❌ not built
+## Milestone 5 — Content app host and real-time sync ✅ Done (5a real-time 2026-07-31, 5b content app 2026-07-31)
 
 - [x] **Real-time sync (5a).** Built 2026-07-31 from
   [its design](superpowers/specs/2026-07-31-realtime-board-sync-design.md). `GET /card/{key}` answers
@@ -135,14 +135,16 @@ before implementation starts.
   queues events mid-drag (latest-per-key), and triggers a full reload on hub reconnect. Changed cards
   pulse for ~2s (`prefers-reduced-motion` gets a steady border tint instead). Needs hand-verification
   with two browser sessions: move/save/trash/delete/create in one, watch the other.
-- [ ] **Content-app host (5b) — awaiting its own spec.** The design's host #1: a `backofficeEntryPoint`
-  that fetches `GET /configurations` at startup and registers one `workspaceView` per configuration,
-  conditioned on each configuration's `appliesTo` content types, so a document type can carry one or
-  more board tabs. Confirmed absent: nothing in the client calls `GET /configurations` except the Data
-  Type workspace view used to configure a *collection* layout (host #2), and `appliesTo` is only read
-  by the board/calendar config editors themselves, never consumed to register a workspace view. Note
-  for the spec: core's `Umb.Condition.WorkspaceContentTypeAlias` matches *aliases*; `appliesTo` stores
-  *keys* — either a small custom condition or a key→alias lookup at registration time.
+- [x] **Content-app host (5b).** Built 2026-07-31 from
+  [its design](superpowers/specs/2026-07-31-content-app-host-design.md). The entry point fetches
+  `GET /configurations` at startup and registers one `workspaceView` per board configuration
+  (`boardWorkspaceViewManifests`, pure and tested), gated on `Umb.Workspace.Document`, a saved
+  document, and a new `DocumentTypeApplies` condition matching the document's content-type **key**
+  against `appliesTo`. One shared element serves every tab via `meta.kanbanConfigId`; the
+  Publish/Undo bar was extracted to `core/kanban-action-bar.element.ts` and overlays the tab's foot.
+  Calendar-kind and empty-`appliesTo` configurations register nothing. Needs hand-verification:
+  tab appears/labels/routes per configuration, two configurations on one type give two tabs, no tab
+  on unlisted types or unsaved documents, publish/undo from the tab, collection view bar unchanged.
 - [ ] **Host #3 (injected)** is effectively available for free — `<umb-community-kanban-board>` already
   takes `config`/`parentId` directly (`core/kanban-board.element.ts`) — but it has never been exercised
   by a real external host (the planned Bookings-section workspace). Worth a smoke test once that
@@ -266,6 +268,8 @@ reserved buffer has not come up in practice.
   value may not be a legal value for the property at all (nothing validates manual lanes against the
   editor's options), so this needs to degrade to a plain create rather than write something the
   property will reject.
+
+- [ ] Only show the Unassigned lane if the lane property is optional and has children.
 
 ## Non-goals (explicitly out of v1 per the design — not gaps)
 

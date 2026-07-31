@@ -33,6 +33,14 @@ export interface KanbanAncestorBox {
    * sizing the board, and exactly what must be ignored when looking for what really bounds it.
    */
   definiteHeight: boolean;
+  /**
+   * Whether it clips its children (overflow-y is anything but visible). An element that cannot clip
+   * cannot bound: a display:block wrapper with auto height still resolves its computed height to
+   * pixels — its own content — so definiteHeight alone mistakes it for a container, feeding the
+   * board's current height back into the measurement. The real container in every observed chain is
+   * a scroll region.
+   */
+  clips: boolean;
 }
 
 /**
@@ -52,7 +60,7 @@ export function boardAvailableBottom(input: {
   ancestors: readonly KanbanAncestorBox[];
 }): number {
   const bounded = input.ancestors
-    .filter((ancestor) => ancestor.definiteHeight && ancestor.bottom > input.rectTop)
+    .filter((ancestor) => ancestor.definiteHeight && ancestor.clips && ancestor.bottom > input.rectTop)
     .map((ancestor) => ancestor.bottom);
 
   return Math.min(input.windowHeight, ...bounded);

@@ -36,8 +36,8 @@ describe('boardAvailableBottom', () => {
         windowHeight: 1201,
         rectTop: 272,
         ancestors: [
-          { bottom: 1147, definiteHeight: true },
-          { bottom: 1201, definiteHeight: true },
+          { bottom: 1147, definiteHeight: true, clips: true },
+          { bottom: 1201, definiteHeight: true, clips: true },
         ],
       }),
     ).toBe(1147);
@@ -50,8 +50,8 @@ describe('boardAvailableBottom', () => {
         windowHeight: 1201,
         rectTop: 272,
         ancestors: [
-          { bottom: 1201, definiteHeight: false },
-          { bottom: 1147, definiteHeight: true },
+          { bottom: 1201, definiteHeight: false, clips: true },
+          { bottom: 1147, definiteHeight: true, clips: true },
         ],
       }),
     ).toBe(1147);
@@ -63,8 +63,8 @@ describe('boardAvailableBottom', () => {
         windowHeight: 1201,
         rectTop: 272,
         ancestors: [
-          { bottom: 1147, definiteHeight: true },
-          { bottom: 900, definiteHeight: true },
+          { bottom: 1147, definiteHeight: true, clips: true },
+          { bottom: 900, definiteHeight: true, clips: true },
         ],
       }),
     ).toBe(900);
@@ -78,8 +78,25 @@ describe('boardAvailableBottom', () => {
         windowHeight: 1201,
         rectTop: 272,
         ancestors: [
-          { bottom: 0, definiteHeight: true },
-          { bottom: 1147, definiteHeight: true },
+          { bottom: 0, definiteHeight: true, clips: true },
+          { bottom: 1147, definiteHeight: true, clips: true },
+        ],
+      }),
+    ).toBe(1147);
+  });
+
+  it('ignores a content-height ancestor that does not clip, whatever height it reports', () => {
+    // The workspace-view host is display:block with auto height: its computed height still resolves to
+    // pixels — its own content — so definiteHeight alone believes it. An element with overflow visible
+    // cannot clip its children, so it cannot be what bounds the board; trusting it fed the board's own
+    // height back into the measurement and pinned the tab's board at its minimum height.
+    expect(
+      boardAvailableBottom({
+        windowHeight: 1201,
+        rectTop: 272,
+        ancestors: [
+          { bottom: 620, definiteHeight: true, clips: false },
+          { bottom: 1147, definiteHeight: true, clips: true },
         ],
       }),
     ).toBe(1147);
@@ -90,7 +107,7 @@ describe('boardAvailableBottom', () => {
       boardAvailableBottom({
         windowHeight: 1201,
         rectTop: 272,
-        ancestors: [{ bottom: 5000, definiteHeight: true }],
+        ancestors: [{ bottom: 5000, definiteHeight: true, clips: true }],
       }),
     ).toBe(1201);
   });

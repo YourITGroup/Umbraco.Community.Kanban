@@ -3,7 +3,23 @@ import { manifests } from './manifests.js';
 import {
   KANBAN_COLLECTION_VIEW_BOARD_ALIAS,
   KANBAN_DOCUMENT_COLLECTION_ALIAS,
+  KANBAN_DOCUMENT_TYPE_APPLIES_CONDITION_ALIAS,
 } from '@/constants.js';
+
+describe('document type applies condition manifest', () => {
+  const condition = manifests.find(
+    (manifest) => manifest.alias === KANBAN_DOCUMENT_TYPE_APPLIES_CONDITION_ALIAS,
+  );
+
+  it('registers the condition', () => {
+    expect(condition).toBeDefined();
+    expect(condition?.type).toBe('condition');
+  });
+
+  it('loads its api lazily', () => {
+    expect(typeof (condition as { api?: unknown }).api).toBe('function');
+  });
+});
 
 describe('collection view manifests', () => {
   const board = manifests.find((manifest) => manifest.alias === KANBAN_COLLECTION_VIEW_BOARD_ALIAS);
