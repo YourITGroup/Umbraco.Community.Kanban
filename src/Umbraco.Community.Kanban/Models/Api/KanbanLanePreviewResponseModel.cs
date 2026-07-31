@@ -1,4 +1,4 @@
-using Umbraco.Community.Kanban.Lanes;
+using Umbraco.Community.Kanban.Grouping;
 
 namespace Umbraco.Community.Kanban.Models.Api;
 
@@ -15,6 +15,12 @@ public sealed class KanbanLaneModel
     public bool IsUnassigned { get; init; }
 
     public bool AcceptsDrops { get; init; }
+
+    /// <summary>
+    /// True when the configuration hides this group. Hidden groups are still listed here — the preview
+    /// is how the configuration UI offers un-hiding one, so filtering them out would strand them.
+    /// </summary>
+    public bool Hidden { get; init; }
 }
 
 public sealed class KanbanLanePreviewResponseModel
@@ -27,9 +33,9 @@ public sealed class KanbanLanePreviewResponseModel
     /// </summary>
     public string[] UnmatchedOverrides { get; init; } = [];
 
-    public static KanbanLanePreviewResponseModel From(KanbanLaneResolution resolution) => new()
+    public static KanbanLanePreviewResponseModel From(KanbanGroupResolution resolution) => new()
     {
-        Lanes = resolution.Lanes
+        Lanes = resolution.Groups
             .Select(lane => new KanbanLaneModel
             {
                 Value = lane.Value,
@@ -38,6 +44,7 @@ public sealed class KanbanLanePreviewResponseModel
                 Icon = lane.Icon,
                 IsUnassigned = lane.IsUnassigned,
                 AcceptsDrops = lane.AcceptsDrops,
+                Hidden = lane.Hidden,
             })
             .ToArray(),
         UnmatchedOverrides = resolution.UnmatchedOverrides.Select(x => x.Value).ToArray(),

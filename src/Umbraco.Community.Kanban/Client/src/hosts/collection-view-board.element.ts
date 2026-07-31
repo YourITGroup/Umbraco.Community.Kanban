@@ -1,4 +1,4 @@
-import { customElement, html, state } from '@umbraco-cms/backoffice/external/lit';
+import { css, customElement, html, state } from '@umbraco-cms/backoffice/external/lit';
 import { UmbLitElement } from '@umbraco-cms/backoffice/lit-element';
 import { UMB_COLLECTION_CONTEXT } from '@umbraco-cms/backoffice/collection';
 import { UMB_ENTITY_CONTEXT } from '@umbraco-cms/backoffice/entity';
@@ -212,6 +212,20 @@ export class UmbCommunityKanbanCollectionViewBoardElement extends UmbLitElement 
         @kanban-create-child=${this.#onCreateChild}></umb-community-kanban-board>
     `;
   }
+
+  static override styles = [
+    css`
+      /*
+       * Horizontal only: the collection already spaces the view vertically, and the board's own styles
+       * record that a second full gutter doubled the list view's inset. Applied through the viewport
+       * variable for the reason the content-app host documents — this element must not pad a board
+       * whose height is measured to the window.
+       */
+      :host {
+        --kanban-viewport-padding: 0 1rem;
+      }
+    `,
+  ];
 }
 
 export { UmbCommunityKanbanCollectionViewBoardElement as element };

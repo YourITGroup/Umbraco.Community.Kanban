@@ -1,4 +1,4 @@
-import { customElement, html, property, state } from '@umbraco-cms/backoffice/external/lit';
+import { css, customElement, html, property, state } from '@umbraco-cms/backoffice/external/lit';
 import { UmbLitElement } from '@umbraco-cms/backoffice/lit-element';
 import { UMB_VARIANT_CONTEXT } from '@umbraco-cms/backoffice/variant';
 import { UMB_DOCUMENT_WORKSPACE_CONTEXT } from '@umbraco-cms/backoffice/document';
@@ -69,6 +69,21 @@ export class UmbCommunityKanbanWorkspaceViewBoardElement extends UmbLitElement {
         .culture=${this._culture}></umb-community-kanban-standalone-board>
     `;
   }
+
+  static override styles = [
+    css`
+      /*
+       * Inset through the board's own viewport variable rather than padding this host. The board sizes
+       * its viewport in JS, from its top to the bottom of the window, so padding around it pushes the
+       * board past the bottom of the region it sits in — the mistake its own styles record. The
+       * variable pads inside the scroll container instead, which is border-box and JS-sized, so the
+       * inset costs nothing and leaves the scrollbars flush.
+       */
+      :host {
+        --kanban-viewport-padding: 1rem;
+      }
+    `,
+  ];
 }
 
 export { UmbCommunityKanbanWorkspaceViewBoardElement as element };

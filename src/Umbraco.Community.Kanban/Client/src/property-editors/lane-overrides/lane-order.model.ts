@@ -3,7 +3,7 @@ import type { KanbanLaneOverrideRow } from './lane-override.model.js';
 /**
  * Sorts rows into the configured display order.
  *
- * Deliberately mirrors `KanbanLaneOrderApplier` on the server, so the editor shows the order the board
+ * Deliberately mirrors `KanbanGroupOrderApplier` on the server, so the editor shows the order the board
  * will render: a listed value takes its listed position, an unlisted lane keeps its source order after
  * every listed one, a listed value matching no lane is ignored, and matching ignores case. Both sides
  * are tested against the same cases — see the note in the design about this rule living in two places.

@@ -3,16 +3,28 @@ namespace Umbraco.Community.Kanban.Models.Api;
 /// <summary>One card placed on the calendar by its date property.</summary>
 public sealed class KanbanCalendarItemModel
 {
-    /// <summary>The start calendar date, "yyyy-MM-dd", always inside the requested range.</summary>
+    /// <summary>The start calendar date as stored, "yyyy-MM-dd".</summary>
     public required string Date { get; init; }
 
-    /// <summary>The start time, "HH:mm". Null when the stored value is date-only (midnight).</summary>
+    /// <summary>The start time as stored, "HH:mm". Null when the stored value is date-only (midnight).</summary>
     public string? Time { get; init; }
 
-    /// <summary>The end calendar date, when a valid end-date property value exists.</summary>
+    /// <summary>The end calendar date as stored, when a valid end-date property value exists.</summary>
     public string? EndDate { get; init; }
 
     public string? EndTime { get; init; }
+
+    /// <summary>
+    /// The moment the start value names, round-trip ISO-8601 with offset — present only when the
+    /// stored value states its own zone (Umbraco.DateTimeWithTimeZone, or a UTC value). The client
+    /// converts it into the viewer's zone and places the card there, matching what a board card's
+    /// value summary shows for the same property. Null means the value is a bare wall clock, and
+    /// <see cref="Date"/>/<see cref="Time"/> are already the answer.
+    /// </summary>
+    public string? Instant { get; init; }
+
+    /// <summary>The end value's moment, on the same terms as <see cref="Instant"/>.</summary>
+    public string? EndInstant { get; init; }
 
     /// <summary>The raw category property value. Null when no category property is configured or the card has none.</summary>
     public string? Category { get; init; }

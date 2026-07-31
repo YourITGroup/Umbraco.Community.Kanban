@@ -33,6 +33,7 @@ import { KanbanRealtimeController } from './kanban-realtime.controller.js';
 import './kanban-lane.element.js';
 import type { KanbanBoardQuery, KanbanCardOutcome, KanbanDataSource } from '../data/kanban-data-source.js';
 import { isPannablePath, panScrollOffset, shouldStartPan } from './pan.model.js';
+import { isZoomGesture, KANBAN_ZOOM_DEFAULT, nextZoom, wheelDeltaPixels, zoomScrollOffset } from './zoom.model.js';
 
 /** Below this a scrolling canvas is useless — roughly a lane header plus two cards. */
 const VIEWPORT_MIN_HEIGHT = 320;
@@ -129,6 +130,14 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
   private _viewportHeight?: number;
 
   /**
+   * The canvas' zoom, driven by ctrl (or pinch) + wheel. Not persisted, unlike the calendar's view
+   * toggle: a zoom is a look at *this* board now, and coming back tomorrow to a board someone left at
+   * half scale reads as a rendering fault rather than as a remembered preference.
+   */
+  @state()
+  private _zoom = KANBAN_ZOOM_DEFAULT;
+
+  /**
    * Cards changed by a colleague in the last moment — drives the highlight pulse. Reassigned, never
    * mutated, because Lit change-detects @state by reference.
    */
@@ -137,6 +146,25 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
 
   /** The pending highlight-clear timers, so a card changed twice re-pulses instead of half-clearing. */
   #highlightTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+  /**
+   * Watches the boxes `#measureViewport` measures against — this element and every ancestor above it —
+   * so the height follows the layout settling rather than only this element re-rendering.
+   *
+   * Why it is needed: on a hard reload the workspace chrome around the board resolves *after* the
+   * board's last render. At that moment no ancestor qualifies as a container yet (no definite height,
+   * or a zero client height), `boardAvailableBottom` falls back to the window, and the board is sized
+   * taller than the region it sits in — pushing its own bottom edge, and with it its horizontal
+   * scrollbar, below the visible area. Nothing re-measured, because nothing re-rendered and the window
+   * never resized, so the board stayed unscrollable until the user resized something by hand.
+   */
+  #resizeObserver?: ResizeObserver;
+
+  /** The boxes currently observed, so a re-sync that would change nothing does nothing. */
+  #observedBoxes: Element[] = [];
+
+  /** Coalesces a burst of observer callbacks into one measurement per frame. */
+  #measureFrame?: number;
 
   /**
    * The server-event subscription. Lives on the board rather than a host so every host — collection
@@ -235,12 +263,26 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
     super.connectedCallback();
 
     window.addEventListener('resize', this.#onWindowResize);
+
+    // On this element rather than `.viewport`, because a reload replaces the viewport with a loader and
+    // would take the listener with it. Explicitly non-passive: the whole point is to preventDefault, and
+    // a passive listener cannot — the browser would zoom the entire backoffice instead.
+    this.addEventListener('wheel', this.#onWheel, { passive: false });
   }
 
   override disconnectedCallback() {
     super.disconnectedCallback();
 
     window.removeEventListener('resize', this.#onWindowResize);
+    this.removeEventListener('wheel', this.#onWheel);
+
+    this.#resizeObserver?.disconnect();
+    this.#observedBoxes = [];
+
+    if (this.#measureFrame !== undefined) {
+      cancelAnimationFrame(this.#measureFrame);
+      this.#measureFrame = undefined;
+    }
 
     // The bar outlives this element — it belongs to the layout — so it has to be told the board is gone,
     // or its buttons would sit there acting on nothing.
@@ -286,6 +328,9 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
 
     this.#measureViewport();
     this.#publishActionState();
+
+    // After measuring, so the observer's own initial callback is the second look rather than the first.
+    this.#syncResizeObserver();
 
     // Again after the browser has laid out. The action bar lives in the layout's footer, so the board
     // appearing or clearing pending changes resizes the container we measure against — and that reflow
@@ -448,9 +493,65 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
   }
 
   /**
-   * Every ancestor above this element, out through shadow boundaries, as bottom edge plus whether it has a
-   * real box. Read-only geometry on elements we climb past — it never looks *into* another component's
-   * shadow content, which is the mistake the reverted vertical pan made.
+   * (Re)points the resize observer at this element and the ancestors the measurement reads. Called after
+   * every render because the chain can change — a host re-parenting the board, a wrapper appearing — and
+   * skipped when the chain is the same one already observed, which is the common case.
+   *
+   * Observing is also how the board gets a measurement *after* first layout for free: a ResizeObserver
+   * delivers an initial callback for every element it starts observing.
+   */
+  #syncResizeObserver() {
+    const boxes: Element[] = [this, ...this.#ancestorChain()];
+    const unchanged =
+      boxes.length === this.#observedBoxes.length &&
+      boxes.every((box, index) => box === this.#observedBoxes[index]);
+
+    if (unchanged) return;
+
+    const observer = (this.#resizeObserver ??= new ResizeObserver(() => this.#scheduleMeasure()));
+
+    observer.disconnect();
+    for (const box of boxes) observer.observe(box);
+    this.#observedBoxes = boxes;
+  }
+
+  /**
+   * One measurement per frame, however many boxes reported a change.
+   *
+   * This cannot feed itself: the board's own height change resizes this element and its content-height
+   * wrappers, but those are exactly what `boardAvailableBottom` filters out (they neither clip nor have a
+   * height of their own), and `#measureViewport` assigns only on a change of a pixel or more.
+   */
+  #scheduleMeasure() {
+    if (this.#measureFrame !== undefined) return;
+
+    this.#measureFrame = requestAnimationFrame(() => {
+      this.#measureFrame = undefined;
+      this.#measureViewport();
+    });
+  }
+
+  /**
+   * Every ancestor above this element, out through shadow boundaries, nearest first. Read-only geometry on
+   * elements we climb past — it never looks *into* another component's shadow content, which is the mistake
+   * the reverted vertical pan made.
+   */
+  #ancestorChain(): Element[] {
+    const chain: Element[] = [];
+
+    // Starts at the parent: this element's own box is the thing being sized, so it cannot bound itself.
+    let element = this.#parentOf(this);
+
+    while (element) {
+      chain.push(element);
+      element = this.#parentOf(element);
+    }
+
+    return chain;
+  }
+
+  /**
+   * The ancestors as bottom edge plus whether each has a real box.
    *
    * A boxless wrapper is recognised by a computed height that is not a pixel value: an element with a
    * rendered box always resolves to pixels, while the layout's `router-slot` wrappers report `100%` and a
@@ -459,10 +560,7 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
   #ancestorBoxes(): { bottom: number; definiteHeight: boolean; clips: boolean }[] {
     const boxes: { bottom: number; definiteHeight: boolean; clips: boolean }[] = [];
 
-    // Starts at the parent: this element's own box is the thing being sized, so it cannot bound itself.
-    let element = this.#parentOf(this);
-
-    while (element) {
+    for (const element of this.#ancestorChain()) {
       const style = getComputedStyle(element);
 
       boxes.push({
@@ -478,8 +576,6 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
         // board's own height back into this measurement.
         clips: style.overflowY !== 'visible',
       });
-
-      element = this.#parentOf(element);
     }
 
     return boxes;
@@ -504,6 +600,53 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
   }
 
   #onWindowResize = () => this.#measureViewport();
+
+  /**
+   * Zooms the canvas around the pointer on ctrl + wheel — or a trackpad pinch, which arrives as the same
+   * event. A plain wheel is left alone so ordinary scrolling still works.
+   *
+   * The new scroll offsets are computed from the *old* scale and applied after the re-render, in that
+   * order for a reason: computed before, because the pointer's canvas coordinate can only be recovered
+   * while the old scale is still in effect; applied after, because until the browser has laid the canvas
+   * out at the new scale the scroll extent is still the old one and the assignment would be clamped.
+   */
+  #onWheel = (event: WheelEvent) => {
+    if (!isZoomGesture(event)) return;
+
+    const viewport = this.renderRoot.querySelector<HTMLDivElement>('.viewport');
+
+    if (!viewport) return;
+
+    // Before the early return on an unchanged scale: at either end of the range the gesture is still a
+    // zoom, and letting it through would zoom the whole backoffice instead of doing nothing.
+    event.preventDefault();
+
+    const from = this._zoom;
+    const to = nextZoom(from, wheelDeltaPixels(event.deltaY, event.deltaMode));
+
+    if (to === from) return;
+
+    const rect = viewport.getBoundingClientRect();
+    const left = zoomScrollOffset({
+      scroll: viewport.scrollLeft,
+      pointerOffset: event.clientX - rect.left,
+      from,
+      to,
+    });
+    const top = zoomScrollOffset({
+      scroll: viewport.scrollTop,
+      pointerOffset: event.clientY - rect.top,
+      from,
+      to,
+    });
+
+    this._zoom = to;
+
+    void this.updateComplete.then(() => {
+      viewport.scrollLeft = left;
+      viewport.scrollTop = top;
+    });
+  };
 
   #onDragStart(
     event: CustomEvent<{ key: string; lane: string; grabOffsetX: number; grabOffsetY: number; width: number }>,
@@ -816,6 +959,11 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
    * The dragged card, following the pointer. A real card element rather than a bespoke chip, so it cannot
    * drift from how cards actually look; `allow-drag` is left off (defaulting false) so the clone cannot
    * start a gesture of its own, and `pointer-events: none` keeps it inert under the cursor.
+   *
+   * The ghost sits outside the zoomed canvas — it is `position: fixed` — so the zoom is re-applied to an
+   * inner box of its own, or picking up a card on a zoomed-out board would produce a full-size ghost
+   * springing out of a small card. The width divides by the zoom for the same reason: `_drag.width` is the
+   * card's on-screen width, and inside a zoomed box a length is multiplied by that zoom again.
    */
   #renderGhost() {
     if (!this._drag || !this._ghost) return nothing;
@@ -827,10 +975,12 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
     return html`<div
       class="ghost"
       aria-hidden="true"
-      style=${`transform: translate3d(${this._ghost.left}px, ${this._ghost.top}px, 0) rotate(2deg); width: ${this._drag.width}px`}>
-      <umb-community-kanban-card
-        .card=${card}
-        ?show-child-items=${this._board?.showChildItems ?? false}></umb-community-kanban-card>
+      style=${`transform: translate3d(${this._ghost.left}px, ${this._ghost.top}px, 0) rotate(2deg)`}>
+      <div class="ghost-scale" style=${`zoom: ${this._zoom}; width: ${this._drag.width / this._zoom}px`}>
+        <umb-community-kanban-card
+          .card=${card}
+          ?show-child-items=${this._board?.showChildItems ?? false}></umb-community-kanban-card>
+      </div>
     </div>`;
   }
 
@@ -856,7 +1006,7 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
         @pointerup=${this.#onViewportPointerEnd}
         @pointercancel=${this.#onViewportPointerEnd}
         @lostpointercapture=${this.#onViewportPointerEnd}>
-        <div class="canvas">
+        <div class="canvas" style=${`--kanban-zoom: ${this._zoom}`}>
           ${this._board.lanes.map(
             (lane) => html`<umb-community-kanban-lane
               .lane=${lane}
@@ -905,12 +1055,21 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
          max-content the canvas box stays viewport-width while its lanes overflow it, and the pan
          gate — which tests against this element — would not cover the area the user sees. */
       .canvas {
+        /* Ctrl + wheel (and trackpad pinch) sets this; the element publishes the factor as a custom
+           property so the percentage minimums below can divide it back out. zoom rather than a scale
+           transform because it scales layout: the scroll extent grows with it and every rect the drag
+           hit-test and the edge auto-scroll read stays truthful. */
+        zoom: var(--kanban-zoom, 1);
         display: flex;
         align-items: stretch;
         gap: var(--uui-size-space-4);
         width: max-content;
-        min-width: 100%;
-        min-height: 100%;
+        /* The percentages resolve against the *unzoomed* viewport and are then multiplied by the zoom,
+           which would leave the canvas short of the viewport when zoomed out — shrinking the background
+           the pan gesture is grabbed from — and forcing scrollbars onto a board that fits when zoomed in.
+           Dividing first cancels that out, so "fill the viewport" keeps meaning the viewport. */
+        min-width: calc(100% / var(--kanban-zoom, 1));
+        min-height: calc(100% / var(--kanban-zoom, 1));
         /* With min-height: 100% the padding must be inside the box, or it forces a scrollbar on a
            board that fits. */
         box-sizing: border-box;

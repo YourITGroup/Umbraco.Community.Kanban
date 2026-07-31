@@ -6,10 +6,10 @@ namespace Umbraco.Community.Kanban.Tests.Services;
 
 public class KanbanBoardComposerTests
 {
-    private static KanbanLane Lane(string value) => new() { Value = value, Name = value };
+    private static KanbanGroup Lane(string value) => new() { Value = value, Name = value };
 
-    private static IReadOnlyList<KanbanLane> Lanes() =>
-        [Lane("todo"), Lane("doing"), KanbanLane.Unassigned()];
+    private static IReadOnlyList<KanbanGroup> Lanes() =>
+        [Lane("todo"), Lane("doing"), KanbanGroup.Unassigned()];
 
     private static KanbanCardModel Card(string name) => new()
     {
@@ -30,6 +30,58 @@ public class KanbanBoardComposerTests
         bool truncated = false,
         int childCount = 0) =>
         new(Lanes(), cards, childCount, truncated, pageSize, lane, skip);
+
+    [Fact]
+    public void Omits_a_hidden_lane_and_the_cards_in_it()
+    {
+        var lanes = new List<KanbanGroup>
+        {
+            Lane("todo"),
+            new() { Value = "doing", Name = "doing", Hidden = true },
+            KanbanGroup.Unassigned(),
+        };
+
+        KanbanBoardResponseModel board = KanbanBoardComposer.Compose(
+            new KanbanBoardComposerRequest(lanes, [At("todo", "a"), At("doing", "b")], 0, false, 25, null, 0));
+
+        // The point of grouping before filtering: "b" belongs to the hidden lane and goes with it, rather
+        // than matching nothing and being collected by the unassigned fallback — which is why the
+        // unassigned lane is absent here rather than holding it. (Absent because empty: see below.)
+        board.Lanes.Select(l => l.Value).Should().Equal("todo");
+        board.Lanes.SelectMany(l => l.Cards).Select(c => c.Name).Should().Equal("a");
+    }
+
+    [Fact]
+    public void A_card_whose_lane_value_matches_nothing_still_lands_in_unassigned()
+    {
+        var lanes = new List<KanbanGroup>
+        {
+            Lane("todo"),
+            new() { Value = "doing", Name = "doing", Hidden = true },
+            KanbanGroup.Unassigned(),
+        };
+
+        KanbanBoardResponseModel board = KanbanBoardComposer.Compose(
+            new KanbanBoardComposerRequest(lanes, [At("gone", "orphan")], 0, false, 25, null, 0));
+
+        board.Lanes.Single(l => l.IsUnassigned).Cards.Select(c => c.Name).Should().Equal("orphan");
+    }
+
+    [Fact]
+    public void Requesting_a_hidden_lane_by_name_returns_nothing()
+    {
+        var lanes = new List<KanbanGroup>
+        {
+            Lane("todo"),
+            new() { Value = "doing", Name = "doing", Hidden = true },
+            KanbanGroup.Unassigned(),
+        };
+
+        KanbanBoardResponseModel board = KanbanBoardComposer.Compose(
+            new KanbanBoardComposerRequest(lanes, [At("doing", "b")], 0, false, 25, "doing", 0));
+
+        board.Lanes.Should().BeEmpty();
+    }
 
     [Fact]
     public void Groups_cards_into_their_lane()
@@ -61,17 +113,77 @@ public class KanbanBoardComposerTests
     [Fact]
     public void Preserves_the_resolved_lane_order()
     {
-        KanbanBoardComposer.Compose(Request([])).Lanes
+        // One unassigned card, so the unassigned lane is part of what the order is asserted against.
+        KanbanBoardComposer.Compose(Request([At(string.Empty, "a")])).Lanes
             .Select(l => l.Value).Should().Equal("todo", "doing", string.Empty);
+    }
+
+    [Fact]
+    public void Omits_the_unassigned_lane_when_no_card_is_in_it()
+    {
+        KanbanBoardResponseModel board = KanbanBoardComposer.Compose(Request([At("todo", "a")]));
+
+        board.Lanes.Should().NotContain(l => l.IsUnassigned);
+        board.Lanes.Select(l => l.Value).Should().Equal("todo", "doing");
+    }
+
+    [Fact]
+    public void Keeps_the_unassigned_lane_when_a_card_is_in_it()
+    {
+        KanbanBoardResponseModel board = KanbanBoardComposer.Compose(Request([At(string.Empty, "a")]));
+
+        board.Lanes.Single(l => l.IsUnassigned).Cards.Select(c => c.Name).Should().Equal("a");
+    }
+
+    [Fact]
+    public void Keeps_the_unassigned_lane_for_an_unmatched_value_even_when_the_lane_property_is_mandatory()
+    {
+        // Mandatory only rules out an *empty* value. A value the lanes no longer offer — a removed dropdown
+        // item, a renamed lane — still lands here, and hiding the lane would lose the card off the board.
+        KanbanBoardResponseModel board = KanbanBoardComposer.Compose(
+            new KanbanBoardComposerRequest(
+                Lanes(), [At("gone", "orphan")], 0, false, 25, null, 0, LanePropertyIsMandatory: true));
+
+        board.Lanes.Single(l => l.IsUnassigned).Cards.Select(c => c.Name).Should().Equal("orphan");
+    }
+
+    [Fact]
+    public void Keeps_an_empty_unassigned_lane_under_truncation_when_the_lane_property_is_optional()
+    {
+        // The unassigned cards may simply be past the read window, and an optional property makes that
+        // the likely case rather than an anomaly.
+        KanbanBoardResponseModel board = KanbanBoardComposer.Compose(
+            Request([At("todo", "a")], truncated: true, childCount: 4000));
+
+        board.Lanes.Should().Contain(l => l.IsUnassigned);
+    }
+
+    [Fact]
+    public void Drops_an_empty_unassigned_lane_under_truncation_when_the_lane_property_is_mandatory()
+    {
+        KanbanBoardResponseModel board = KanbanBoardComposer.Compose(
+            new KanbanBoardComposerRequest(
+                Lanes(), [At("todo", "a")], 4000, true, 25, null, 0, LanePropertyIsMandatory: true));
+
+        board.Lanes.Should().NotContain(l => l.IsUnassigned);
+    }
+
+    [Fact]
+    public void Returns_no_lanes_when_the_empty_unassigned_lane_is_the_one_requested()
+    {
+        // The client only pages a lane it has already been shown, so this is the stale-request case:
+        // answering with an empty lane would put the column back on a board that had dropped it.
+        KanbanBoardComposer.Compose(Request([At("todo", "a")], lane: string.Empty)).Lanes
+            .Should().BeEmpty();
     }
 
     [Fact]
     public void Carries_lane_appearance_through()
     {
-        var lanes = new List<KanbanLane>
+        var lanes = new List<KanbanGroup>
         {
             new() { Value = "todo", Name = "To do", Colour = "blue", Icon = "icon-box", AcceptsDrops = true },
-            KanbanLane.Unassigned(),
+            KanbanGroup.Unassigned(),
         };
 
         KanbanBoardLaneModel lane = KanbanBoardComposer
@@ -169,7 +281,7 @@ public class KanbanBoardComposerTests
     [Fact]
     public void Drops_unmatched_cards_when_there_is_no_unassigned_lane()
     {
-        var lanes = new List<KanbanLane> { new() { Value = "todo", Name = "To do" } };
+        var lanes = new List<KanbanGroup> { new() { Value = "todo", Name = "To do" } };
 
         KanbanBoardResponseModel board = KanbanBoardComposer.Compose(
             new KanbanBoardComposerRequest(lanes, [At("archived", "a")], 1, false, 25, null, 0));

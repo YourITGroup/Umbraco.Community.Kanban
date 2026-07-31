@@ -26,10 +26,10 @@ public class KanbanBoardConfiguration
     public Guid? LaneContentTypeKey { get; set; }
 
     /// <summary>
-    /// Pins a lane source by alias, overriding detection from the lane property's editor. Not
+    /// Pins a group source by alias, overriding detection from the lane property's editor. Not
     /// exposed in the configuration UI: <see cref="UseManualLanes" /> covers the only choice an
     /// editor needs, and this remains for third-party sources registered through
-    /// <c>KanbanLaneSources()</c>.
+    /// <c>KanbanGroupSources()</c>.
     /// </summary>
     [ConfigurationField("laneSource")]
     public string? LaneSource { get; set; }
@@ -42,20 +42,20 @@ public class KanbanBoardConfiguration
     public bool UseManualLanes { get; set; }
 
     /// <summary>
-    /// The lane source alias this configuration pins, if any. An explicit
+    /// The group source alias this configuration pins, if any. An explicit
     /// <see cref="LaneSource" /> wins over <see cref="UseManualLanes" /> so a board pinned to a
     /// third-party source is not quietly reinterpreted as a manual one.
     /// </summary>
     [JsonIgnore]
-    public string? PinnedLaneSource =>
+    public string? PinnedGroupSource =>
         string.IsNullOrWhiteSpace(LaneSource) == false
             ? LaneSource
             : UseManualLanes
-                ? Constants.ManualLaneSourceAlias
+                ? Constants.ManualGroupSourceAlias
                 : null;
 
     [ConfigurationField("manualLanes")]
-    public KanbanManualLane[] ManualLanes { get; set; } = [];
+    public KanbanManualGroup[] ManualLanes { get; set; } = [];
 
     /// <summary>
     /// Lane values in display order. Not exposed in the configuration UI as a setting of its own: it
@@ -70,7 +70,7 @@ public class KanbanBoardConfiguration
     public string[] LaneOrder { get; set; } = [];
 
     [ConfigurationField("laneOverrides")]
-    public KanbanLaneOverride[] LaneOverrides { get; set; } = [];
+    public KanbanGroupOverride[] LaneOverrides { get; set; } = [];
 
     /// <summary>
     /// The properties shown as summary items on a card, in the order they appear.

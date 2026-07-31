@@ -15,8 +15,12 @@ public sealed record KanbanCardAssignment(string LaneValue, KanbanCardModel Card
 /// <param name="Skip">Cards to skip within <paramref name="Lane" />. Ignored when Lane is null.</param>
 /// <param name="ShowChildItems">Whether cards list their children, echoed to the client.</param>
 /// <param name="AllowDrag">Whether the board permits dragging cards between lanes, echoed to the client.</param>
+/// <param name="LanePropertyIsMandatory">
+/// True when the lane property is required, so a card is not expected to be unassigned. Only used to
+/// decide whether an *empty* unassigned lane is shown under truncation — see <see cref="KanbanBoardComposer" />.
+/// </param>
 public sealed record KanbanBoardComposerRequest(
-    IReadOnlyList<KanbanLane> Lanes,
+    IReadOnlyList<KanbanGroup> Lanes,
     IReadOnlyList<KanbanCardAssignment> Cards,
     int ChildCount,
     bool Truncated,
@@ -24,7 +28,8 @@ public sealed record KanbanBoardComposerRequest(
     string? Lane,
     int Skip,
     bool ShowChildItems = false,
-    bool AllowDrag = false);
+    bool AllowDrag = false,
+    bool LanePropertyIsMandatory = false);
 
 /// <summary>
 /// Groups cards into lanes and pages each lane independently. Pure — every input is a
@@ -34,11 +39,17 @@ public static class KanbanBoardComposer
 {
     public static KanbanBoardResponseModel Compose(KanbanBoardComposerRequest request)
     {
+        // Grouped against every lane, hidden ones included, so a hidden lane's cards land in its own
+        // bucket and are then dropped with it. Excluding hidden lanes before grouping would instead
+        // leave those cards matching nothing, and the unassigned fallback would collect them — a
+        // hidden lane would empty itself into Unassigned rather than take its cards with it.
         Dictionary<string, List<KanbanCardModel>> grouped = Group(request.Lanes, request.Cards);
 
-        IEnumerable<KanbanLane> lanes = request.Lane is null
+        IEnumerable<KanbanGroup> lanes = (request.Lane is null
             ? request.Lanes
-            : request.Lanes.Where(lane => Matches(lane, request.Lane));
+            : request.Lanes.Where(lane => Matches(lane, request.Lane)))
+            .Where(lane => lane.Hidden == false)
+            .Where(lane => lane.IsUnassigned == false || ShowsUnassigned(grouped[lane.Value], request));
 
         var skip = request.Lane is null ? 0 : Math.Max(0, request.Skip);
 
@@ -54,27 +65,44 @@ public static class KanbanBoardComposer
         };
     }
 
-    private static bool Matches(KanbanLane lane, string requested) =>
+    /// <summary>
+    /// Whether the unassigned lane earns a column. It is a synthetic lane nobody configured and nothing can
+    /// be dropped into, so an empty one is a column of dead space on every board whose cards all have a
+    /// value — which is every board with a mandatory lane property.
+    ///
+    /// Cards decide it: any card grouped into the lane keeps it, so nothing visible is ever hidden. That
+    /// includes cards whose value matches no lane, which land here even under a mandatory property (a value
+    /// removed from the dropdown, a renamed lane) — hiding those would lose them from the board entirely.
+    ///
+    /// Truncation is the one case cards cannot decide, the read window having stopped short of the children
+    /// that would have filled the lane. There the property is what tips it: an optional property keeps the
+    /// lane, because unassigned cards are ordinary and likely beyond the window; a mandatory one drops it,
+    /// unmatched values being rare enough not to reserve a column for on a guess.
+    /// </summary>
+    private static bool ShowsUnassigned(List<KanbanCardModel> cards, KanbanBoardComposerRequest request) =>
+        cards.Count > 0 || (request.Truncated && request.LanePropertyIsMandatory == false);
+
+    private static bool Matches(KanbanGroup lane, string requested) =>
         string.Equals(lane.Value, requested, StringComparison.OrdinalIgnoreCase);
 
     private static Dictionary<string, List<KanbanCardModel>> Group(
-        IReadOnlyList<KanbanLane> lanes,
+        IReadOnlyList<KanbanGroup> lanes,
         IReadOnlyList<KanbanCardAssignment> cards)
     {
         var grouped = new Dictionary<string, List<KanbanCardModel>>();
 
-        foreach (KanbanLane lane in lanes)
+        foreach (KanbanGroup lane in lanes)
         {
             // Duplicate lane values are possible from editor-authored data; the first wins,
             // as it does everywhere else in the lane pipeline.
             grouped.TryAdd(lane.Value, []);
         }
 
-        KanbanLane? unassigned = lanes.FirstOrDefault(lane => lane.IsUnassigned);
+        KanbanGroup? unassigned = lanes.FirstOrDefault(lane => lane.IsUnassigned);
 
         foreach (KanbanCardAssignment assignment in cards)
         {
-            KanbanLane? target = string.IsNullOrEmpty(assignment.LaneValue)
+            KanbanGroup? target = string.IsNullOrEmpty(assignment.LaneValue)
                 ? unassigned
                 : lanes.FirstOrDefault(lane => Matches(lane, assignment.LaneValue)) ?? unassigned;
 
@@ -88,7 +116,7 @@ public static class KanbanBoardComposer
     }
 
     private static KanbanBoardLaneModel Project(
-        KanbanLane lane,
+        KanbanGroup lane,
         List<KanbanCardModel> cards,
         int skip,
         int pageSize,

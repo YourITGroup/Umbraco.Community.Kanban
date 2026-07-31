@@ -1,8 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Community.Kanban.Configuration;
-using Umbraco.Community.Kanban.Lanes;
-using Umbraco.Community.Kanban.Lanes.Sources;
+using Umbraco.Community.Kanban.Grouping;
+using Umbraco.Community.Kanban.Grouping.Sources;
 using Umbraco.Community.Kanban.Services;
 
 namespace Umbraco.Community.Kanban.Extensions;
@@ -14,7 +14,7 @@ public static class UmbracoBuilderExtensions
     /// </summary>
     public static IUmbracoBuilder AddKanban(this IUmbracoBuilder builder)
     {
-        if (builder.Services.Any(x => x.ServiceType == typeof(IKanbanLaneResolver)))
+        if (builder.Services.Any(x => x.ServiceType == typeof(IKanbanGroupResolver)))
         {
             return builder;
         }
@@ -22,7 +22,8 @@ public static class UmbracoBuilderExtensions
         builder.AddKanbanOpenApiDocument();
 
         builder.Services.AddSingleton<IKanbanPropertyDataTypeLookup, KanbanPropertyDataTypeLookup>();
-        builder.Services.AddSingleton<IKanbanLaneResolver, KanbanLaneResolver>();
+        builder.Services.AddSingleton<IKanbanContentInstanceLookup, KanbanContentInstanceLookup>();
+        builder.Services.AddSingleton<IKanbanGroupResolver, KanbanGroupResolver>();
         builder.Services.AddSingleton<IKanbanConfigurationService, KanbanConfigurationService>();
         builder.Services.AddSingleton<IKanbanContentTypeLookup, KanbanContentTypeLookup>();
         builder.Services.AddSingleton<IKanbanLaneContentTypeResolver, KanbanLaneContentTypeResolver>();
@@ -37,17 +38,19 @@ public static class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IKanbanCalendarService, KanbanCalendarService>();
 
         // Manual is appended first so a configuration that pins it wins over an
-        // editor-matching source.
-        builder.KanbanLaneSources()
-            .Append<ManualLaneSource>()
-            .Append<CoreListEditorLaneSource>();
+        // editor-matching source. The other two claim disjoint editors, so their
+        // order relative to each other carries no meaning.
+        builder.KanbanGroupSources()
+            .Append<ManualGroupSource>()
+            .Append<CoreListEditorGroupSource>()
+            .Append<ContentInstanceGroupSource>();
 
         return builder;
     }
 
     /// <summary>
-    /// The lane source collection, for packages adding their own sources.
+    /// The group source collection, for packages adding their own sources.
     /// </summary>
-    public static KanbanLaneSourceCollectionBuilder KanbanLaneSources(this IUmbracoBuilder builder) =>
-        builder.WithCollectionBuilder<KanbanLaneSourceCollectionBuilder>();
+    public static KanbanGroupSourceCollectionBuilder KanbanGroupSources(this IUmbracoBuilder builder) =>
+        builder.WithCollectionBuilder<KanbanGroupSourceCollectionBuilder>();
 }

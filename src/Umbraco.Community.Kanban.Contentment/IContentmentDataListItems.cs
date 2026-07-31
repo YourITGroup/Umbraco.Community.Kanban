@@ -7,7 +7,7 @@ namespace Umbraco.Community.Kanban.Contentment;
 /// </summary>
 /// <remarks>
 /// Exists as a seam only because Contentment's <c>ConfigurationEditorUtility</c> is <c>public sealed</c>
-/// with no interface, so a lane source depending on it directly could not be tested at all. Mirrors
+/// with no interface, so a group source depending on it directly could not be tested at all. Mirrors
 /// <c>IKanbanPropertyDataTypeLookup</c> in the core package, which exists for the same reason.
 /// </remarks>
 public interface IContentmentDataListItems

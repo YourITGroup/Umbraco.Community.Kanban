@@ -3,7 +3,7 @@ using Umbraco.Community.Contentment.DataEditors;
 namespace Umbraco.Community.Kanban.Contentment.Tests.Fakes;
 
 /// <summary>
-/// Returns canned items, so lane source tests need neither Contentment's DI nor a mocking framework.
+/// Returns canned items, so group source tests need neither Contentment's DI nor a mocking framework.
 /// Records the reference it was asked for, which is how the tests assert the configuration reached it.
 /// </summary>
 public sealed class FakeContentmentDataListItems : IContentmentDataListItems

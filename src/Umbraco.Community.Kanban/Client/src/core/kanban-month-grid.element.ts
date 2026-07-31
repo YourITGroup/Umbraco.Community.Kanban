@@ -101,8 +101,26 @@ export class UmbCommunityKanbanMonthGridElement extends UmbLitElement {
     `;
   }
 
+  /**
+   * The weekday labels, taken from the first rendered week rather than from a first-day-of-week
+   * setting: the grid is already built starting on whatever day the calendar chose, so reading the
+   * row it was given cannot disagree with the cells underneath it.
+   */
+  #renderWeekdays() {
+    const first = this.weeks[0];
+
+    if (!first) return nothing;
+
+    return html`
+      <div class="weekdays" role="row">
+        ${first.cells.map((cell) => html`<div class="weekday" role="columnheader">${weekdayName(cell.date)}</div>`)}
+      </div>
+    `;
+  }
+
   override render() {
     return html`
+      ${this.#renderWeekdays()}
       <div class="grid" role="grid">
         ${this.weeks.map((week) => week.cells.map((cell) => this.#renderCell(cell)))}
       </div>
@@ -113,6 +131,32 @@ export class UmbCommunityKanbanMonthGridElement extends UmbLitElement {
     css`
       :host {
         display: block;
+      }
+
+      /*
+       * Sticky so the labels stay with the cells they name while a long month scrolls, below the
+       * calendar's own sticky toolbar — which publishes its measured height as the offset.
+       */
+      .weekdays {
+        position: sticky;
+        top: var(--kanban-calendar-sticky-top, 0px);
+        z-index: 2;
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 1px;
+        /* Page background, matching the calendar's sticky toolbar directly above: the weekday labels sit
+           outside the grid's bordered box, so they belong to the page rather than to a panel. */
+        background: var(--umb-body-layout-color-background, var(--uui-color-background));
+        padding-bottom: var(--uui-size-space-1);
+      }
+
+      .weekday {
+        font-size: var(--uui-type-small-size);
+        font-weight: 600;
+        color: var(--uui-color-text-alt);
+        text-align: center;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
       }
 
       .grid {
@@ -158,9 +202,10 @@ export class UmbCommunityKanbanMonthGridElement extends UmbLitElement {
         display: flex;
         align-items: center;
         gap: var(--uui-size-space-1);
-        border: none;
+        /* White on a white cell, so the border is what makes the card a card. */
+        border: 1px solid var(--uui-color-border);
         border-radius: var(--uui-border-radius);
-        background: var(--uui-color-surface-alt);
+        background: var(--uui-color-surface);
         padding: 1px var(--uui-size-space-2);
         font: inherit;
         font-size: var(--uui-type-small-size);
@@ -224,6 +269,15 @@ export class UmbCommunityKanbanMonthGridElement extends UmbLitElement {
       }
     `,
   ];
+}
+
+const WEEKDAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/** Date-part arithmetic only: UTC construction and UTC getters, per the calendar models' rule. */
+function weekdayName(date: string): string {
+  const [year, month, day] = date.split('-').map(Number);
+
+  return WEEKDAY_NAMES[new Date(Date.UTC(year, month - 1, day)).getUTCDay()];
 }
 
 declare global {

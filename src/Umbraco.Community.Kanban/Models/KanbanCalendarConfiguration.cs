@@ -48,11 +48,11 @@ public class KanbanCalendarConfiguration
 
     /// <summary>Manual category values, used when the category property's editor has no source.</summary>
     [ConfigurationField("categoryManualValues")]
-    public KanbanManualLane[] CategoryManualValues { get; set; } = [];
+    public KanbanManualGroup[] CategoryManualValues { get; set; } = [];
 
     /// <summary>Per-category appearance overrides, same precedence rules as lanes.</summary>
     [ConfigurationField("categoryOverrides")]
-    public KanbanLaneOverride[] CategoryOverrides { get; set; } = [];
+    public KanbanGroupOverride[] CategoryOverrides { get; set; } = [];
 
     /// <summary>
     /// The properties shown as summary items on a card. The converter also accepts the bare alias

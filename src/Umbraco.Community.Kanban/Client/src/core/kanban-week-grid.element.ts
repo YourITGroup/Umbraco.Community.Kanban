@@ -122,13 +122,15 @@ export class UmbCommunityKanbanWeekGridElement extends UmbLitElement {
 
   override render() {
     return html`
-      <div class="header-row">
-        <div class="gutter"></div>
-        ${this.days.map((date) => html`<div class="day-heading">${dayHeading(date)}</div>`)}
-      </div>
-      <div class="allday-row">
-        <div class="gutter allday-label">all-day</div>
-        ${this.days.map((date) => this.#renderAllDay(date))}
+      <div class="head">
+        <div class="header-row">
+          <div class="gutter"></div>
+          ${this.days.map((date) => html`<div class="day-heading">${dayHeading(date)}</div>`)}
+        </div>
+        <div class="allday-row">
+          <div class="gutter allday-label">all-day</div>
+          ${this.days.map((date) => this.#renderAllDay(date))}
+        </div>
       </div>
       <div class="body">
         <div class="gutter hours">
@@ -145,7 +147,26 @@ export class UmbCommunityKanbanWeekGridElement extends UmbLitElement {
         display: block;
         border: 1px solid var(--uui-color-border);
         border-radius: var(--uui-border-radius);
-        overflow: hidden;
+        /*
+         * clip, not hidden: both clip the rounded corners identically, but hidden makes this a scroll
+         * container, and a scroll container is what a sticky element sticks to — the day headings
+         * would then be stuck to a box that never scrolls, which looks exactly like doing nothing.
+         * clip creates no scroll container, so the headings stick to the page instead.
+         */
+        overflow: clip;
+      }
+
+      /*
+       * Both heading rows travel together, so the hour grid scrolls under the whole thing. Wrapping
+       * them in one sticky box rather than sticking each row is what avoids hard-coding the header
+       * row's height as the all-day row's offset.
+       */
+      .head {
+        position: sticky;
+        /* Below the calendar's sticky toolbar, whose measured height arrives in this property. */
+        top: var(--kanban-calendar-sticky-top, 0px);
+        z-index: 2;
+        background: var(--uui-color-surface);
       }
 
       .header-row,
@@ -222,7 +243,7 @@ export class UmbCommunityKanbanWeekGridElement extends UmbLitElement {
         border: 1px solid var(--uui-color-border);
         border-inline-start: 3px solid var(--uui-color-interactive);
         border-radius: var(--uui-border-radius);
-        background: var(--uui-color-surface-alt);
+        background: var(--uui-color-surface);
         font: inherit;
         font-size: var(--uui-type-small-size);
         padding: 1px var(--uui-size-space-1);
@@ -259,10 +280,11 @@ export class UmbCommunityKanbanWeekGridElement extends UmbLitElement {
         flex-direction: column;
         align-items: stretch;
         gap: 2px;
-        border: none;
+        /* border first, then the inline-start accent: the category colour overrides that edge. */
+        border: 1px solid var(--uui-color-border);
         border-inline-start: 3px solid transparent;
         border-radius: var(--uui-border-radius);
-        background: var(--uui-color-surface-alt);
+        background: var(--uui-color-surface);
         padding: 1px var(--uui-size-space-2);
         font: inherit;
         font-size: var(--uui-type-small-size);

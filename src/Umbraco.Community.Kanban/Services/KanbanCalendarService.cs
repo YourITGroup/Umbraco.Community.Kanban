@@ -1,19 +1,33 @@
+using System.Globalization;
 using Umbraco.Cms.Core.Actions;
 using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Models.Membership;
 using Umbraco.Cms.Core.Security.Authorization;
-using Umbraco.Community.Kanban.Lanes;
+using Umbraco.Community.Kanban.Grouping;
 using Umbraco.Community.Kanban.Models;
 using Umbraco.Community.Kanban.Models.Api;
 
 namespace Umbraco.Community.Kanban.Services;
+
+/// <summary>
+/// The resolved categories, split into what the calendar shows and which values it must drop items for.
+/// </summary>
+/// <param name="Visible">The categories to send, hidden ones already removed.</param>
+/// <param name="Hidden">The values of hidden categories, compared case-insensitively.</param>
+internal sealed record KanbanCategoryResolution(
+    IReadOnlyList<KanbanCategoryModel> Visible,
+    IReadOnlySet<string> Hidden)
+{
+    public static KanbanCategoryResolution None { get; } =
+        new([], new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+}
 
 /// <inheritdoc />
 public sealed class KanbanCalendarService(
     IKanbanContentLoader contentLoader,
     IKanbanCalendarConfigurationResolver configurationResolver,
     IKanbanLaneContentTypeResolver laneContentTypeResolver,
-    IKanbanLaneResolver laneResolver,
+    IKanbanGroupResolver laneResolver,
     IContentPermissionAuthorizer permissionAuthorizer,
     IKanbanPropertyValueReader propertyValueReader) : IKanbanCalendarService
 {
@@ -67,12 +81,24 @@ public sealed class KanbanCalendarService(
             page.Children.Select(child => child.Key).ToList(),
             BrowsePermission);
 
+        // Resolved before the items, because a hidden category takes the items carrying it with it and
+        // that has to be decided before the cap counts what is shown.
+        KanbanCategoryResolution categories = await ResolveCategoriesAsync(parent, configuration);
+
         var undated = 0;
-        var placed = new List<(KanbanCardDate Start, KanbanCardDate? End, IContent Content)>();
+        var placed = new List<(KanbanCardDate Start, KanbanCardDate? End, string? Category, IContent Content)>();
 
         foreach (IContent child in page.Children)
         {
             if (browseable.Contains(child.Key) == false)
+            {
+                continue;
+            }
+
+            var category = ReadCategory(child, configuration, request.Culture);
+
+            // An uncategorised item is never hidden: there is no category to have hidden.
+            if (category is not null && categories.Hidden.Contains(category))
             {
                 continue;
             }
@@ -85,12 +111,15 @@ public sealed class KanbanCalendarService(
                 continue;
             }
 
-            if (start.Value.Date < request.From || start.Value.Date > request.To)
+            // A day of slack either side: a zone-bearing value is filtered here by its stored wall
+            // clock, but the client places it in the viewer's zone, which can move it across a
+            // boundary. The client drops whatever still falls outside the window it asked for.
+            if (start.Value.Date < request.From.AddDays(-1) || start.Value.Date > request.To.AddDays(1))
             {
                 continue;
             }
 
-            placed.Add((start.Value, ReadEnd(child, configuration, request.Culture, start.Value), child));
+            placed.Add((start.Value, ReadEnd(child, configuration, request.Culture, start.Value), category, child));
         }
 
         var truncatedByCap = placed.Count > Constants.DefaultCalendarCap;
@@ -102,11 +131,13 @@ public sealed class KanbanCalendarService(
             .Take(Constants.DefaultCalendarCap)
             .Select(entry => new KanbanCalendarItemModel
             {
-                Date = entry.Start.Date.ToString("yyyy-MM-dd"),
-                Time = entry.Start.Time?.ToString("HH:mm"),
-                EndDate = entry.End?.Date.ToString("yyyy-MM-dd"),
-                EndTime = entry.End?.Time?.ToString("HH:mm"),
-                Category = ReadCategory(entry.Content, configuration, request.Culture),
+                Date = entry.Start.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                Time = entry.Start.Time?.ToString("HH:mm", CultureInfo.InvariantCulture),
+                EndDate = entry.End?.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                EndTime = entry.End?.Time?.ToString("HH:mm", CultureInfo.InvariantCulture),
+                Instant = entry.Start.Instant?.ToString("O", CultureInfo.InvariantCulture),
+                EndInstant = entry.End?.Instant?.ToString("O", CultureInfo.InvariantCulture),
+                Category = entry.Category,
                 Card = KanbanCardMapper.Map(
                     entry.Content,
                     configuration.CardProperties,
@@ -119,7 +150,7 @@ public sealed class KanbanCalendarService(
         return new KanbanCalendarResponseModel
         {
             Items = items,
-            Categories = await ResolveCategoriesAsync(parent, configuration),
+            Categories = categories.Visible,
             DatePropertyEditorAlias = ResolveEditorAlias(page.Children, configuration.DateProperty),
             DatePropertyAlias = configuration.DateProperty,
             ParentContentTypeKey = parent.ContentType.Key,
@@ -172,20 +203,20 @@ public sealed class KanbanCalendarService(
     /// into the board-configuration shape the lane resolver takes. The synthetic unassigned lane is
     /// dropped: an uncategorised card is simply unaccented, not bucketed.
     /// </summary>
-    private async Task<IReadOnlyList<KanbanCategoryModel>> ResolveCategoriesAsync(
+    private async Task<KanbanCategoryResolution> ResolveCategoriesAsync(
         IContent parent,
         KanbanCalendarConfiguration configuration)
     {
         if (string.IsNullOrWhiteSpace(configuration.CategoryProperty))
         {
-            return [];
+            return KanbanCategoryResolution.None;
         }
 
         Guid contentTypeKey = await laneContentTypeResolver.ResolveAsync(
             parent.ContentType.Key,
             configuration.CategoryProperty);
 
-        KanbanLaneResolution resolution = await laneResolver.ResolveAsync(contentTypeKey, new KanbanBoardConfiguration
+        KanbanGroupResolution resolution = await laneResolver.ResolveAsync(contentTypeKey, new KanbanBoardConfiguration
         {
             LaneProperty = configuration.CategoryProperty,
             ManualLanes = configuration.CategoryManualValues,
@@ -193,16 +224,24 @@ public sealed class KanbanCalendarService(
             LaneOverrides = configuration.CategoryOverrides,
         });
 
-        return resolution.Lanes
-            .Where(lane => lane.IsUnassigned == false)
-            .Select(lane => new KanbanCategoryModel
-            {
-                Value = lane.Value,
-                Name = lane.Name,
-                Colour = lane.Colour,
-                Icon = lane.Icon,
-            })
-            .ToList();
+        List<KanbanGroup> categories = resolution.Groups.Where(lane => lane.IsUnassigned == false).ToList();
+
+        return new KanbanCategoryResolution(
+            categories
+                .Where(category => category.Hidden == false)
+                .Select(category => new KanbanCategoryModel
+                {
+                    Value = category.Value,
+                    Name = category.Name,
+                    Colour = category.Colour,
+                    Icon = category.Icon,
+                })
+                .ToList(),
+            // Case-insensitive, matching how every other comparison against a stored group value is made.
+            categories
+                .Where(category => category.Hidden)
+                .Select(category => category.Value)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase));
     }
 
     /// <summary>

@@ -27,11 +27,21 @@ public static class Constants
     public const int DefaultCalendarCap = 500;
 
     /// <summary>
-    /// The alias of the lane source that reads lanes typed into the board configuration.
-    /// Lives here rather than only on <c>ManualLaneSource</c> because
-    /// <see cref="Models.KanbanBoardConfiguration" /> pins it without depending on the Lanes namespace.
+    /// The alias of the group source that reads groups typed into the configuration by hand.
+    /// Lives here rather than only on <c>ManualGroupSource</c> because
+    /// <see cref="Models.KanbanBoardConfiguration" /> pins it without depending on the Grouping namespace.
     /// </summary>
-    public const string ManualLaneSourceAlias = "manual";
+    public const string ManualGroupSourceAlias = "manual";
+
+    /// <summary>The alias of the group source that lists the documents a picker property allows.</summary>
+    public const string ContentInstanceGroupSourceAlias = "content-instances";
+
+    /// <summary>
+    /// The most groups a source may produce. A board of hundreds of swimlanes is unusable long before
+    /// this, so the cap exists to keep a picker aimed at a large document type from rendering a board
+    /// nobody can scroll; the source logs when it bites.
+    /// </summary>
+    public const int DefaultGroupCap = 200;
 
     /// <summary>How many children a board reads before it reports itself truncated.</summary>
     public const int DefaultChildCap = 1000;

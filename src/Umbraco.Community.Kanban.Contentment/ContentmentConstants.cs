@@ -13,6 +13,6 @@ public static class ContentmentConstants
     /// </summary>
     public const string DataListEditorAlias = "Umbraco.Community.Contentment.DataList";
 
-    /// <summary>The alias a board configuration uses to pin this lane source explicitly.</summary>
-    public const string LaneSourceAlias = "contentment-data-list";
+    /// <summary>The alias a board configuration uses to pin this group source explicitly.</summary>
+    public const string GroupSourceAlias = "contentment-data-list";
 }

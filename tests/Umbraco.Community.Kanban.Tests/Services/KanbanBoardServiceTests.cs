@@ -23,7 +23,7 @@ public class KanbanBoardServiceTests
         KanbanBoardService Service,
         FakeKanbanContentLoader Loader,
         FakeContentPermissionAuthorizer Permissions,
-        FakeKanbanLaneResolver LaneResolver,
+        FakeKanbanGroupResolver LaneResolver,
         FakeKanbanContentTypeLookup ContentTypes,
         FakeKanbanDataTypeConfigurationLookup DataTypes,
         FakeKanbanConfigurationService Configurations,
@@ -66,11 +66,11 @@ public class KanbanBoardServiceTests
         loader.Content[ParentKey] = parent;
 
         var permissions = new FakeContentPermissionAuthorizer();
-        var laneResolver = new FakeKanbanLaneResolver();
-        laneResolver.Lanes.AddRange([
-            new KanbanLane { Value = "todo", Name = "To do" },
-            new KanbanLane { Value = "doing", Name = "Doing" },
-            KanbanLane.Unassigned(),
+        var laneResolver = new FakeKanbanGroupResolver();
+        laneResolver.Groups.AddRange([
+            new KanbanGroup { Value = "todo", Name = "To do" },
+            new KanbanGroup { Value = "doing", Name = "Doing" },
+            KanbanGroup.Unassigned(),
         ]);
 
         var contentTypes = new FakeKanbanContentTypeLookup();

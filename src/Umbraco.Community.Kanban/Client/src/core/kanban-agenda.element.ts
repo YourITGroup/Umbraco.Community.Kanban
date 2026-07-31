@@ -119,7 +119,8 @@ export class UmbCommunityKanbanAgendaElement extends UmbLitElement {
         border: 1px solid var(--uui-color-border);
         border-radius: var(--uui-border-radius);
         background: var(--uui-color-surface);
-        overflow: hidden;
+        /* clip rather than hidden, so the date rails below can stick to the page — see the week grid. */
+        overflow: clip;
       }
 
       .day {
@@ -139,6 +140,12 @@ export class UmbCommunityKanbanAgendaElement extends UmbLitElement {
         flex-direction: column;
         align-items: center;
         gap: 2px;
+        /* Stays with its day while a day full of entries scrolls past. align-self stops the rail
+           stretching to the day's height, which would leave sticky nothing to move within. */
+        position: sticky;
+        /* Clear of the calendar's sticky toolbar, which publishes its measured height. */
+        top: calc(var(--kanban-calendar-sticky-top, 0px) + var(--uui-size-space-4));
+        align-self: flex-start;
       }
 
       .day-number {
@@ -186,10 +193,11 @@ export class UmbCommunityKanbanAgendaElement extends UmbLitElement {
         flex-direction: column;
         gap: var(--uui-size-space-1);
         width: 100%;
-        border: none;
+        /* border first, then the inline-start accent: the category colour overrides that edge. */
+        border: 1px solid var(--uui-color-border);
         border-inline-start: 3px solid transparent;
         border-radius: var(--uui-border-radius);
-        background: var(--uui-color-surface-alt);
+        background: var(--uui-color-surface);
         padding: var(--uui-size-space-2) var(--uui-size-space-3);
         font: inherit;
         font-size: var(--uui-type-small-size);

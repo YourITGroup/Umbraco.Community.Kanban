@@ -3,12 +3,16 @@ export interface KanbanLaneOverrideValue {
   colour?: string;
   icon?: string;
   label?: string;
+  /** True keeps the lane/category, and everything in it, off the board or calendar. */
+  hidden?: boolean;
 }
 
 export interface KanbanResolvedLane {
   value: string;
   name: string;
   isUnassigned: boolean;
+  /** Echoed by the preview so a hidden lane can still be listed, and un-hidden. */
+  hidden?: boolean;
 }
 
 export interface KanbanLaneOverrideRow {
@@ -43,4 +47,15 @@ export function mergeOverridesWithLanes(
   }
 
   return rows;
+}
+
+/**
+ * True when an override says nothing at all and should not be stored, so an untouched lane leaves no
+ * residue in the configuration.
+ *
+ * `hidden: false` counts as saying nothing — it is the default, and keeping it would leave a row behind
+ * for every lane an editor ever un-hid.
+ */
+export function isEmptyOverride(value: KanbanLaneOverrideValue): boolean {
+  return !value.colour && !value.icon && !value.label && !value.hidden;
 }

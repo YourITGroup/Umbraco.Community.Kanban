@@ -68,7 +68,8 @@ export const manifests: Array<UmbExtensionManifest> = [
           {
             alias: 'categoryOverrides',
             label: 'Category appearance',
-            description: 'Override the colour, icon or label of individual categories.',
+            description:
+              'Override the colour, icon or label of individual categories, and hide the ones you do not want on the calendar. Hiding a category hides its items too.',
             propertyEditorUiAlias: KANBAN_LANE_OVERRIDES_UI_ALIAS,
             // Point the shared overrides editor at the calendar's own settings: categories have no
             // manual toggle (a non-empty list is the toggle) and no stored order.

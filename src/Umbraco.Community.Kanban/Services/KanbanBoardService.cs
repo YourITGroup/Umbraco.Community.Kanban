@@ -2,7 +2,7 @@ using Umbraco.Cms.Core.Actions;
 using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Models.Membership;
 using Umbraco.Cms.Core.Security.Authorization;
-using Umbraco.Community.Kanban.Lanes;
+using Umbraco.Community.Kanban.Grouping;
 using Umbraco.Community.Kanban.Models;
 using Umbraco.Community.Kanban.Models.Api;
 
@@ -13,7 +13,7 @@ public sealed class KanbanBoardService(
     IKanbanContentLoader contentLoader,
     IKanbanBoardConfigurationResolver configurationResolver,
     IKanbanLaneContentTypeResolver laneContentTypeResolver,
-    IKanbanLaneResolver laneResolver,
+    IKanbanGroupResolver laneResolver,
     IContentPermissionAuthorizer permissionAuthorizer,
     IKanbanPropertyValueReader propertyValueReader) : IKanbanBoardService
 {
@@ -65,7 +65,7 @@ public sealed class KanbanBoardService(
             parent.ContentType.Key,
             configuration.LaneProperty);
 
-        KanbanLaneResolution lanes = await laneResolver.ResolveAsync(laneContentTypeKey, configuration);
+        KanbanGroupResolution lanes = await laneResolver.ResolveAsync(laneContentTypeKey, configuration);
 
         KanbanChildPage page = contentLoader.GetChildren(parent.Id, Constants.DefaultChildCap);
         List<Guid> keys = page.Children.Select(child => child.Key).ToList();
@@ -117,7 +117,7 @@ public sealed class KanbanBoardService(
         var pageSize = Math.Max(1, request.Take ?? configuration.LanePageSize);
 
         return KanbanBoardComposer.Compose(new KanbanBoardComposerRequest(
-            lanes.Lanes,
+            lanes.Groups,
             assignments,
             page.TotalChildCount,
             truncated,
@@ -125,6 +125,7 @@ public sealed class KanbanBoardService(
             request.Lane,
             request.Skip ?? 0,
             configuration.ShowChildItems,
-            configuration.AllowDrag));
+            configuration.AllowDrag,
+            lanes.LanePropertyIsMandatory));
     }
 }

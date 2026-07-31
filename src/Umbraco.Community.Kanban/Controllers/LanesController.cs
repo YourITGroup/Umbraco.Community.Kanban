@@ -3,14 +3,14 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Umbraco.Cms.Web.Common.Authorization;
-using Umbraco.Community.Kanban.Lanes;
+using Umbraco.Community.Kanban.Grouping;
 using Umbraco.Community.Kanban.Models.Api;
 
 namespace Umbraco.Community.Kanban.Controllers;
 
 [ApiVersion("1.0")]
 [ApiExplorerSettings(GroupName = "Lanes")]
-public sealed class LanesController(IKanbanLaneResolver laneResolver) : KanbanControllerBase
+public sealed class LanesController(IKanbanGroupResolver laneResolver) : KanbanControllerBase
 {
     /// <summary>
     /// Resolves the lanes a configuration would produce, without requiring it to be saved.

@@ -7,13 +7,13 @@ public class KanbanBoardConfigurationTests
     [Fact]
     public void PinnedLaneSource_IsNothingByDefault_SoLanesAreDetectedFromTheLaneProperty()
     {
-        new KanbanBoardConfiguration().PinnedLaneSource.Should().BeNull();
+        new KanbanBoardConfiguration().PinnedGroupSource.Should().BeNull();
     }
 
     [Fact]
     public void PinnedLaneSource_IsManual_WhenTheToggleIsOn()
     {
-        new KanbanBoardConfiguration { UseManualLanes = true }.PinnedLaneSource.Should().Be("manual");
+        new KanbanBoardConfiguration { UseManualLanes = true }.PinnedGroupSource.Should().Be("manual");
     }
 
     [Fact]
@@ -21,14 +21,14 @@ public class KanbanBoardConfigurationTests
     {
         var configuration = new KanbanBoardConfiguration { LaneSource = "my-source", UseManualLanes = true };
 
-        configuration.PinnedLaneSource.Should().Be("my-source");
+        configuration.PinnedGroupSource.Should().Be("my-source");
     }
 
     [Fact]
     public void PinnedLaneSource_IgnoresABlankAlias()
     {
-        new KanbanBoardConfiguration { LaneSource = "   " }.PinnedLaneSource.Should().BeNull();
-        new KanbanBoardConfiguration { LaneSource = "  ", UseManualLanes = true }.PinnedLaneSource.Should().Be("manual");
+        new KanbanBoardConfiguration { LaneSource = "   " }.PinnedGroupSource.Should().BeNull();
+        new KanbanBoardConfiguration { LaneSource = "  ", UseManualLanes = true }.PinnedGroupSource.Should().Be("manual");
     }
 
     [Fact]

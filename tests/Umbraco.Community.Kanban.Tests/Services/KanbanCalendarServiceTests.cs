@@ -20,7 +20,7 @@ public class KanbanCalendarServiceTests
         KanbanCalendarService Service,
         FakeKanbanContentLoader Loader,
         FakeContentPermissionAuthorizer Permissions,
-        FakeKanbanLaneResolver LaneResolver,
+        FakeKanbanGroupResolver LaneResolver,
         FakeKanbanConfigurationService Configurations,
         ContentType ChildContentType);
 
@@ -65,7 +65,7 @@ public class KanbanCalendarServiceTests
         loader.Content[ParentKey] = parent;
 
         var permissions = new FakeContentPermissionAuthorizer();
-        var laneResolver = new FakeKanbanLaneResolver();
+        var laneResolver = new FakeKanbanGroupResolver();
 
         var contentTypes = new FakeKanbanContentTypeLookup();
         contentTypes.AllowedChildren[parentContentType.Key] = [ChildTypeKey];
@@ -146,21 +146,49 @@ public class KanbanCalendarServiceTests
     }
 
     [Fact]
-    public async Task Places_cards_inside_the_inclusive_range_and_orders_them()
+    public async Task Places_cards_in_the_requested_range_plus_a_day_of_slack_and_orders_them()
     {
+        // The slack exists because a zone-bearing value is filtered by its stored wall clock here but
+        // placed in the viewer's zone by the client, which can move it onto the adjacent day. The
+        // client trims what still falls outside the window it asked for.
         Harness harness = Configured();
         Child(harness, "Last day", """{"date":"2026-08-31T09:00:00"}""");
         Child(harness, "First day", """{"date":"2026-08-01T00:00:00"}""");
-        Child(harness, "Before", """{"date":"2026-07-31T23:00:00"}""");
-        Child(harness, "After", """{"date":"2026-09-01T00:00:00"}""");
+        Child(harness, "Day before", """{"date":"2026-07-31T23:00:00"}""");
+        Child(harness, "Well before", """{"date":"2026-07-29T09:00:00"}""");
+        Child(harness, "Well after", """{"date":"2026-09-03T09:00:00"}""");
 
         KanbanCalendarResult result = await harness.Service.GetCalendarAsync(Request(), User);
 
         result.Status.Should().Be(KanbanBoardStatus.Success);
-        result.Calendar!.Items.Select(i => i.Card.Name).Should().Equal("First day", "Last day");
-        result.Calendar.Items[0].Date.Should().Be("2026-08-01");
-        result.Calendar.Items[0].Time.Should().BeNull();
-        result.Calendar.Items[1].Time.Should().Be("09:00");
+        result.Calendar!.Items.Select(i => i.Card.Name).Should().Equal("Day before", "First day", "Last day");
+        result.Calendar.Items[1].Date.Should().Be("2026-08-01");
+        result.Calendar.Items[1].Time.Should().BeNull();
+        result.Calendar.Items[2].Time.Should().Be("09:00");
+    }
+
+    [Fact]
+    public async Task Carries_the_moment_of_a_zone_bearing_value_and_nothing_for_a_wall_clock()
+    {
+        Harness harness = Configured();
+        Child(
+            harness,
+            "Zoned",
+            """{"date":"2026-08-15T09:00:00+10:00","timeZone":"Australia/Sydney"}""",
+            """{"date":"2026-08-15T11:30:00+10:00","timeZone":"Australia/Sydney"}""");
+        Child(harness, "Unzoned", """{"date":"2026-08-15T09:00:00"}""");
+
+        KanbanCalendarResult result = await harness.Service.GetCalendarAsync(Request(), User);
+
+        KanbanCalendarItemModel zoned = result.Calendar!.Items.Single(i => i.Card.Name == "Zoned");
+        zoned.Date.Should().Be("2026-08-15", "the wall clock still reads as stored");
+        zoned.Time.Should().Be("09:00");
+        zoned.Instant.Should().Be("2026-08-15T09:00:00.0000000+10:00");
+        zoned.EndInstant.Should().Be("2026-08-15T11:30:00.0000000+10:00");
+
+        KanbanCalendarItemModel unzoned = result.Calendar.Items.Single(i => i.Card.Name == "Unzoned");
+        unzoned.Instant.Should().BeNull();
+        unzoned.EndInstant.Should().BeNull();
     }
 
     [Fact]
@@ -201,11 +229,11 @@ public class KanbanCalendarServiceTests
         {
             DateProperty = "start",
             CategoryProperty = "kind",
-            CategoryOverrides = [new KanbanLaneOverride { Value = "workshop", Colour = "red" }],
+            CategoryOverrides = [new KanbanGroupOverride { Value = "workshop", Colour = "red" }],
         });
-        harness.LaneResolver.Lanes.AddRange([
-            new KanbanLane { Value = "workshop", Name = "Workshop", Colour = "red" },
-            KanbanLane.Unassigned(),
+        harness.LaneResolver.Groups.AddRange([
+            new KanbanGroup { Value = "workshop", Name = "Workshop", Colour = "red" },
+            KanbanGroup.Unassigned(),
         ]);
         Child(harness, "A", """{"date":"2026-08-15T10:00:00"}""", kind: "workshop");
 
@@ -218,6 +246,70 @@ public class KanbanCalendarServiceTests
         (Guid _, KanbanBoardConfiguration adapter) = harness.LaneResolver.Calls.Single();
         adapter.LaneProperty.Should().Be("kind");
         adapter.LaneOverrides.Should().ContainSingle(o => o.Value == "workshop");
+    }
+
+    [Fact]
+    public async Task Drops_a_hidden_category_and_the_items_carrying_it()
+    {
+        Harness harness = Configured(new KanbanCalendarConfiguration
+        {
+            DateProperty = "start",
+            CategoryProperty = "kind",
+        });
+        harness.LaneResolver.Groups.AddRange([
+            new KanbanGroup { Value = "workshop", Name = "Workshop" },
+            new KanbanGroup { Value = "private", Name = "Private", Hidden = true },
+            KanbanGroup.Unassigned(),
+        ]);
+        Child(harness, "Shown", """{"date":"2026-08-15T10:00:00"}""", kind: "workshop");
+        Child(harness, "Hidden", """{"date":"2026-08-15T11:00:00"}""", kind: "private");
+        Child(harness, "Uncategorised", """{"date":"2026-08-15T12:00:00"}""");
+
+        KanbanCalendarResult result = await harness.Service.GetCalendarAsync(Request(), User);
+
+        // An item with no category has no category to have hidden, so it stays.
+        result.Calendar!.Items.Select(i => i.Card.Name).Should().Equal("Shown", "Uncategorised");
+        result.Calendar.Categories.Select(c => c.Value).Should().Equal("workshop");
+    }
+
+    [Fact]
+    public async Task Matches_a_hidden_category_regardless_of_case()
+    {
+        Harness harness = Configured(new KanbanCalendarConfiguration
+        {
+            DateProperty = "start",
+            CategoryProperty = "kind",
+        });
+        harness.LaneResolver.Groups.AddRange([
+            new KanbanGroup { Value = "Private", Name = "Private", Hidden = true },
+            KanbanGroup.Unassigned(),
+        ]);
+        Child(harness, "Hidden", """{"date":"2026-08-15T11:00:00"}""", kind: "private");
+
+        KanbanCalendarResult result = await harness.Service.GetCalendarAsync(Request(), User);
+
+        result.Calendar!.Items.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_hidden_category_does_not_count_an_item_as_undated()
+    {
+        Harness harness = Configured(new KanbanCalendarConfiguration
+        {
+            DateProperty = "start",
+            CategoryProperty = "kind",
+        });
+        harness.LaneResolver.Groups.AddRange([
+            new KanbanGroup { Value = "private", Name = "Private", Hidden = true },
+            KanbanGroup.Unassigned(),
+        ]);
+        // Hidden and dateless: dropped for being hidden, so it is not also reported as an omitted date.
+        Child(harness, "Hidden", null, kind: "private");
+
+        KanbanCalendarResult result = await harness.Service.GetCalendarAsync(Request(), User);
+
+        result.Calendar!.Items.Should().BeEmpty();
+        result.Calendar.UndatedCount.Should().Be(0);
     }
 
     [Fact]
