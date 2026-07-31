@@ -49,6 +49,14 @@ export class UmbCommunityKanbanWorkspaceViewBoardElement extends UmbLitElement {
   @state()
   private _actions?: KanbanBoardActionsState;
 
+  /**
+   * The bar's measured height, handed to the board as its bottom inset so the viewport — and its
+   * horizontal scrollbar — end above the bar rather than underneath it. Measured, not assumed: the
+   * bar's height follows theme sizing variables.
+   */
+  @state()
+  private _barInset = 0;
+
   /** The parent/culture pair the board was last loaded for, so a re-render is not a re-fetch. */
   #loadedFor?: string;
 
@@ -125,6 +133,9 @@ export class UmbCommunityKanbanWorkspaceViewBoardElement extends UmbLitElement {
   }
 
   override updated() {
+    // Idempotent and change-guarded, so the update it schedules settles in one pass.
+    this.#measureBar();
+
     // The parent and culture arrive asynchronously and independently; load once both are real, and
     // again only when either actually changes.
     if (!this._parentId) {
@@ -140,6 +151,15 @@ export class UmbCommunityKanbanWorkspaceViewBoardElement extends UmbLitElement {
 
     this.#loadedFor = key;
     this.#board?.load();
+  }
+
+  #measureBar() {
+    const bar = this.shadowRoot?.querySelector('umb-community-kanban-action-bar');
+    const inset = bar ? Math.ceil(bar.getBoundingClientRect().height) : 0;
+
+    if (Math.abs(this._barInset - inset) >= 1) {
+      this._barInset = inset;
+    }
   }
 
   #onOpenDocument(event: CustomEvent<{ key: string }>) {
@@ -187,7 +207,6 @@ export class UmbCommunityKanbanWorkspaceViewBoardElement extends UmbLitElement {
 
     return html`
       <umb-community-kanban-action-bar
-        class="bar"
         .barState=${this._actions}
         @kanban-undo=${this.#onUndo}
         @kanban-publish=${this.#onPublish}></umb-community-kanban-action-bar>
@@ -197,10 +216,14 @@ export class UmbCommunityKanbanWorkspaceViewBoardElement extends UmbLitElement {
   override render() {
     if (!this._parentId) return html`<uui-loader></uui-loader>`;
 
+    // The bar sits in flow below the board rather than overlaying it: the board is told to end
+    // `bottom-inset` pixels early, so the bar lands exactly in the freed strip and neither the
+    // vertical scroll's end nor the horizontal scrollbar hides underneath it.
     return html`
       <umb-community-kanban-board
         parent-id=${this._parentId}
         config-id=${this.#configId ?? ''}
+        bottom-inset=${this._barInset}
         .culture=${this._culture}
         .datasource=${this.#datasource}
         @kanban-open-document=${this.#onOpenDocument}
@@ -211,19 +234,8 @@ export class UmbCommunityKanbanWorkspaceViewBoardElement extends UmbLitElement {
 
   static override styles = [
     css`
-      /* The bar overlays the foot of the tab rather than sitting below the board, because the board
-         sizes its viewport to the container bottom — a sibling below it would land past the fold and
-         grow a second scrollbar. Overlaying is also what the native bulk bar does over a collection. */
       :host {
         display: block;
-        position: relative;
-      }
-
-      .bar {
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        right: 0;
       }
     `,
   ];

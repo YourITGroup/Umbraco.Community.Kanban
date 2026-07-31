@@ -64,6 +64,15 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
   @property({ attribute: false })
   datasource?: KanbanDataSource;
 
+  /**
+   * Pixels to keep free below the board's viewport, inside its container. A host whose action bar
+   * lives in the same container (the workspace tab) sets this to the bar's height, so the viewport —
+   * and its horizontal scrollbar — end above the bar instead of underneath it. Hosts whose bar lives
+   * outside the measured container (the collection layout's footer slot) leave it at zero.
+   */
+  @property({ type: Number, attribute: 'bottom-inset' })
+  bottomInset = 0;
+
   @state()
   private _status: KanbanBoardStatus = 'idle';
 
@@ -424,10 +433,10 @@ export class UmbCommunityKanbanBoardElement extends UmbLitElement {
         rectTop,
         ancestors: this.#ancestorBoxes(),
       }),
-      // Nothing to reserve: this element has no padding of its own, the container's padding is already
-      // excluded by measuring its content box, and the action bar lives in the layout's footer — which the
-      // container's own height already accounts for.
-      gutter: 0,
+      // This element has no padding of its own and the container's padding is already excluded by
+      // measuring its content box — so the only thing ever reserved is what the host asks for: the
+      // height of an action bar sharing the container, zero everywhere else.
+      gutter: this.bottomInset,
       min: VIEWPORT_MIN_HEIGHT,
     });
 
