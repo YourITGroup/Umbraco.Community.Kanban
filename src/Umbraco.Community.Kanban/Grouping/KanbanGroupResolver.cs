@@ -1,15 +1,15 @@
 using Umbraco.Community.Kanban.Models;
 
-namespace Umbraco.Community.Kanban.Lanes;
+namespace Umbraco.Community.Kanban.Grouping;
 
 /// <inheritdoc />
-public sealed class KanbanLaneResolver(
+public sealed class KanbanGroupResolver(
     IKanbanPropertyDataTypeLookup lookup,
-    KanbanLaneSourceCollection sources) : IKanbanLaneResolver
+    KanbanGroupSourceCollection sources) : IKanbanGroupResolver
 {
-    public async Task<KanbanLaneResolution> ResolveAsync(Guid contentTypeKey, KanbanBoardConfiguration configuration)
+    public async Task<KanbanGroupResolution> ResolveAsync(Guid contentTypeKey, KanbanBoardConfiguration configuration)
     {
-        var lanes = await GetLanesAsync(contentTypeKey, configuration);
+        var lanes = await GetGroupsAsync(contentTypeKey, configuration);
 
         // Apply runs before Assign, but under their current semantics the two are commutative:
         // Apply unconditionally overwrites a lane's colour whenever the override supplies one,
@@ -18,25 +18,25 @@ public sealed class KanbanLaneResolver(
         // precede the palette) rather than enforced by behaviour. If either collaborator's
         // overwrite semantics change — e.g. Assign starts overwriting non-blank colours, or
         // Apply starts respecting an existing colour — this ordering becomes load-bearing again.
-        var unmatched = KanbanLaneOverrideApplier.Apply(lanes, configuration.LaneOverrides);
+        var unmatched = KanbanGroupOverrideApplier.Apply(lanes, configuration.LaneOverrides);
 
         // Colours are assigned in source order, before the display order is applied, so dragging a
         // lane changes which column it is in and nothing else.
-        KanbanLaneColourAssigner.Assign(lanes);
+        KanbanGroupColourAssigner.Assign(lanes);
 
-        var ordered = KanbanLaneOrderApplier.Apply(lanes, configuration.LaneOrder).ToList();
+        var ordered = KanbanGroupOrderApplier.Apply(lanes, configuration.LaneOrder).ToList();
 
         // The unassigned lane leads: cards with no value are usually the ones needing attention, and
         // it is never part of the configured order, having no stored value to order by.
-        ordered.Insert(0, KanbanLane.Unassigned());
+        ordered.Insert(0, KanbanGroup.Unassigned());
 
         // Only the unassigned lane still needs a colour, and Assign is what knows it is neutral.
-        KanbanLaneColourAssigner.Assign(ordered);
+        KanbanGroupColourAssigner.Assign(ordered);
 
-        return new KanbanLaneResolution(ordered, unmatched);
+        return new KanbanGroupResolution(ordered, unmatched);
     }
 
-    private async Task<List<KanbanLane>> GetLanesAsync(Guid contentTypeKey, KanbanBoardConfiguration configuration)
+    private async Task<List<KanbanGroup>> GetGroupsAsync(Guid contentTypeKey, KanbanBoardConfiguration configuration)
     {
         if (string.IsNullOrWhiteSpace(configuration.LaneProperty))
         {
@@ -51,7 +51,7 @@ public sealed class KanbanLaneResolver(
             // The lane property may have been renamed or deleted since the board was configured.
             // Fall through to the same empty context the no-LaneProperty branch uses above: a
             // manual board pinned via LaneSource still resolves to its manual lanes because
-            // ManualLaneSource.CanHandle keys off configuration, not editor alias. A non-manual
+            // ManualGroupSource.CanHandle keys off configuration, not editor alias. A non-manual
             // board still collapses to the unassigned lane, since no source claims an empty
             // editor alias.
             var staleProperty = BuildContext(string.Empty, new Dictionary<string, object>(), configuration);
@@ -62,7 +62,7 @@ public sealed class KanbanLaneResolver(
         return await ResolveFromSourcesAsync(context);
     }
 
-    private async Task<List<KanbanLane>> ResolveFromSourcesAsync(KanbanLaneSourceContext context)
+    private async Task<List<KanbanGroup>> ResolveFromSourcesAsync(KanbanGroupSourceContext context)
     {
         var source = SelectSource(context);
         if (source is null)
@@ -70,15 +70,15 @@ public sealed class KanbanLaneResolver(
             return [];
         }
 
-        var lanes = await source.GetLanesAsync(context);
+        var lanes = await source.GetGroupsAsync(context);
         return lanes.ToList();
     }
 
-    private IKanbanLaneSource? SelectSource(KanbanLaneSourceContext context)
+    private IKanbanGroupSource? SelectSource(KanbanGroupSourceContext context)
     {
         // An explicitly pinned source wins, so an editor can force manual lanes
         // over an editor a built-in source would otherwise claim.
-        var pinnedAlias = context.Configuration.PinnedLaneSource;
+        var pinnedAlias = context.Configuration.PinnedGroupSource;
 
         if (string.IsNullOrWhiteSpace(pinnedAlias) == false)
         {
@@ -94,7 +94,7 @@ public sealed class KanbanLaneResolver(
         return sources.FirstOrDefault(x => x.CanHandle(context));
     }
 
-    private static KanbanLaneSourceContext BuildContext(
+    private static KanbanGroupSourceContext BuildContext(
         string editorAlias,
         IDictionary<string, object> configurationData,
         KanbanBoardConfiguration configuration) =>

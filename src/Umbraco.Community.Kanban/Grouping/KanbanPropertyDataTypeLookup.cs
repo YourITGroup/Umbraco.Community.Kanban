@@ -1,7 +1,7 @@
 using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Services;
 
-namespace Umbraco.Community.Kanban.Lanes;
+namespace Umbraco.Community.Kanban.Grouping;
 
 /// <inheritdoc />
 public sealed class KanbanPropertyDataTypeLookup(

@@ -1,19 +1,19 @@
-using Umbraco.Community.Kanban.Lanes;
+using Umbraco.Community.Kanban.Grouping;
 using Umbraco.Community.Kanban.Models;
 
 namespace Umbraco.Community.Kanban.Tests.Lanes;
 
-public class KanbanLaneColourAssignerTests
+public class KanbanGroupColourAssignerTests
 {
-    private static List<KanbanLane> Lanes(int count) =>
+    private static List<KanbanGroup> Lanes(int count) =>
         Enumerable.Range(0, count)
-            .Select(i => new KanbanLane { Value = $"lane{i}", Name = $"Lane {i}" })
+            .Select(i => new KanbanGroup { Value = $"lane{i}", Name = $"Lane {i}" })
             .ToList();
 
     [Fact]
     public void Palette_IsTheEightNonLegacyUmbracoColours()
     {
-        KanbanLanePalette.Cycle.Should().Equal(
+        KanbanGroupPalette.Cycle.Should().Equal(
             "yellow", "pink", "blue", "light-blue", "red", "green", "brown", "grey");
     }
 
@@ -22,7 +22,7 @@ public class KanbanLaneColourAssignerTests
     {
         var lanes = Lanes(3);
 
-        KanbanLaneColourAssigner.Assign(lanes);
+        KanbanGroupColourAssigner.Assign(lanes);
 
         lanes.Select(x => x.Colour).Should().Equal("yellow", "pink", "blue");
     }
@@ -32,7 +32,7 @@ public class KanbanLaneColourAssignerTests
     {
         var lanes = Lanes(10);
 
-        KanbanLaneColourAssigner.Assign(lanes);
+        KanbanGroupColourAssigner.Assign(lanes);
 
         lanes[8].Colour.Should().Be("yellow");
         lanes[9].Colour.Should().Be("pink");
@@ -44,7 +44,7 @@ public class KanbanLaneColourAssignerTests
         var lanes = Lanes(3);
         lanes[1].Colour = "#ff0000";
 
-        KanbanLaneColourAssigner.Assign(lanes);
+        KanbanGroupColourAssigner.Assign(lanes);
 
         lanes.Select(x => x.Colour).Should().Equal("yellow", "#ff0000", "blue");
     }
@@ -53,11 +53,11 @@ public class KanbanLaneColourAssignerTests
     public void Assign_IndexesFromTheFullOrderSoAnOverrideDoesNotShiftOtherLanes()
     {
         var withoutOverride = Lanes(3);
-        KanbanLaneColourAssigner.Assign(withoutOverride);
+        KanbanGroupColourAssigner.Assign(withoutOverride);
 
         var withOverride = Lanes(3);
         withOverride[0].Colour = "#ff0000";
-        KanbanLaneColourAssigner.Assign(withOverride);
+        KanbanGroupColourAssigner.Assign(withOverride);
 
         withOverride[1].Colour.Should().Be(withoutOverride[1].Colour);
         withOverride[2].Colour.Should().Be(withoutOverride[2].Colour);
@@ -67,9 +67,9 @@ public class KanbanLaneColourAssignerTests
     public void Assign_SkipsTheUnassignedLaneAndLeavesItGrey()
     {
         var lanes = Lanes(2);
-        lanes.Add(KanbanLane.Unassigned());
+        lanes.Add(KanbanGroup.Unassigned());
 
-        KanbanLaneColourAssigner.Assign(lanes);
+        KanbanGroupColourAssigner.Assign(lanes);
 
         lanes[2].Colour.Should().Be("grey");
         lanes.Select(x => x.Colour).Should().Equal("yellow", "pink", "grey");
@@ -80,9 +80,9 @@ public class KanbanLaneColourAssignerTests
     {
         var lanes = Lanes(4);
 
-        KanbanLaneColourAssigner.Assign(lanes);
+        KanbanGroupColourAssigner.Assign(lanes);
         var first = lanes.Select(x => x.Colour).ToArray();
-        KanbanLaneColourAssigner.Assign(lanes);
+        KanbanGroupColourAssigner.Assign(lanes);
 
         lanes.Select(x => x.Colour).Should().Equal(first);
     }

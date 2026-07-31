@@ -2,28 +2,28 @@ using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging.Abstractions;
 using Umbraco.Community.Contentment.DataEditors;
 using Umbraco.Community.Kanban.Contentment.Tests.Fakes;
-using Umbraco.Community.Kanban.Lanes;
-using Umbraco.Community.Kanban.Lanes.Sources;
+using Umbraco.Community.Kanban.Grouping;
+using Umbraco.Community.Kanban.Grouping.Sources;
 using Umbraco.Community.Kanban.Models;
 
 namespace Umbraco.Community.Kanban.Contentment.Tests;
 
 /// <summary>
-/// The lane source through the real <see cref="KanbanLaneResolver" />, with the built-in sources
+/// The group source through the real <see cref="KanbanGroupResolver" />, with the built-in sources
 /// alongside it — the arrangement a live site has.
 /// </summary>
 public class ContentmentLaneResolutionTests
 {
     private static readonly Guid ContentTypeKey = Guid.Parse("8f6f5f4e-0000-4000-8000-000000000001");
 
-    private static KanbanLaneResolver Resolver(IContentmentDataListItems items, IKanbanPropertyDataTypeLookup lookup) =>
+    private static KanbanGroupResolver Resolver(IContentmentDataListItems items, IKanbanPropertyDataTypeLookup lookup) =>
         new(
             lookup,
-            new KanbanLaneSourceCollection(() =>
+            new KanbanGroupSourceCollection(() =>
             [
-                new ManualLaneSource(),
-                new CoreListEditorLaneSource(),
-                new ContentmentDataListLaneSource(items, NullLogger<ContentmentDataListLaneSource>.Instance),
+                new ManualGroupSource(),
+                new CoreListEditorGroupSource(),
+                new ContentmentDataListGroupSource(items, NullLogger<ContentmentDataListGroupSource>.Instance),
             ]));
 
     private static FakePropertyDataTypeLookup StatusIsADataList() =>
@@ -43,7 +43,7 @@ public class ContentmentLaneResolutionTests
             new DataListItem { Value = "confirmed", Name = "Confirmed" });
         var configuration = new KanbanBoardConfiguration { LaneProperty = "status" };
 
-        KanbanLaneResolution result = await Resolver(items, StatusIsADataList())
+        KanbanGroupResolution result = await Resolver(items, StatusIsADataList())
             .ResolveAsync(ContentTypeKey, configuration);
 
         result.Lanes.Where(lane => lane.IsUnassigned == false).Select(lane => lane.Value)
@@ -59,7 +59,7 @@ public class ContentmentLaneResolutionTests
         var items = new FakeContentmentDataListItems(new DataListItem { Value = "pending", Name = "Pending" });
         var configuration = new KanbanBoardConfiguration { LaneProperty = "status" };
 
-        KanbanLaneResolution result = await Resolver(items, StatusIsADataList())
+        KanbanGroupResolution result = await Resolver(items, StatusIsADataList())
             .ResolveAsync(ContentTypeKey, configuration);
 
         result.Lanes.First().Colour.Should().NotBeNullOrWhiteSpace();
@@ -75,10 +75,10 @@ public class ContentmentLaneResolutionTests
         {
             LaneProperty = "status",
             UseManualLanes = true,
-            ManualLanes = [new KanbanManualLane { Value = "custom", Label = "Custom" }],
+            ManualLanes = [new KanbanManualGroup { Value = "custom", Label = "Custom" }],
         };
 
-        KanbanLaneResolution result = await Resolver(items, StatusIsADataList())
+        KanbanGroupResolution result = await Resolver(items, StatusIsADataList())
             .ResolveAsync(ContentTypeKey, configuration);
 
         result.Lanes.Where(lane => lane.IsUnassigned == false).Select(lane => lane.Value)

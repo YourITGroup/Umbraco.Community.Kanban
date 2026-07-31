@@ -27,11 +27,11 @@ public static class Constants
     public const int DefaultCalendarCap = 500;
 
     /// <summary>
-    /// The alias of the lane source that reads lanes typed into the board configuration.
-    /// Lives here rather than only on <c>ManualLaneSource</c> because
-    /// <see cref="Models.KanbanBoardConfiguration" /> pins it without depending on the Lanes namespace.
+    /// The alias of the group source that reads groups typed into the configuration by hand.
+    /// Lives here rather than only on <c>ManualGroupSource</c> because
+    /// <see cref="Models.KanbanBoardConfiguration" /> pins it without depending on the Grouping namespace.
     /// </summary>
-    public const string ManualLaneSourceAlias = "manual";
+    public const string ManualGroupSourceAlias = "manual";
 
     /// <summary>How many children a board reads before it reports itself truncated.</summary>
     public const int DefaultChildCap = 1000;

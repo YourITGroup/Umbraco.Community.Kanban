@@ -1,14 +1,14 @@
-using Umbraco.Community.Kanban.Lanes;
+using Umbraco.Community.Kanban.Grouping;
 using Umbraco.Community.Kanban.Models;
 
 namespace Umbraco.Community.Kanban.Tests.Lanes;
 
-public class KanbanLaneOrderApplierTests
+public class KanbanGroupOrderApplierTests
 {
-    private static List<KanbanLane> Lanes(params string[] values) =>
-        values.Select(value => new KanbanLane { Value = value, Name = value }).ToList();
+    private static List<KanbanGroup> Lanes(params string[] values) =>
+        values.Select(value => new KanbanGroup { Value = value, Name = value }).ToList();
 
-    private static string[] Values(IEnumerable<KanbanLane> lanes) =>
+    private static string[] Values(IEnumerable<KanbanGroup> lanes) =>
         lanes.Select(lane => lane.Value).ToArray();
 
     [Fact]
@@ -16,7 +16,7 @@ public class KanbanLaneOrderApplierTests
     {
         var lanes = Lanes("pending", "confirmed", "cancelled");
 
-        var ordered = KanbanLaneOrderApplier.Apply(lanes, ["cancelled", "confirmed", "pending"]);
+        var ordered = KanbanGroupOrderApplier.Apply(lanes, ["cancelled", "confirmed", "pending"]);
 
         Values(ordered).Should().Equal("cancelled", "confirmed", "pending");
     }
@@ -28,7 +28,7 @@ public class KanbanLaneOrderApplierTests
         // is the only position that does not reorder the lanes an editor arranged deliberately.
         var lanes = Lanes("pending", "confirmed", "archived", "cancelled");
 
-        var ordered = KanbanLaneOrderApplier.Apply(lanes, ["cancelled", "pending"]);
+        var ordered = KanbanGroupOrderApplier.Apply(lanes, ["cancelled", "pending"]);
 
         Values(ordered).Should().Equal("cancelled", "pending", "confirmed", "archived");
     }
@@ -38,7 +38,7 @@ public class KanbanLaneOrderApplierTests
     {
         var lanes = Lanes("pending", "confirmed");
 
-        var ordered = KanbanLaneOrderApplier.Apply(lanes, ["confirmed", "renamed-away", "pending"]);
+        var ordered = KanbanGroupOrderApplier.Apply(lanes, ["confirmed", "renamed-away", "pending"]);
 
         Values(ordered).Should().Equal("confirmed", "pending");
     }
@@ -48,7 +48,7 @@ public class KanbanLaneOrderApplierTests
     {
         var lanes = Lanes("Pending", "Confirmed");
 
-        var ordered = KanbanLaneOrderApplier.Apply(lanes, ["confirmed", "PENDING"]);
+        var ordered = KanbanGroupOrderApplier.Apply(lanes, ["confirmed", "PENDING"]);
 
         Values(ordered).Should().Equal("Confirmed", "Pending");
     }
@@ -59,8 +59,8 @@ public class KanbanLaneOrderApplierTests
         // Every board configured before laneOrder existed is in this state.
         var lanes = Lanes("pending", "confirmed", "cancelled");
 
-        Values(KanbanLaneOrderApplier.Apply(lanes, null)).Should().Equal("pending", "confirmed", "cancelled");
-        Values(KanbanLaneOrderApplier.Apply(lanes, [])).Should().Equal("pending", "confirmed", "cancelled");
+        Values(KanbanGroupOrderApplier.Apply(lanes, null)).Should().Equal("pending", "confirmed", "cancelled");
+        Values(KanbanGroupOrderApplier.Apply(lanes, [])).Should().Equal("pending", "confirmed", "cancelled");
     }
 
     [Fact]
@@ -68,7 +68,7 @@ public class KanbanLaneOrderApplierTests
     {
         var lanes = Lanes("pending", "confirmed");
 
-        var ordered = KanbanLaneOrderApplier.Apply(lanes, ["", "   ", "confirmed"]);
+        var ordered = KanbanGroupOrderApplier.Apply(lanes, ["", "   ", "confirmed"]);
 
         Values(ordered).Should().Equal("confirmed", "pending");
     }
@@ -78,7 +78,7 @@ public class KanbanLaneOrderApplierTests
     {
         var lanes = Lanes("pending", "confirmed");
 
-        KanbanLaneOrderApplier.Apply(lanes, ["confirmed", "pending"]);
+        KanbanGroupOrderApplier.Apply(lanes, ["confirmed", "pending"]);
 
         Values(lanes).Should().Equal("pending", "confirmed");
     }
@@ -90,7 +90,7 @@ public class KanbanLaneOrderApplierTests
         // The order names one position, so the second lane sorts as unlisted, after the listed ones.
         var lanes = Lanes("Todo", "todo", "done");
 
-        var ordered = KanbanLaneOrderApplier.Apply(lanes, ["done", "todo"]);
+        var ordered = KanbanGroupOrderApplier.Apply(lanes, ["done", "todo"]);
 
         Values(ordered).Should().Equal("done", "Todo", "todo");
     }

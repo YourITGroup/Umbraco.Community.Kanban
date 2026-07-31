@@ -2,10 +2,10 @@ namespace Umbraco.Community.Kanban.Models;
 
 /// <summary>
 /// A lane typed by hand into the board configuration.
-/// Separate from <see cref="KanbanLane"/> so runtime-only fields never end up
+/// Separate from <see cref="KanbanGroup"/> so runtime-only fields never end up
 /// in the stored data type configuration.
 /// </summary>
-public class KanbanManualLane
+public class KanbanManualGroup
 {
     public string Value { get; set; } = string.Empty;
 

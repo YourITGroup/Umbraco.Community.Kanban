@@ -3,7 +3,7 @@ using Umbraco.Cms.Core.Actions;
 using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Models.Membership;
 using Umbraco.Cms.Core.Security.Authorization;
-using Umbraco.Community.Kanban.Lanes;
+using Umbraco.Community.Kanban.Grouping;
 using Umbraco.Community.Kanban.Models;
 using Umbraco.Community.Kanban.Models.Api;
 
@@ -14,7 +14,7 @@ public sealed class KanbanCalendarService(
     IKanbanContentLoader contentLoader,
     IKanbanCalendarConfigurationResolver configurationResolver,
     IKanbanLaneContentTypeResolver laneContentTypeResolver,
-    IKanbanLaneResolver laneResolver,
+    IKanbanGroupResolver laneResolver,
     IContentPermissionAuthorizer permissionAuthorizer,
     IKanbanPropertyValueReader propertyValueReader) : IKanbanCalendarService
 {
@@ -191,7 +191,7 @@ public sealed class KanbanCalendarService(
             parent.ContentType.Key,
             configuration.CategoryProperty);
 
-        KanbanLaneResolution resolution = await laneResolver.ResolveAsync(contentTypeKey, new KanbanBoardConfiguration
+        KanbanGroupResolution resolution = await laneResolver.ResolveAsync(contentTypeKey, new KanbanBoardConfiguration
         {
             LaneProperty = configuration.CategoryProperty,
             ManualLanes = configuration.CategoryManualValues,

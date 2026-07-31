@@ -10,7 +10,7 @@ const row = (value: string, orphaned = false): KanbanLaneOverrideRow => ({
 
 const values = (rows: KanbanLaneOverrideRow[]) => rows.map((r) => r.value);
 
-// The same cases KanbanLaneOrderApplierTests asserts server-side. The two implementations must agree,
+// The same cases KanbanGroupOrderApplierTests asserts server-side. The two implementations must agree,
 // or the editor shows an order the board does not render.
 describe('orderLaneRows', () => {
   it('puts listed rows in the listed order', () => {

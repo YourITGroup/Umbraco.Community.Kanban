@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Umbraco.Community.Contentment.DataEditors;
-using Umbraco.Community.Kanban.Lanes;
+using Umbraco.Community.Kanban.Grouping;
 using Umbraco.Community.Kanban.Models;
 
 namespace Umbraco.Community.Kanban.Contentment;
@@ -10,24 +10,24 @@ namespace Umbraco.Community.Kanban.Contentment;
 /// Any data source works, including custom ones, because resolution goes through Contentment's
 /// <c>IContentmentDataSource</c> rather than enumerating known source types.
 /// </summary>
-public sealed class ContentmentDataListLaneSource(
+public sealed class ContentmentDataListGroupSource(
     IContentmentDataListItems items,
-    ILogger<ContentmentDataListLaneSource> logger) : IKanbanLaneSource
+    ILogger<ContentmentDataListGroupSource> logger) : IKanbanGroupSource
 {
-    public string Alias => ContentmentConstants.LaneSourceAlias;
+    public string Alias => ContentmentConstants.GroupSourceAlias;
 
-    public bool CanHandle(KanbanLaneSourceContext context) =>
+    public bool CanHandle(KanbanGroupSourceContext context) =>
         string.Equals(context.EditorAlias, ContentmentConstants.DataListEditorAlias, StringComparison.OrdinalIgnoreCase);
 
-    public Task<IReadOnlyList<KanbanLane>> GetLanesAsync(KanbanLaneSourceContext context)
+    public Task<IReadOnlyList<KanbanGroup>> GetGroupsAsync(KanbanGroupSourceContext context)
     {
         if (ContentmentDataListConfiguration.TryRead(context.ConfigurationData, out ContentmentDataSourceReference? reference) == false
             || reference is null)
         {
-            return Task.FromResult<IReadOnlyList<KanbanLane>>([]);
+            return Task.FromResult<IReadOnlyList<KanbanGroup>>([]);
         }
 
-        IReadOnlyList<KanbanLane> lanes = Read(reference)
+        IReadOnlyList<KanbanGroup> lanes = Read(reference)
             .Where(item => string.IsNullOrWhiteSpace(item.Value) == false)
             .Select(ToLane)
             .ToList();
@@ -57,7 +57,7 @@ public sealed class ContentmentDataListLaneSource(
         }
     }
 
-    private static KanbanLane ToLane(DataListItem item) => new()
+    private static KanbanGroup ToLane(DataListItem item) => new()
     {
         // Blank values are filtered out before this runs, so Value is known to be present.
         Value = item.Value!,

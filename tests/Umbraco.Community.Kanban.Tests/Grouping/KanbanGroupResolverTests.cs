@@ -1,16 +1,16 @@
-using Umbraco.Community.Kanban.Lanes;
-using Umbraco.Community.Kanban.Lanes.Sources;
+using Umbraco.Community.Kanban.Grouping;
+using Umbraco.Community.Kanban.Grouping.Sources;
 using Umbraco.Community.Kanban.Models;
 using Umbraco.Community.Kanban.Tests.Fakes;
 
 namespace Umbraco.Community.Kanban.Tests.Lanes;
 
-public class KanbanLaneResolverTests
+public class KanbanGroupResolverTests
 {
     private static readonly Guid ContentTypeKey = Guid.Parse("8f6f5f4e-0000-4000-8000-000000000001");
 
-    private static KanbanLaneResolver Resolver(IKanbanPropertyDataTypeLookup lookup) =>
-        new(lookup, new KanbanLaneSourceCollection(() => [new ManualLaneSource(), new CoreListEditorLaneSource()]));
+    private static KanbanGroupResolver Resolver(IKanbanPropertyDataTypeLookup lookup) =>
+        new(lookup, new KanbanGroupSourceCollection(() => [new ManualGroupSource(), new CoreListEditorGroupSource()]));
 
     [Fact]
     public async Task Resolve_UsesTheSourceThatHandlesTheEditor()
@@ -33,7 +33,7 @@ public class KanbanLaneResolverTests
         {
             LaneProperty = "status",
             LaneSource = "manual",
-            ManualLanes = [new KanbanManualLane { Value = "custom", Label = "Custom" }],
+            ManualLanes = [new KanbanManualGroup { Value = "custom", Label = "Custom" }],
         };
 
         var result = await Resolver(lookup).ResolveAsync(ContentTypeKey, configuration);
@@ -52,7 +52,7 @@ public class KanbanLaneResolverTests
         {
             LaneProperty = "status",
             UseManualLanes = true,
-            ManualLanes = [new KanbanManualLane { Value = "custom", Label = "Custom" }],
+            ManualLanes = [new KanbanManualGroup { Value = "custom", Label = "Custom" }],
         };
 
         var result = await Resolver(lookup).ResolveAsync(ContentTypeKey, configuration);
@@ -134,7 +134,7 @@ public class KanbanLaneResolverTests
     /// only ever fills in a colour that is still blank) the two orders are commutative, and no
     /// fixture built from their public behaviour can distinguish them. It proves only that an
     /// override colour wins over the palette colour that colour assignment would otherwise have
-    /// given that lane. See the comment on <see cref="KanbanLaneResolver.ResolveAsync"/> for the
+    /// given that lane. See the comment on <see cref="KanbanGroupResolver.ResolveAsync"/> for the
     /// full note on why the pipeline order is chosen for clarity rather than enforced here.
     /// </summary>
     [Fact]
@@ -145,7 +145,7 @@ public class KanbanLaneResolverTests
         var configuration = new KanbanBoardConfiguration
         {
             LaneProperty = "status",
-            LaneOverrides = [new KanbanLaneOverride { Value = "Open", Colour = "red", Label = "Blocked" }],
+            LaneOverrides = [new KanbanGroupOverride { Value = "Open", Colour = "red", Label = "Blocked" }],
         };
 
         var result = await Resolver(lookup).ResolveAsync(ContentTypeKey, configuration);
@@ -163,7 +163,7 @@ public class KanbanLaneResolverTests
         var configuration = new KanbanBoardConfiguration
         {
             LaneProperty = "status",
-            LaneOverrides = [new KanbanLaneOverride { Value = "Archived", Colour = "grey" }],
+            LaneOverrides = [new KanbanGroupOverride { Value = "Archived", Colour = "grey" }],
         };
 
         var result = await Resolver(lookup).ResolveAsync(ContentTypeKey, configuration);
@@ -203,7 +203,7 @@ public class KanbanLaneResolverTests
         {
             LaneProperty = "status",
             LaneSource = "manual",
-            ManualLanes = [new KanbanManualLane { Value = "custom", Label = "Custom" }],
+            ManualLanes = [new KanbanManualGroup { Value = "custom", Label = "Custom" }],
         };
 
         var result = await Resolver(lookup).ResolveAsync(ContentTypeKey, configuration);

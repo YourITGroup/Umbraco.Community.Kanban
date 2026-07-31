@@ -2,8 +2,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Community.Kanban.Controllers;
 using Umbraco.Community.Kanban.Extensions;
-using Umbraco.Community.Kanban.Lanes;
-using Umbraco.Community.Kanban.Lanes.Sources;
+using Umbraco.Community.Kanban.Grouping;
+using Umbraco.Community.Kanban.Grouping.Sources;
 
 namespace Umbraco.Community.Kanban.Tests.Composing;
 
@@ -13,7 +13,7 @@ public class RegistrationTests
     public void AddKanban_RegistersTheBuiltInSources_ManualFirst()
     {
         // Exercises the real composition path — builder.AddKanban() — rather than
-        // constructing a KanbanLaneSourceCollection by hand, so a regression that
+        // constructing a KanbanGroupSourceCollection by hand, so a regression that
         // reorders or drops the .Append<>() calls in AddKanban() would fail this test.
         // Manual must come first so a pinned manual configuration is found before
         // a built-in source claims the editor.
@@ -23,16 +23,16 @@ public class RegistrationTests
         builder.Build();
 
         using ServiceProvider provider = builder.Services.BuildServiceProvider();
-        var sources = provider.GetRequiredService<KanbanLaneSourceCollection>();
+        var sources = provider.GetRequiredService<KanbanGroupSourceCollection>();
 
-        sources.First().Should().BeOfType<ManualLaneSource>();
-        sources.Should().ContainSingle(x => x is CoreListEditorLaneSource);
+        sources.First().Should().BeOfType<ManualGroupSource>();
+        sources.Should().ContainSingle(x => x is CoreListEditorGroupSource);
     }
 
     [Fact]
     public void AddKanban_RegistersTheLaneResolverAndPropertyDataTypeLookup()
     {
-        // AddKanban() registers IKanbanLaneResolver -> KanbanLaneResolver and
+        // AddKanban() registers IKanbanGroupResolver -> KanbanGroupResolver and
         // IKanbanPropertyDataTypeLookup -> KanbanPropertyDataTypeLookup. We assert the
         // registrations rather than resolving instances: KanbanPropertyDataTypeLookup
         // depends on IContentTypeService/IDataTypeService, whose own dependencies
@@ -46,8 +46,8 @@ public class RegistrationTests
         builder.AddKanban();
 
         builder.Services.Should().ContainSingle(d =>
-            d.ServiceType == typeof(IKanbanLaneResolver) &&
-            d.ImplementationType == typeof(KanbanLaneResolver) &&
+            d.ServiceType == typeof(IKanbanGroupResolver) &&
+            d.ImplementationType == typeof(KanbanGroupResolver) &&
             d.Lifetime == ServiceLifetime.Singleton);
 
         builder.Services.Should().ContainSingle(d =>

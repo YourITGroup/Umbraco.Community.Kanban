@@ -6,10 +6,10 @@ namespace Umbraco.Community.Kanban.Tests.Services;
 
 public class KanbanBoardComposerTests
 {
-    private static KanbanLane Lane(string value) => new() { Value = value, Name = value };
+    private static KanbanGroup Lane(string value) => new() { Value = value, Name = value };
 
-    private static IReadOnlyList<KanbanLane> Lanes() =>
-        [Lane("todo"), Lane("doing"), KanbanLane.Unassigned()];
+    private static IReadOnlyList<KanbanGroup> Lanes() =>
+        [Lane("todo"), Lane("doing"), KanbanGroup.Unassigned()];
 
     private static KanbanCardModel Card(string name) => new()
     {
@@ -68,10 +68,10 @@ public class KanbanBoardComposerTests
     [Fact]
     public void Carries_lane_appearance_through()
     {
-        var lanes = new List<KanbanLane>
+        var lanes = new List<KanbanGroup>
         {
             new() { Value = "todo", Name = "To do", Colour = "blue", Icon = "icon-box", AcceptsDrops = true },
-            KanbanLane.Unassigned(),
+            KanbanGroup.Unassigned(),
         };
 
         KanbanBoardLaneModel lane = KanbanBoardComposer
@@ -169,7 +169,7 @@ public class KanbanBoardComposerTests
     [Fact]
     public void Drops_unmatched_cards_when_there_is_no_unassigned_lane()
     {
-        var lanes = new List<KanbanLane> { new() { Value = "todo", Name = "To do" } };
+        var lanes = new List<KanbanGroup> { new() { Value = "todo", Name = "To do" } };
 
         KanbanBoardResponseModel board = KanbanBoardComposer.Compose(
             new KanbanBoardComposerRequest(lanes, [At("archived", "a")], 1, false, 25, null, 0));

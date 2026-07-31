@@ -1,6 +1,6 @@
 import { moveItem } from '../move-item.js';
 
-/** Mirrors KanbanManualLane on the server. */
+/** Mirrors KanbanManualGroup on the server. */
 export interface KanbanManualLaneValue {
   value: string;
   label?: string;

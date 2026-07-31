@@ -1,4 +1,4 @@
-using Umbraco.Community.Kanban.Lanes;
+using Umbraco.Community.Kanban.Grouping;
 
 namespace Umbraco.Community.Kanban.Tests.Fakes;
 

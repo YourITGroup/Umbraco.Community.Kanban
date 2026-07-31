@@ -2,12 +2,12 @@ using Umbraco.Community.Kanban.Models;
 
 namespace Umbraco.Community.Kanban.Tests.Lanes;
 
-public class KanbanLaneTests
+public class KanbanGroupTests
 {
     [Fact]
     public void ALane_AcceptsDropsByDefault()
     {
-        var lane = new KanbanLane { Value = "open", Name = "Open" };
+        var lane = new KanbanGroup { Value = "open", Name = "Open" };
 
         lane.AcceptsDrops.Should().BeTrue();
         lane.IsUnassigned.Should().BeFalse();
@@ -17,7 +17,7 @@ public class KanbanLaneTests
     [Fact]
     public void TheUnassignedLane_IsDragOutOnly()
     {
-        var lane = KanbanLane.Unassigned();
+        var lane = KanbanGroup.Unassigned();
 
         lane.IsUnassigned.Should().BeTrue();
         lane.AcceptsDrops.Should().BeFalse();

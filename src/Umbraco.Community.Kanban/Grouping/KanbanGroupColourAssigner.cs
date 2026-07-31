@@ -1,11 +1,11 @@
 using Umbraco.Community.Kanban.Models;
 
-namespace Umbraco.Community.Kanban.Lanes;
+namespace Umbraco.Community.Kanban.Grouping;
 
 /// <summary>
 /// Fills in a colour for lanes that do not already have one.
 /// </summary>
-public static class KanbanLaneColourAssigner
+public static class KanbanGroupColourAssigner
 {
     /// <summary>
     /// Assigns palette colours in place. A lane's colour comes from its position among the
@@ -19,7 +19,7 @@ public static class KanbanLaneColourAssigner
     /// colour of its own happened to sit. Call this before applying a display order, so that
     /// reordering lanes moves columns without recolouring them.
     /// </remarks>
-    public static void Assign(IReadOnlyList<KanbanLane> lanes)
+    public static void Assign(IReadOnlyList<KanbanGroup> lanes)
     {
         var position = 0;
 
@@ -27,7 +27,7 @@ public static class KanbanLaneColourAssigner
         {
             if (lane.IsUnassigned)
             {
-                lane.Colour = KanbanLanePalette.Neutral;
+                lane.Colour = KanbanGroupPalette.Neutral;
                 continue;
             }
 
@@ -38,7 +38,7 @@ public static class KanbanLaneColourAssigner
                 continue;
             }
 
-            lane.Colour = KanbanLanePalette.Cycle[palettePosition % KanbanLanePalette.Cycle.Count];
+            lane.Colour = KanbanGroupPalette.Cycle[palettePosition % KanbanGroupPalette.Cycle.Count];
         }
     }
 }

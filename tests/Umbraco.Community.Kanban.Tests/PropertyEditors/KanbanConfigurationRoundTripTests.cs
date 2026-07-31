@@ -71,7 +71,7 @@ public class KanbanConfigurationRoundTripTests
 
         var configuration = configurationObject.Should().BeOfType<KanbanBoardConfiguration>().Subject;
         configuration.UseManualLanes.Should().BeTrue();
-        configuration.PinnedLaneSource.Should().Be("manual");
+        configuration.PinnedGroupSource.Should().Be("manual");
     }
 
     [Fact]

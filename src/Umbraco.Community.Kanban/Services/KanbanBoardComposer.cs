@@ -16,7 +16,7 @@ public sealed record KanbanCardAssignment(string LaneValue, KanbanCardModel Card
 /// <param name="ShowChildItems">Whether cards list their children, echoed to the client.</param>
 /// <param name="AllowDrag">Whether the board permits dragging cards between lanes, echoed to the client.</param>
 public sealed record KanbanBoardComposerRequest(
-    IReadOnlyList<KanbanLane> Lanes,
+    IReadOnlyList<KanbanGroup> Lanes,
     IReadOnlyList<KanbanCardAssignment> Cards,
     int ChildCount,
     bool Truncated,
@@ -36,7 +36,7 @@ public static class KanbanBoardComposer
     {
         Dictionary<string, List<KanbanCardModel>> grouped = Group(request.Lanes, request.Cards);
 
-        IEnumerable<KanbanLane> lanes = request.Lane is null
+        IEnumerable<KanbanGroup> lanes = request.Lane is null
             ? request.Lanes
             : request.Lanes.Where(lane => Matches(lane, request.Lane));
 
@@ -54,27 +54,27 @@ public static class KanbanBoardComposer
         };
     }
 
-    private static bool Matches(KanbanLane lane, string requested) =>
+    private static bool Matches(KanbanGroup lane, string requested) =>
         string.Equals(lane.Value, requested, StringComparison.OrdinalIgnoreCase);
 
     private static Dictionary<string, List<KanbanCardModel>> Group(
-        IReadOnlyList<KanbanLane> lanes,
+        IReadOnlyList<KanbanGroup> lanes,
         IReadOnlyList<KanbanCardAssignment> cards)
     {
         var grouped = new Dictionary<string, List<KanbanCardModel>>();
 
-        foreach (KanbanLane lane in lanes)
+        foreach (KanbanGroup lane in lanes)
         {
             // Duplicate lane values are possible from editor-authored data; the first wins,
             // as it does everywhere else in the lane pipeline.
             grouped.TryAdd(lane.Value, []);
         }
 
-        KanbanLane? unassigned = lanes.FirstOrDefault(lane => lane.IsUnassigned);
+        KanbanGroup? unassigned = lanes.FirstOrDefault(lane => lane.IsUnassigned);
 
         foreach (KanbanCardAssignment assignment in cards)
         {
-            KanbanLane? target = string.IsNullOrEmpty(assignment.LaneValue)
+            KanbanGroup? target = string.IsNullOrEmpty(assignment.LaneValue)
                 ? unassigned
                 : lanes.FirstOrDefault(lane => Matches(lane, assignment.LaneValue)) ?? unassigned;
 
@@ -88,7 +88,7 @@ public static class KanbanBoardComposer
     }
 
     private static KanbanBoardLaneModel Project(
-        KanbanLane lane,
+        KanbanGroup lane,
         List<KanbanCardModel> cards,
         int skip,
         int pageSize,

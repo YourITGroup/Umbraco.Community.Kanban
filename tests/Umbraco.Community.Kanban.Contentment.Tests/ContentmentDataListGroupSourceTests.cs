@@ -2,19 +2,19 @@ using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging.Abstractions;
 using Umbraco.Community.Contentment.DataEditors;
 using Umbraco.Community.Kanban.Contentment.Tests.Fakes;
-using Umbraco.Community.Kanban.Lanes;
+using Umbraco.Community.Kanban.Grouping;
 using Umbraco.Community.Kanban.Models;
 
 namespace Umbraco.Community.Kanban.Contentment.Tests;
 
-public class ContentmentDataListLaneSourceTests
+public class ContentmentDataListGroupSourceTests
 {
     private const string SourceKey = "Some.Source, Some.Assembly";
 
-    private static ContentmentDataListLaneSource Source(IContentmentDataListItems items) =>
-        new(items, NullLogger<ContentmentDataListLaneSource>.Instance);
+    private static ContentmentDataListGroupSource Source(IContentmentDataListItems items) =>
+        new(items, NullLogger<ContentmentDataListGroupSource>.Instance);
 
-    private static KanbanLaneSourceContext Context(
+    private static KanbanGroupSourceContext Context(
         string editorAlias = ContentmentConstants.DataListEditorAlias,
         KanbanBoardConfiguration? configuration = null) =>
         new(
@@ -49,7 +49,7 @@ public class ContentmentDataListLaneSourceTests
     {
         var items = new FakeContentmentDataListItems();
 
-        await Source(items).GetLanesAsync(Context());
+        await Source(items).GetGroupsAsync(Context());
 
         items.Requested!.Key.Should().Be(SourceKey);
         items.Requested.ValueJson.Should().Contain("\"a\"");
@@ -61,7 +61,7 @@ public class ContentmentDataListLaneSourceTests
         var items = new FakeContentmentDataListItems(
             new DataListItem { Value = "confirmed", Name = "Confirmed", Icon = "icon-check" });
 
-        IReadOnlyList<KanbanLane> lanes = await Source(items).GetLanesAsync(Context());
+        IReadOnlyList<KanbanGroup> lanes = await Source(items).GetGroupsAsync(Context());
 
         lanes.Should().ContainSingle();
         lanes[0].Value.Should().Be("confirmed");
@@ -74,7 +74,7 @@ public class ContentmentDataListLaneSourceTests
     {
         var items = new FakeContentmentDataListItems(new DataListItem { Value = "confirmed", Name = "" });
 
-        IReadOnlyList<KanbanLane> lanes = await Source(items).GetLanesAsync(Context());
+        IReadOnlyList<KanbanGroup> lanes = await Source(items).GetGroupsAsync(Context());
 
         lanes[0].Name.Should().Be("confirmed");
     }
@@ -86,7 +86,7 @@ public class ContentmentDataListLaneSourceTests
         // rejected: lane colour comes from an override or the cycle.
         var items = new FakeContentmentDataListItems(new DataListItem { Value = "confirmed", Name = "Confirmed" });
 
-        IReadOnlyList<KanbanLane> lanes = await Source(items).GetLanesAsync(Context());
+        IReadOnlyList<KanbanGroup> lanes = await Source(items).GetGroupsAsync(Context());
 
         lanes[0].Colour.Should().BeNull();
     }
@@ -96,7 +96,7 @@ public class ContentmentDataListLaneSourceTests
     {
         var items = new FakeContentmentDataListItems(new DataListItem { Value = "confirmed", Icon = "" });
 
-        IReadOnlyList<KanbanLane> lanes = await Source(items).GetLanesAsync(Context());
+        IReadOnlyList<KanbanGroup> lanes = await Source(items).GetGroupsAsync(Context());
 
         lanes[0].Icon.Should().BeNull();
     }
@@ -108,7 +108,7 @@ public class ContentmentDataListLaneSourceTests
             new DataListItem { Value = "cancelled", Name = "Cancelled", Disabled = true },
             new DataListItem { Value = "confirmed", Name = "Confirmed" });
 
-        IReadOnlyList<KanbanLane> lanes = await Source(items).GetLanesAsync(Context());
+        IReadOnlyList<KanbanGroup> lanes = await Source(items).GetGroupsAsync(Context());
 
         lanes[0].AcceptsDrops.Should().BeFalse();
         lanes[1].AcceptsDrops.Should().BeTrue();
@@ -123,7 +123,7 @@ public class ContentmentDataListLaneSourceTests
             new DataListItem { Value = null, Name = "Also nameless" },
             new DataListItem { Value = "confirmed", Name = "Confirmed" });
 
-        IReadOnlyList<KanbanLane> lanes = await Source(items).GetLanesAsync(Context());
+        IReadOnlyList<KanbanGroup> lanes = await Source(items).GetGroupsAsync(Context());
 
         lanes.Select(lane => lane.Value).Should().Equal("confirmed");
     }
@@ -136,7 +136,7 @@ public class ContentmentDataListLaneSourceTests
             new DataListItem { Value = "confirmed" },
             new DataListItem { Value = "cancelled" });
 
-        IReadOnlyList<KanbanLane> lanes = await Source(items).GetLanesAsync(Context());
+        IReadOnlyList<KanbanGroup> lanes = await Source(items).GetGroupsAsync(Context());
 
         lanes.Select(lane => lane.Value).Should().Equal("pending", "confirmed", "cancelled");
     }
@@ -144,12 +144,12 @@ public class ContentmentDataListLaneSourceTests
     [Fact]
     public async Task GetLanes_ReturnsNothingWhenTheConfigurationNamesNoDataSource()
     {
-        var context = new KanbanLaneSourceContext(
+        var context = new KanbanGroupSourceContext(
             ContentmentConstants.DataListEditorAlias,
             new Dictionary<string, object>(),
             new KanbanBoardConfiguration());
 
-        IReadOnlyList<KanbanLane> lanes = await Source(new FakeContentmentDataListItems()).GetLanesAsync(context);
+        IReadOnlyList<KanbanGroup> lanes = await Source(new FakeContentmentDataListItems()).GetGroupsAsync(context);
 
         lanes.Should().BeEmpty();
     }
@@ -158,8 +158,8 @@ public class ContentmentDataListLaneSourceTests
     public async Task GetLanes_ReturnsNothingWhenTheDataSourceThrows()
     {
         // GetItems runs third-party code. An empty board is recoverable; a 500 from GET /board is not.
-        IReadOnlyList<KanbanLane> lanes =
-            await Source(FakeContentmentDataListItems.Throwing()).GetLanesAsync(Context());
+        IReadOnlyList<KanbanGroup> lanes =
+            await Source(FakeContentmentDataListItems.Throwing()).GetGroupsAsync(Context());
 
         lanes.Should().BeEmpty();
     }

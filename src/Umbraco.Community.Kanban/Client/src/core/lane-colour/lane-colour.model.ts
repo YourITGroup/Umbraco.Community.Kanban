@@ -1,4 +1,4 @@
-/** Mirrors KanbanLanePalette.Cycle on the server. Keep the two in step. */
+/** Mirrors KanbanGroupPalette.Cycle on the server. Keep the two in step. */
 export const KANBAN_LANE_PALETTE = [
   'yellow',
   'pink',

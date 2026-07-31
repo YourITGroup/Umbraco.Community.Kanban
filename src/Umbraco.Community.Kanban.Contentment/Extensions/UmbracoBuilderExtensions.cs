@@ -7,7 +7,7 @@ namespace Umbraco.Community.Kanban.Contentment.Extensions;
 public static class UmbracoBuilderExtensions
 {
     /// <summary>
-    /// Registers the Contentment Data List lane source. Safe to call more than once.
+    /// Registers the Contentment Data List group source. Safe to call more than once.
     /// </summary>
     public static IUmbracoBuilder AddKanbanContentment(this IUmbracoBuilder builder)
     {
@@ -23,8 +23,8 @@ public static class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IContentmentDataListItems, ContentmentDataListItems>();
 
         // Appended last, which is safe: no built-in source claims the Data List alias, and a
-        // configuration pinning "manual" still wins through KanbanBoardConfiguration.PinnedLaneSource.
-        builder.KanbanLaneSources().Append<ContentmentDataListLaneSource>();
+        // configuration pinning "manual" still wins through KanbanBoardConfiguration.PinnedGroupSource.
+        builder.KanbanGroupSources().Append<ContentmentDataListGroupSource>();
 
         return builder;
     }

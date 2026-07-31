@@ -3,7 +3,7 @@ namespace Umbraco.Community.Kanban.Models;
 /// <summary>
 /// An editor-supplied appearance override for one lane, applied whatever source produced it.
 /// </summary>
-public class KanbanLaneOverride
+public class KanbanGroupOverride
 {
     /// <summary>The lane value this override targets.</summary>
     public string Value { get; set; } = string.Empty;

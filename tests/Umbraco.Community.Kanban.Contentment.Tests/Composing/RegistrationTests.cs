@@ -3,8 +3,8 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Community.Kanban.Contentment.Extensions;
 using Umbraco.Community.Kanban.Contentment.Tests.Fakes;
-using Umbraco.Community.Kanban.Lanes;
-using Umbraco.Community.Kanban.Lanes.Sources;
+using Umbraco.Community.Kanban.Grouping;
+using Umbraco.Community.Kanban.Grouping.Sources;
 
 namespace Umbraco.Community.Kanban.Contentment.Tests.Composing;
 
@@ -42,13 +42,13 @@ public class RegistrationTests
         builder.Build();
 
         using ServiceProvider provider = builder.Services.BuildServiceProvider();
-        var sources = provider.GetRequiredService<KanbanLaneSourceCollection>();
+        var sources = provider.GetRequiredService<KanbanGroupSourceCollection>();
 
         // Manual stays first so a pinned manual configuration is found before any source claims
         // the editor.
-        sources.First().Should().BeOfType<ManualLaneSource>();
-        sources.Should().ContainSingle(x => x is CoreListEditorLaneSource);
-        sources.Should().ContainSingle(x => x is ContentmentDataListLaneSource);
+        sources.First().Should().BeOfType<ManualGroupSource>();
+        sources.Should().ContainSingle(x => x is CoreListEditorGroupSource);
+        sources.Should().ContainSingle(x => x is ContentmentDataListGroupSource);
     }
 
     [Fact]

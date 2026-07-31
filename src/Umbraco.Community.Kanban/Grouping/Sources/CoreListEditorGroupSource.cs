@@ -1,13 +1,13 @@
 using System.Text.Json.Nodes;
 using Umbraco.Community.Kanban.Models;
 
-namespace Umbraco.Community.Kanban.Lanes.Sources;
+namespace Umbraco.Community.Kanban.Grouping.Sources;
 
 /// <summary>
 /// Resolves lanes from the core list editors, all of which store their options
 /// under the <c>items</c> configuration key.
 /// </summary>
-public sealed class CoreListEditorLaneSource : IKanbanLaneSource
+public sealed class CoreListEditorGroupSource : IKanbanGroupSource
 {
     private static readonly HashSet<string> SupportedEditorAliases = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -18,14 +18,14 @@ public sealed class CoreListEditorLaneSource : IKanbanLaneSource
 
     public string Alias => "core-list-editor";
 
-    public bool CanHandle(KanbanLaneSourceContext context) =>
+    public bool CanHandle(KanbanGroupSourceContext context) =>
         SupportedEditorAliases.Contains(context.EditorAlias);
 
-    public Task<IReadOnlyList<KanbanLane>> GetLanesAsync(KanbanLaneSourceContext context)
+    public Task<IReadOnlyList<KanbanGroup>> GetGroupsAsync(KanbanGroupSourceContext context)
     {
-        IReadOnlyList<KanbanLane> lanes = ReadItems(context.ConfigurationData)
+        IReadOnlyList<KanbanGroup> lanes = ReadItems(context.ConfigurationData)
             .Where(item => string.IsNullOrWhiteSpace(item) == false)
-            .Select(item => new KanbanLane { Value = item, Name = item })
+            .Select(item => new KanbanGroup { Value = item, Name = item })
             .ToList();
 
         return Task.FromResult(lanes);

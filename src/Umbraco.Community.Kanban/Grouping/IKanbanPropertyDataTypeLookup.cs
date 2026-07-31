@@ -1,4 +1,4 @@
-namespace Umbraco.Community.Kanban.Lanes;
+namespace Umbraco.Community.Kanban.Grouping;
 
 /// <summary>The editor alias and configuration of the data type behind a content type property.</summary>
 public sealed record KanbanPropertyDataType(string EditorAlias, IDictionary<string, object> ConfigurationData);

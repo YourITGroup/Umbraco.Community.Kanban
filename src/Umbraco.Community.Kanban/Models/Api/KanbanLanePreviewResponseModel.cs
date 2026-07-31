@@ -1,4 +1,4 @@
-using Umbraco.Community.Kanban.Lanes;
+using Umbraco.Community.Kanban.Grouping;
 
 namespace Umbraco.Community.Kanban.Models.Api;
 
@@ -27,7 +27,7 @@ public sealed class KanbanLanePreviewResponseModel
     /// </summary>
     public string[] UnmatchedOverrides { get; init; } = [];
 
-    public static KanbanLanePreviewResponseModel From(KanbanLaneResolution resolution) => new()
+    public static KanbanLanePreviewResponseModel From(KanbanGroupResolution resolution) => new()
     {
         Lanes = resolution.Lanes
             .Select(lane => new KanbanLaneModel

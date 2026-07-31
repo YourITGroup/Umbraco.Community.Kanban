@@ -1,26 +1,26 @@
-using Umbraco.Community.Kanban.Lanes;
+using Umbraco.Community.Kanban.Grouping;
 using Umbraco.Community.Kanban.Models;
 
 namespace Umbraco.Community.Kanban.Tests.Lanes;
 
-public class KanbanLaneOverrideApplierTests
+public class KanbanGroupOverrideApplierTests
 {
-    private static List<KanbanLane> Lanes() =>
+    private static List<KanbanGroup> Lanes() =>
     [
-        new KanbanLane { Value = "todo", Name = "To do" },
-        new KanbanLane { Value = "done", Name = "Done", Colour = "green" },
+        new KanbanGroup { Value = "todo", Name = "To do" },
+        new KanbanGroup { Value = "done", Name = "Done", Colour = "green" },
     ];
 
     [Fact]
     public void Apply_SetsColourIconAndLabel()
     {
         var lanes = Lanes();
-        KanbanLaneOverride[] overrides =
+        KanbanGroupOverride[] overrides =
         [
             new() { Value = "todo", Colour = "red", Icon = "icon-alert", Label = "Blocked" },
         ];
 
-        KanbanLaneOverrideApplier.Apply(lanes, overrides);
+        KanbanGroupOverrideApplier.Apply(lanes, overrides);
 
         lanes[0].Colour.Should().Be("red");
         lanes[0].Icon.Should().Be("icon-alert");
@@ -31,9 +31,9 @@ public class KanbanLaneOverrideApplierTests
     public void Apply_BeatsAColourTheSourceSupplied()
     {
         var lanes = Lanes();
-        KanbanLaneOverride[] overrides = [new() { Value = "done", Colour = "brown" }];
+        KanbanGroupOverride[] overrides = [new() { Value = "done", Colour = "brown" }];
 
-        KanbanLaneOverrideApplier.Apply(lanes, overrides);
+        KanbanGroupOverrideApplier.Apply(lanes, overrides);
 
         lanes[1].Colour.Should().Be("brown");
     }
@@ -42,9 +42,9 @@ public class KanbanLaneOverrideApplierTests
     public void Apply_LeavesFieldsTheOverrideDoesNotSet()
     {
         var lanes = Lanes();
-        KanbanLaneOverride[] overrides = [new() { Value = "done", Icon = "icon-check" }];
+        KanbanGroupOverride[] overrides = [new() { Value = "done", Icon = "icon-check" }];
 
-        KanbanLaneOverrideApplier.Apply(lanes, overrides);
+        KanbanGroupOverrideApplier.Apply(lanes, overrides);
 
         lanes[1].Colour.Should().Be("green");
         lanes[1].Name.Should().Be("Done");
@@ -55,9 +55,9 @@ public class KanbanLaneOverrideApplierTests
     public void Apply_MatchesLaneValuesCaseInsensitively()
     {
         var lanes = Lanes();
-        KanbanLaneOverride[] overrides = [new() { Value = "TODO", Colour = "red" }];
+        KanbanGroupOverride[] overrides = [new() { Value = "TODO", Colour = "red" }];
 
-        KanbanLaneOverrideApplier.Apply(lanes, overrides);
+        KanbanGroupOverrideApplier.Apply(lanes, overrides);
 
         lanes[0].Colour.Should().Be("red");
     }
@@ -66,13 +66,13 @@ public class KanbanLaneOverrideApplierTests
     public void Apply_ReturnsOverridesThatMatchedNothing()
     {
         var lanes = Lanes();
-        KanbanLaneOverride[] overrides =
+        KanbanGroupOverride[] overrides =
         [
             new() { Value = "todo", Colour = "red" },
             new() { Value = "archived", Colour = "grey" },
         ];
 
-        var unmatched = KanbanLaneOverrideApplier.Apply(lanes, overrides);
+        var unmatched = KanbanGroupOverrideApplier.Apply(lanes, overrides);
 
         unmatched.Select(x => x.Value).Should().Equal("archived");
     }
@@ -82,7 +82,7 @@ public class KanbanLaneOverrideApplierTests
     {
         var lanes = Lanes();
 
-        var unmatched = KanbanLaneOverrideApplier.Apply(lanes, []);
+        var unmatched = KanbanGroupOverrideApplier.Apply(lanes, []);
 
         unmatched.Should().BeEmpty();
         lanes[0].Colour.Should().BeNull();
@@ -94,14 +94,14 @@ public class KanbanLaneOverrideApplierTests
         // A dropdown with both "Todo" and "todo" as distinct options is plausible,
         // editor-authorable data. Nothing upstream prevents it, so Apply must not throw
         // when two lanes collide once compared case-insensitively - the first lane wins.
-        List<KanbanLane> lanes =
+        List<KanbanGroup> lanes =
         [
-            new KanbanLane { Value = "Todo", Name = "Todo", Colour = "blue", Icon = "icon-alert" },
-            new KanbanLane { Value = "todo", Name = "todo (duplicate)" },
+            new KanbanGroup { Value = "Todo", Name = "Todo", Colour = "blue", Icon = "icon-alert" },
+            new KanbanGroup { Value = "todo", Name = "todo (duplicate)" },
         ];
-        KanbanLaneOverride[] overrides = [new() { Value = "TODO", Colour = "red" }];
+        KanbanGroupOverride[] overrides = [new() { Value = "TODO", Colour = "red" }];
 
-        Action act = () => KanbanLaneOverrideApplier.Apply(lanes, overrides);
+        Action act = () => KanbanGroupOverrideApplier.Apply(lanes, overrides);
 
         act.Should().NotThrow();
         lanes[0].Colour.Should().Be("red");

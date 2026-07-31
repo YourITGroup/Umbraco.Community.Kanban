@@ -1,4 +1,4 @@
-namespace Umbraco.Community.Kanban.Lanes;
+namespace Umbraco.Community.Kanban.Grouping;
 
 /// <summary>
 /// The colour aliases lanes cycle through when nothing supplies one.
@@ -6,7 +6,7 @@ namespace Umbraco.Community.Kanban.Lanes;
 /// the palette behind the content type icon colour picker, minus <c>text</c> —
 /// which is a text colour rather than a hue.
 /// </summary>
-public static class KanbanLanePalette
+public static class KanbanGroupPalette
 {
     public static readonly IReadOnlyList<string> Cycle =
     [

@@ -3,7 +3,7 @@ namespace Umbraco.Community.Kanban.Models;
 /// <summary>
 /// A single swimlane on a board.
 /// </summary>
-public class KanbanLane
+public class KanbanGroup
 {
     /// <summary>The stored property value that puts a card in this lane.</summary>
     public string Value { get; set; } = string.Empty;
@@ -23,7 +23,7 @@ public class KanbanLane
     public bool AcceptsDrops { get; set; } = true;
 
     /// <summary>Creates the synthetic unassigned lane, which is always neutral and drag-out-only.</summary>
-    public static KanbanLane Unassigned() => new()
+    public static KanbanGroup Unassigned() => new()
     {
         Value = string.Empty,
         Name = "Unassigned",

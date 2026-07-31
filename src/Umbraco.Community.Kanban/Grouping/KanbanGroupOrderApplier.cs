@@ -1,11 +1,11 @@
 using Umbraco.Community.Kanban.Models;
 
-namespace Umbraco.Community.Kanban.Lanes;
+namespace Umbraco.Community.Kanban.Grouping;
 
 /// <summary>
 /// Puts lanes in the order an editor arranged, whatever produced them.
 /// </summary>
-public static class KanbanLaneOrderApplier
+public static class KanbanGroupOrderApplier
 {
     /// <summary>
     /// Returns the lanes in <paramref name="laneOrder" />'s order.
@@ -16,8 +16,8 @@ public static class KanbanLaneOrderApplier
     /// being dropped. A listed value matching no lane is ignored — the same situation as an orphaned
     /// override, and unlike one there is nothing to show for it, because order is not styling.
     /// </remarks>
-    public static IReadOnlyList<KanbanLane> Apply(
-        IReadOnlyList<KanbanLane> lanes,
+    public static IReadOnlyList<KanbanGroup> Apply(
+        IReadOnlyList<KanbanGroup> lanes,
         IReadOnlyList<string>? laneOrder)
     {
         if (laneOrder is null || laneOrder.Count == 0)
@@ -61,7 +61,7 @@ public static class KanbanLaneOrderApplier
             .ToList();
     }
 
-    private static int Position(KanbanLane lane, Dictionary<string, int> positions, HashSet<int> claimed)
+    private static int Position(KanbanGroup lane, Dictionary<string, int> positions, HashSet<int> claimed)
     {
         if (positions.TryGetValue(lane.Value, out var position) && claimed.Add(position))
         {

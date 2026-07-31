@@ -1,4 +1,4 @@
-using Umbraco.Community.Kanban.Lanes;
+using Umbraco.Community.Kanban.Grouping;
 using Umbraco.Community.Kanban.Models;
 using Umbraco.Community.Kanban.Models.Api;
 
@@ -9,8 +9,8 @@ public class KanbanLanePreviewResponseModelTests
     [Fact]
     public void From_CopiesEveryLaneField()
     {
-        var resolution = new KanbanLaneResolution(
-            [new KanbanLane { Value = "open", Name = "Open", Colour = "yellow", Icon = "icon-box", AcceptsDrops = true }],
+        var resolution = new KanbanGroupResolution(
+            [new KanbanGroup { Value = "open", Name = "Open", Colour = "yellow", Icon = "icon-box", AcceptsDrops = true }],
             []);
 
         var model = KanbanLanePreviewResponseModel.From(resolution);
@@ -27,9 +27,9 @@ public class KanbanLanePreviewResponseModelTests
     [Fact]
     public void From_ReportsUnmatchedOverridesByValue()
     {
-        var resolution = new KanbanLaneResolution(
+        var resolution = new KanbanGroupResolution(
             [],
-            [new KanbanLaneOverride { Value = "archived" }]);
+            [new KanbanGroupOverride { Value = "archived" }]);
 
         var model = KanbanLanePreviewResponseModel.From(resolution);
 

@@ -20,7 +20,7 @@ public class KanbanCalendarServiceTests
         KanbanCalendarService Service,
         FakeKanbanContentLoader Loader,
         FakeContentPermissionAuthorizer Permissions,
-        FakeKanbanLaneResolver LaneResolver,
+        FakeKanbanGroupResolver LaneResolver,
         FakeKanbanConfigurationService Configurations,
         ContentType ChildContentType);
 
@@ -65,7 +65,7 @@ public class KanbanCalendarServiceTests
         loader.Content[ParentKey] = parent;
 
         var permissions = new FakeContentPermissionAuthorizer();
-        var laneResolver = new FakeKanbanLaneResolver();
+        var laneResolver = new FakeKanbanGroupResolver();
 
         var contentTypes = new FakeKanbanContentTypeLookup();
         contentTypes.AllowedChildren[parentContentType.Key] = [ChildTypeKey];
@@ -229,11 +229,11 @@ public class KanbanCalendarServiceTests
         {
             DateProperty = "start",
             CategoryProperty = "kind",
-            CategoryOverrides = [new KanbanLaneOverride { Value = "workshop", Colour = "red" }],
+            CategoryOverrides = [new KanbanGroupOverride { Value = "workshop", Colour = "red" }],
         });
         harness.LaneResolver.Lanes.AddRange([
-            new KanbanLane { Value = "workshop", Name = "Workshop", Colour = "red" },
-            KanbanLane.Unassigned(),
+            new KanbanGroup { Value = "workshop", Name = "Workshop", Colour = "red" },
+            KanbanGroup.Unassigned(),
         ]);
         Child(harness, "A", """{"date":"2026-08-15T10:00:00"}""", kind: "workshop");
 
