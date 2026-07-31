@@ -1,4 +1,4 @@
-import { customElement, html, property, state } from '@umbraco-cms/backoffice/external/lit';
+import { css, customElement, html, property, state } from '@umbraco-cms/backoffice/external/lit';
 import { UmbLitElement } from '@umbraco-cms/backoffice/lit-element';
 import { UMB_VARIANT_CONTEXT } from '@umbraco-cms/backoffice/variant';
 import { UMB_DOCUMENT_WORKSPACE_CONTEXT } from '@umbraco-cms/backoffice/document';
@@ -67,6 +67,20 @@ export class UmbCommunityKanbanWorkspaceViewCalendarElement extends UmbLitElemen
         .culture=${this._culture}></umb-community-kanban-standalone-calendar>
     `;
   }
+
+  static override styles = [
+    css`
+      /*
+       * Padded here rather than in the calendar, which stays layout-neutral for the collection and
+       * standalone hosts. Unlike the board this is safe as ordinary padding: the calendar is a plain
+       * block that grows to its content and measures no heights.
+       */
+      :host {
+        display: block;
+        padding: 1rem;
+      }
+    `,
+  ];
 }
 
 export { UmbCommunityKanbanWorkspaceViewCalendarElement as element };

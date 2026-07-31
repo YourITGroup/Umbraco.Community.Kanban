@@ -1,4 +1,4 @@
-import { customElement, html, state } from '@umbraco-cms/backoffice/external/lit';
+import { css, customElement, html, state } from '@umbraco-cms/backoffice/external/lit';
 import { UmbLitElement } from '@umbraco-cms/backoffice/lit-element';
 import { UMB_ENTITY_CONTEXT } from '@umbraco-cms/backoffice/entity';
 import { UMB_VARIANT_CONTEXT } from '@umbraco-cms/backoffice/variant';
@@ -57,6 +57,16 @@ export class UmbCommunityKanbanCollectionViewCalendarElement extends UmbLitEleme
         .culture=${this._culture}></umb-community-kanban-standalone-calendar>
     `;
   }
+
+  static override styles = [
+    css`
+      /* Horizontal only: the collection already spaces the view vertically. */
+      :host {
+        display: block;
+        padding: 0 1rem;
+      }
+    `,
+  ];
 }
 
 export { UmbCommunityKanbanCollectionViewCalendarElement as element };

@@ -81,6 +81,19 @@ export class UmbCommunityKanbanCalendarElement extends UmbLitElement {
   /** The viewer's zone, read once: it identifies the browser, not anything that changes per render. */
   #viewerTimeZone = getClientTimeZone().value;
 
+  /**
+   * The toolbar is sticky, so the grids' own sticky headings have to stick *below* it or they scroll
+   * underneath and the dates the toolbar names go missing. Its height is measured rather than
+   * hard-coded because the toolbar wraps at narrow widths, and published as a custom property —
+   * custom properties inherit through shadow roots, so each grid reads it without knowing us.
+   */
+  #toolbarResizeObserver = new ResizeObserver((entries) => {
+    // The rect, not contentRect: the toolbar's own padding is part of what covers the scrolling grid.
+    const height = entries[0]?.target.getBoundingClientRect().height ?? 0;
+
+    this.style.setProperty('--kanban-calendar-sticky-top', `${Math.ceil(height)}px`);
+  });
+
   constructor() {
     super();
 
@@ -89,6 +102,23 @@ export class UmbCommunityKanbanCalendarElement extends UmbLitElement {
     if (stored === 'month' || stored === 'week' || stored === 'agenda') {
       this._view = stored;
     }
+  }
+
+  override connectedCallback() {
+    super.connectedCallback();
+
+    // Re-observed on every connect, not once in firstUpdated: disconnecting the element stops the
+    // observer, and moving an element (a workspace view being re-slotted) is a reconnect.
+    void this.updateComplete.then(() => {
+      const toolbar = this.shadowRoot?.querySelector('.toolbar');
+
+      if (toolbar) this.#toolbarResizeObserver.observe(toolbar);
+    });
+  }
+
+  override disconnectedCallback() {
+    this.#toolbarResizeObserver.disconnect();
+    super.disconnectedCallback();
   }
 
   override updated() {
@@ -360,11 +390,24 @@ export class UmbCommunityKanbanCalendarElement extends UmbLitElement {
         display: block;
       }
 
+      /*
+       * Sticky, so which month or week you are looking at — and the controls that change it — stay
+       * put while the grid scrolls. The spacing below the buttons is padding rather than margin
+       * because a margin is transparent: cards would surface in the gap before sliding under.
+       */
       .toolbar {
+        position: sticky;
+        top: 0;
+        /* Above the grids' own sticky headings (z-index: 2), which stick below this one. */
+        z-index: 3;
+        /* The page's own background, so the sticky bar reads as page rather than as a panel over it —
+           the same token chain umb-body-layout paints its body with, so a host recolouring the layout
+           takes the toolbar with it. */
+        background: var(--umb-body-layout-color-background, var(--uui-color-background));
         display: flex;
         align-items: center;
         gap: var(--uui-size-space-4);
-        margin-bottom: var(--uui-size-space-3);
+        padding-bottom: var(--uui-size-space-3);
       }
 
       .title {
