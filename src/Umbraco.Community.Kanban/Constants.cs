@@ -20,6 +20,12 @@ public static class Constants
     /// </summary>
     public const string BoardConfigIdKey = "kanban.boardConfigId";
 
+    /// <summary>The extra configuration alias naming a Calendar configuration on a Collection data type.</summary>
+    public const string CalendarConfigIdKey = "kanban.calendarConfigId";
+
+    /// <summary>The most items one calendar range request returns; past it the response flags truncation.</summary>
+    public const int DefaultCalendarCap = 500;
+
     /// <summary>
     /// The alias of the lane source that reads lanes typed into the board configuration.
     /// Lives here rather than only on <c>ManualLaneSource</c> because

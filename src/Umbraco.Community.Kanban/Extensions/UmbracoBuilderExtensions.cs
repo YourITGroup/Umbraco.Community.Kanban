@@ -33,6 +33,8 @@ public static class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IKanbanPropertyValueReader, KanbanPropertyValueReader>();
         builder.Services.AddSingleton<IKanbanBoardService, KanbanBoardService>();
         builder.Services.AddSingleton<IKanbanCardService, KanbanCardService>();
+        builder.Services.AddSingleton<IKanbanCalendarConfigurationResolver, KanbanCalendarConfigurationResolver>();
+        builder.Services.AddSingleton<IKanbanCalendarService, KanbanCalendarService>();
 
         // Manual is appended first so a configuration that pins it wins over an
         // editor-matching source.

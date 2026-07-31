@@ -34,8 +34,13 @@ public class KanbanCalendarConfiguration
     [ConfigurationField("categoryOverrides")]
     public KanbanLaneOverride[] CategoryOverrides { get; set; } = [];
 
+    /// <summary>
+    /// The properties shown as summary items on a card. The converter also accepts the bare alias
+    /// array this was before the calendar shared the board's card-properties editor.
+    /// </summary>
     [ConfigurationField("cardProperties")]
-    public string[] CardProperties { get; set; } = [];
+    [JsonConverter(typeof(KanbanCardPropertyArrayJsonConverter))]
+    public KanbanCardProperty[] CardProperties { get; set; } = [];
 
     [ConfigurationField("showAgenda")]
     public bool ShowAgenda { get; set; } = true;

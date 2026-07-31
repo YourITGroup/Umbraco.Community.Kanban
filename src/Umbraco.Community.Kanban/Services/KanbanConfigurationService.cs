@@ -81,6 +81,15 @@ public sealed class KanbanConfigurationService(
             : GetConfigurationObject(dataType) as KanbanBoardConfiguration;
     }
 
+    public async Task<KanbanCalendarConfiguration?> GetCalendarConfigurationAsync(Guid key)
+    {
+        IDataType? dataType = await dataTypeService.GetAsync(key);
+
+        return dataType is null || string.Equals(dataType.EditorAlias, Constants.CalendarEditorAlias, StringComparison.OrdinalIgnoreCase) == false
+            ? null
+            : GetConfigurationObject(dataType) as KanbanCalendarConfiguration;
+    }
+
     private object? GetConfigurationObject(IDataType dataType)
     {
         if (propertyEditors.TryGet(dataType.EditorAlias, out var editor) == false)

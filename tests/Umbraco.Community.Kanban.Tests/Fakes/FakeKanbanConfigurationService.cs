@@ -17,4 +17,11 @@ internal sealed class FakeKanbanConfigurationService : IKanbanConfigurationServi
         Task.FromResult(BoardConfigurations.TryGetValue(key, out KanbanBoardConfiguration? configuration)
             ? configuration
             : null);
+
+    public Dictionary<Guid, KanbanCalendarConfiguration> CalendarConfigurations { get; } = [];
+
+    public Task<KanbanCalendarConfiguration?> GetCalendarConfigurationAsync(Guid key) =>
+        Task.FromResult(CalendarConfigurations.TryGetValue(key, out KanbanCalendarConfiguration? configuration)
+            ? configuration
+            : null);
 }
