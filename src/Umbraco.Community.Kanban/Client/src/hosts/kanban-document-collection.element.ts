@@ -1,8 +1,9 @@
-import { css, customElement, html, state } from '@umbraco-cms/backoffice/external/lit';
+import { customElement, html, state } from '@umbraco-cms/backoffice/external/lit';
 import type { PropertyValues } from '@umbraco-cms/backoffice/external/lit';
 import { UMB_COLLECTION_CONTEXT, UmbCollectionDefaultElement } from '@umbraco-cms/backoffice/collection';
 import { UmbKanbanBoardActionsContext, type KanbanBoardActionsState } from '@/core/board-actions.context.js';
 import { isChromelessCollectionView } from './collection-chrome.model.js';
+import '@/core/kanban-action-bar.element.js';
 
 /**
  * The document collection, with the list view's own chrome hidden while a Kanban view is showing.
@@ -112,31 +113,11 @@ export class UmbCommunityKanbanDocumentCollectionElement extends UmbCollectionDe
     if (!actions || actions.pending === 0) return html``;
 
     return html`
-      <div id="board-actions" slot="footer">
-        <div class="summary">
-          ${actions.pending} ${actions.pending === 1 ? 'card has' : 'cards have'} pending changes
-        </div>
-        <div class="buttons">
-          <uui-button
-            look="secondary"
-            icon="icon-undo"
-            label="Undo the last move"
-            title="Undo the last move made on this board"
-            ?disabled=${!actions.canUndo || actions.busy}
-            @click=${this.#onUndo}>
-            Undo
-          </uui-button>
-          <uui-button
-            look="primary"
-            color="positive"
-            icon="icon-globe"
-            label="Publish pending changes"
-            ?disabled=${actions.busy}
-            @click=${this.#onPublish}>
-            Publish pending changes
-          </uui-button>
-        </div>
-      </div>
+      <umb-community-kanban-action-bar
+        slot="footer"
+        .barState=${actions}
+        @kanban-undo=${this.#onUndo}
+        @kanban-publish=${this.#onPublish}></umb-community-kanban-action-bar>
     `;
   }
 
@@ -152,28 +133,6 @@ export class UmbCommunityKanbanDocumentCollectionElement extends UmbCollectionDe
     ...(Array.isArray(UmbCollectionDefaultElement.styles)
       ? UmbCollectionDefaultElement.styles
       : [UmbCollectionDefaultElement.styles]),
-    css`
-      /* Mirrors core's own selection-action bar: same surface, contrast colour, padding and
-         space-between layout, in the same slot. */
-      #board-actions {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: var(--uui-size-3);
-        box-sizing: border-box;
-        width: 100%;
-        padding: var(--uui-size-space-4) var(--uui-size-space-6);
-        background-color: var(--uui-color-selected);
-        color: var(--uui-color-selected-contrast);
-      }
-
-      .summary,
-      .buttons {
-        display: flex;
-        align-items: center;
-        gap: var(--uui-size-3);
-      }
-    `,
   ];
 }
 
