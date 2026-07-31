@@ -1,10 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { KANBAN_COLLECTION_VIEW_BOARD_ALIAS } from '@/constants.js';
+import { KANBAN_COLLECTION_VIEW_BOARD_ALIAS, KANBAN_COLLECTION_VIEW_CALENDAR_ALIAS } from '@/constants.js';
 import { isChromelessCollectionView } from './collection-chrome.model.js';
 
 describe('isChromelessCollectionView', () => {
   it('hides the layout’s chrome for the board view, which brings its own action bar', () => {
     expect(isChromelessCollectionView(KANBAN_COLLECTION_VIEW_BOARD_ALIAS)).toBe(true);
+  });
+
+  it('hides the layout’s chrome for the calendar view, which fetches by date range, not by page', () => {
+    expect(isChromelessCollectionView(KANBAN_COLLECTION_VIEW_CALENDAR_ALIAS)).toBe(true);
   });
 
   it('keeps the chrome for the list view, whose pager and bulk actions are the point', () => {

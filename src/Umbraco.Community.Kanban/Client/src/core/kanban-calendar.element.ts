@@ -19,7 +19,7 @@ import './kanban-month-grid.element.js';
 import './kanban-week-grid.element.js';
 import './kanban-agenda.element.js';
 
-export type KanbanCalendarView = 'month' | 'week';
+export type KanbanCalendarView = 'month' | 'week' | 'agenda';
 
 /**
  * What a host needs to start a create from a slot: the slot itself plus the property/editor
@@ -41,7 +41,7 @@ const VIEW_STORAGE_KEY = 'kanban-calendar-view';
 const FIRST_DAY_OF_WEEK = 1;
 
 /**
- * Calendar chrome and state: navigation (previous/today/next, month↔week toggle), fetching the
+ * Calendar chrome and state: navigation (previous/today/next, month/week/agenda toggle), fetching the
  * visible range through the datasource, and the notes that keep omissions honest (undated count,
  * truncation, fetch errors). Rendering a range is delegated to the grids; card and slot events
  * bubble up unchanged for a host to wire.
@@ -81,7 +81,7 @@ export class UmbCommunityKanbanCalendarElement extends UmbLitElement {
 
     const stored = window.localStorage?.getItem(VIEW_STORAGE_KEY);
 
-    if (stored === 'month' || stored === 'week') {
+    if (stored === 'month' || stored === 'week' || stored === 'agenda') {
       this._view = stored;
     }
   }
@@ -91,7 +91,11 @@ export class UmbCommunityKanbanCalendarElement extends UmbLitElement {
     // collection data type, the same two-step rule the board endpoint applies.
     if (!this.parentId || !this.datasource) return;
 
-    const key = [this.parentId, this.configId, this.culture ?? '', this._view, this._anchor].join('|');
+    // Keyed on the fetched range rather than the view: two views sharing a range (a stored
+    // agenda preference falling back to month) must not refetch, and a view whose range
+    // changes after load (that same fallback resolving) must.
+    const { from, to } = this.#range;
+    const key = [this.parentId, this.configId, this.culture ?? '', from, to].join('|');
 
     if (key === this.#loadedFor) return;
 
@@ -102,9 +106,22 @@ export class UmbCommunityKanbanCalendarElement extends UmbLitElement {
   get #range(): { from: string; to: string } {
     const { year, month } = anchorParts(this._anchor);
 
-    return this._view === 'month'
-      ? monthRange(year, month, FIRST_DAY_OF_WEEK)
-      : weekRange(this._anchor, FIRST_DAY_OF_WEEK);
+    if (this.#effectiveView === 'week') return weekRange(this._anchor, FIRST_DAY_OF_WEEK);
+
+    if (this.#effectiveView === 'agenda') {
+      // The calendar month exactly — no leading or trailing grid padding, which would list
+      // items from adjacent months under this month's title.
+      const next = addMonths(year, month, 1);
+      const from = `${year.toString().padStart(4, '0')}-${month.toString().padStart(2, '0')}-01`;
+      const to = addDays(
+        `${next.year.toString().padStart(4, '0')}-${next.month.toString().padStart(2, '0')}-01`,
+        -1,
+      );
+
+      return { from, to };
+    }
+
+    return monthRange(year, month, FIRST_DAY_OF_WEEK);
   }
 
   async load() {
@@ -136,13 +153,13 @@ export class UmbCommunityKanbanCalendarElement extends UmbLitElement {
   }
 
   #navigate(delta: -1 | 1) {
-    if (this._view === 'month') {
+    if (this._view === 'week') {
+      this._anchor = addDays(this._anchor, delta * 7);
+    } else {
       const { year, month } = anchorParts(this._anchor);
       const moved = addMonths(year, month, delta);
 
       this._anchor = `${moved.year.toString().padStart(4, '0')}-${moved.month.toString().padStart(2, '0')}-01`;
-    } else {
-      this._anchor = addDays(this._anchor, delta * 7);
     }
   }
 
@@ -153,7 +170,7 @@ export class UmbCommunityKanbanCalendarElement extends UmbLitElement {
   get #title(): string {
     const { year, month } = anchorParts(this._anchor);
 
-    if (this._view === 'month') {
+    if (this._view !== 'week') {
       return `${MONTH_NAMES[month - 1]} ${year}`;
     }
 
@@ -236,33 +253,43 @@ export class UmbCommunityKanbanCalendarElement extends UmbLitElement {
       return html`<div class="note">The calendar could not load. Navigate to retry.</div>`;
     }
 
-    const grid =
-      this._view === 'month'
-        ? html`
-            <umb-community-kanban-month-grid
-              .weeks=${this.#weeks}
-              .itemsByDay=${this.#itemsByDay}
-              .appearanceFor=${this.#appearanceFor}
-              ?disable-create=${!this._calendar?.datePropertyEditorAlias}
-              @kanban-create-at=${this.#onGridCreateAt}></umb-community-kanban-month-grid>
-          `
-        : html`
-            <umb-community-kanban-week-grid
-              .days=${this.#weekDays}
-              .itemsByDay=${this.#itemsByDay}
-              .appearanceFor=${this.#appearanceFor}
-              ?disable-create=${!this._calendar?.datePropertyEditorAlias}
-              @kanban-create-at=${this.#onGridCreateAt}></umb-community-kanban-week-grid>
-          `;
+    if (this.#effectiveView === 'agenda') {
+      return html`
+        <umb-community-kanban-agenda
+          .days=${agendaDays(this._calendar?.items ?? [])}
+          .appearanceFor=${this.#appearanceFor}></umb-community-kanban-agenda>
+      `;
+    }
 
-    return html`
-      ${grid}
-      ${this._calendar?.showAgenda
-        ? html`<umb-community-kanban-agenda
-            .days=${agendaDays(this._calendar?.items ?? [])}
-            .appearanceFor=${this.#appearanceFor}></umb-community-kanban-agenda>`
-        : nothing}
-    `;
+    return this.#effectiveView === 'month'
+      ? html`
+          <umb-community-kanban-month-grid
+            .weeks=${this.#weeks}
+            .itemsByDay=${this.#itemsByDay}
+            .appearanceFor=${this.#appearanceFor}
+            ?disable-create=${!this._calendar?.datePropertyEditorAlias}
+            @kanban-create-at=${this.#onGridCreateAt}></umb-community-kanban-month-grid>
+        `
+      : html`
+          <umb-community-kanban-week-grid
+            .days=${this.#weekDays}
+            .itemsByDay=${this.#itemsByDay}
+            .appearanceFor=${this.#appearanceFor}
+            ?disable-create=${!this._calendar?.datePropertyEditorAlias}
+            @kanban-create-at=${this.#onGridCreateAt}></umb-community-kanban-week-grid>
+        `;
+  }
+
+  /**
+   * The view actually shown. A stored 'agenda' preference can outlive the configuration that
+   * offered it — another calendar with the agenda switched off shares the same storage key —
+   * so when the loaded configuration says no agenda, fall back to month rather than render a
+   * view whose toggle is not even offered.
+   */
+  get #effectiveView(): KanbanCalendarView {
+    if (this._view === 'agenda' && this._calendar?.showAgenda === false) return 'month';
+
+    return this._view;
   }
 
   /** The 7 dates of the visible week, in order. */
@@ -298,6 +325,17 @@ export class UmbCommunityKanbanCalendarElement extends UmbLitElement {
             @click=${() => this.#setView('week')}>
             Week
           </uui-button>
+          ${this._calendar?.showAgenda !== false
+            ? html`
+                <uui-button
+                  label="Agenda view"
+                  compact
+                  look=${this._view === 'agenda' ? 'outline' : 'default'}
+                  @click=${() => this.#setView('agenda')}>
+                  Agenda
+                </uui-button>
+              `
+            : nothing}
         </uui-button-group>
       </div>
       ${this.#renderBody()} ${this.#renderNotes()}

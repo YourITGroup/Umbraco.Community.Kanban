@@ -89,7 +89,8 @@ export const manifests: Array<UmbExtensionManifest> = [
           },
           {
             alias: 'showAgenda',
-            label: 'Show agenda list',
+            label: 'Agenda view',
+            description: 'Offer an Agenda view alongside Month and Week.',
             propertyEditorUiAlias: 'Umb.PropertyEditorUi.Toggle',
           },
           {

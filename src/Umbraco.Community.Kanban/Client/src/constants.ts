@@ -70,12 +70,10 @@ export const KANBAN_ENTRY_POINT_ALIAS = 'Umb.Community.Kanban.EntryPoint';
 
 /**
  * Views that supply their own chrome, so the collection layout hides its pager and selection-action bar
- * while one of them is showing. A board pages its own lanes and has no checkbox selection, so neither
- * control can act on anything it displays.
- *
- * The calendar collection view joins this list when it exists — it will have the same problem for the same
- * reason.
+ * while one of them is showing. A board pages its own lanes and has no checkbox selection; a calendar
+ * fetches by date range, not by page. Neither control can act on anything they display.
  */
 export const KANBAN_CHROMELESS_COLLECTION_VIEW_ALIASES: readonly string[] = [
   KANBAN_COLLECTION_VIEW_BOARD_ALIAS,
+  KANBAN_COLLECTION_VIEW_CALENDAR_ALIAS,
 ];
