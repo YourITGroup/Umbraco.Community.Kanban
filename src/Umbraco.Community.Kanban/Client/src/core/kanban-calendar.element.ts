@@ -1,5 +1,7 @@
 import { css, customElement, html, nothing, property, state } from '@umbraco-cms/backoffice/external/lit';
 import { UmbLitElement } from '@umbraco-cms/backoffice/lit-element';
+import { extractUmbColorVariable } from '@umbraco-cms/backoffice/resources';
+import { laneColourStyle } from './lane.model.js';
 import type { KanbanDataSource } from '../data/kanban-data-source.js';
 import type { KanbanCalendarItemModel, KanbanCalendarModel } from '../data/kanban-calendar.types.js';
 import {
@@ -155,8 +157,24 @@ export class UmbCommunityKanbanCalendarElement extends UmbLitElement {
     return monthGrid(year, month, FIRST_DAY_OF_WEEK, todayIso());
   }
 
-  /** Task 9 wires category colours; until then chips are unaccented. */
-  #appearanceFor: (category: string | null | undefined) => KanbanCategoryAppearance = () => ({});
+  /**
+   * Category value → accent. Categories arrive fully resolved from the server — the lane pipeline
+   * has already applied source, overrides and the colour cycle — so this only maps values and
+   * turns a palette alias into CSS the way lanes do. Unknown or absent categories get no accent.
+   */
+  get #appearanceFor(): (category: string | null | undefined) => KanbanCategoryAppearance {
+    const byValue = new Map(
+      (this._calendar?.categories ?? []).map((category) => [
+        category.value,
+        {
+          colour: laneColourStyle(category.colour, extractUmbColorVariable),
+          icon: category.icon ?? undefined,
+        },
+      ]),
+    );
+
+    return (category) => (category ? (byValue.get(category) ?? {}) : {});
+  }
 
   #renderNotes() {
     if (!this._calendar) return nothing;
