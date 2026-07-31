@@ -109,21 +109,41 @@ What this fixed, and what it cost, kept for anyone re-deriving this area cold:
   **native** pager and selection bar (chrome suppression is view-gated, not global); no new scrollbar
   appears the moment the bar shows up during a drag.
 
-## Milestone 4 — Calendar month grid and agenda list ❌ Not built
+## Milestone 4 — Calendar views ✅ Built 2026-07-31 (re-scoped read-only, extended)
 
-Nothing beyond the `Umbraco.Community.Kanban.Calendar` configuration property editor
-(`property-editors/calendar/`) exists. Confirmed absent by direct check of the codebase:
+Built from [its design](superpowers/specs/2026-07-31-calendar-views-design.md), which re-scoped the
+milestone with the user: **read-only** (no `PUT /card/{key}/date`, no drag-to-reschedule — the
+master design's reschedule ideas are dropped, not deferred), but extended with a time-gridded week
+view, categories, and slot-click creation. Delivered:
 
-- [ ] No `CalendarController` / `GET /calendar` endpoint.
-- [ ] No `PUT /card/{key}/date` endpoint (preserve-time-of-day, calendar-date-only arithmetic).
-- [ ] No month-grid or agenda-list client element.
-- [ ] No drag-to-reschedule, and so no "disabled when `dateProperty` is `updateDate`" behaviour to
-  verify either — there's nothing to disable yet.
-- [ ] No tests for month boundaries or DST-crossing date arithmetic (design §7 calls both out
-  explicitly as easy-to-get-wrong).
+- `GET /calendar` (`CalendarController` + `KanbanCalendarService`, board-identical pipeline) with
+  inclusive range, undated count, truncation flag, categories resolved through the lane pipeline.
+- `KanbanCardDateReader`: every date editor family (legacy DateTime object, the four modern
+  `{date, timeZone}` JSON editors, plain-string fallback) plus `updateDate`/`createDate`, always
+  **as stored** — no timezone conversion anywhere. Midnight reads as date-only (all-day).
+- Configuration gains `endDateProperty` (spans; 1h nominal fallback), `categoryProperty`,
+  `categoryManualValues` + `categoryOverrides` (lane machinery + precedence reused); calendar
+  `cardProperties` now uses the board's card-properties editor (converter keeps old bare arrays).
+- Pure tested client models: `calendar.model.ts` (month grids across leap/boundary/week-start
+  cases), `overlap.model.ts` (transitive clustering, category-ordered columns, block geometry),
+  `date-preset.model.ts` (per-editor create-preset values).
+- Elements: `kanban-calendar` (month↔week toggle persisted, prev/today/next, undated/truncation/
+  error notes, agenda per `showAgenda`), `kanban-month-grid` ("+N more", ellipsised chips with
+  category accents), `kanban-week-grid` (hour axis, all-day strip, overlap columns),
+  `kanban-agenda` (overlaps side-by-side).
+- All three hosts: `umb-community-kanban-standalone-calendar` exported from the importmap module
+  (config-id optional — the server resolves `kanban.calendarConfigId` from the collection data
+  type when absent); a Calendar collection view; per-configuration workspace tabs (the Calendar
+  skip in the workspace-view model is gone). The data type Kanban tab now also picks/creates the
+  calendar configuration.
+- Slot-click creation: empty month day / week hour opens core's create flow (item-picker for
+  type/blueprint when several) with the date property preset via `modalContext.data.preset`;
+  disabled for system date properties.
 
-This is a full milestone of work, not a polish pass — it needs its own brainstorm → spec → plan cycle
-before implementation starts.
+Needs hand-verification: month/week render + navigation + toggle persistence, agenda overlap
+columns, category colours/icons, "+N more", undated note, slot-create presets per editor family
+(legacy, date+time, with-timezone), calendar layout on a collection, calendar tab via `appliesTo`,
+and a board regression pass (shared workspace-view model changed).
 
 ## Milestone 5 — Content app host and real-time sync ✅ Done (5a real-time, 5b content app, injected host — all 2026-07-31)
 

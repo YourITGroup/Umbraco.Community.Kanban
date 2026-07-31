@@ -9,11 +9,20 @@ const BOARD_NAME_SUFFIX = 'Kanban Board';
  * modal preset, so the editor can still change it before saving.
  */
 export function buildBoardDataTypeName(collectionDataTypeName: string | undefined | null): string {
+  return buildKanbanDataTypeName(collectionDataTypeName, BOARD_NAME_SUFFIX);
+}
+
+/** The calendar twin, proposing "… Kanban Calendar". */
+export function buildCalendarDataTypeName(collectionDataTypeName: string | undefined | null): string {
+  return buildKanbanDataTypeName(collectionDataTypeName, 'Kanban Calendar');
+}
+
+function buildKanbanDataTypeName(collectionDataTypeName: string | undefined | null, suffix: string): string {
   const trimmed = collectionDataTypeName?.trim();
 
   // An unnamed Collection data type — or one whose workspace has not resolved its name yet — would
   // otherwise propose a name with a leading space, or the literal word "undefined".
-  if (!trimmed) return BOARD_NAME_SUFFIX;
+  if (!trimmed) return suffix;
 
-  return `${trimmed} ${BOARD_NAME_SUFFIX}`;
+  return `${trimmed} ${suffix}`;
 }

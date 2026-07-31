@@ -1,5 +1,29 @@
 import { describe, it, expect } from 'vitest';
-import { buildBoardQuery, buildCardQuery, buildLaneBody } from './kanban-data-source.js';
+import { buildBoardQuery, buildCalendarQuery, buildCardQuery, buildLaneBody } from './kanban-data-source.js';
+
+describe('buildCalendarQuery', () => {
+  it('always sends the parent id and the inclusive range', () => {
+    expect(buildCalendarQuery({ parentId: 'p1', from: '2026-08-01', to: '2026-08-31' })).toEqual({
+      parentId: 'p1',
+      from: '2026-08-01',
+      to: '2026-08-31',
+    });
+  });
+
+  it('sends configId and culture when present', () => {
+    expect(
+      buildCalendarQuery({ parentId: 'p1', from: '2026-08-01', to: '2026-08-31', configId: 'c1', culture: 'nb-NO' }),
+    ).toEqual({ parentId: 'p1', from: '2026-08-01', to: '2026-08-31', configId: 'c1', culture: 'nb-NO' });
+  });
+
+  it('omits an empty culture, which means "no culture", not a culture named empty string', () => {
+    expect(buildCalendarQuery({ parentId: 'p1', from: '2026-08-01', to: '2026-08-31', culture: '' })).toEqual({
+      parentId: 'p1',
+      from: '2026-08-01',
+      to: '2026-08-31',
+    });
+  });
+});
 
 describe('buildCardQuery', () => {
   it('sends the parent and omits everything optional that is absent', () => {

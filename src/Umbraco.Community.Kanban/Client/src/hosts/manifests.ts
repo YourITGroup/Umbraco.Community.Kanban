@@ -1,5 +1,6 @@
 import {
   KANBAN_COLLECTION_VIEW_BOARD_ALIAS,
+  KANBAN_COLLECTION_VIEW_CALENDAR_ALIAS,
   KANBAN_DOCUMENT_COLLECTION_ALIAS,
   KANBAN_DOCUMENT_TYPE_APPLIES_CONDITION_ALIAS,
   KANBAN_ENTRY_POINT_ALIAS,
@@ -28,6 +29,24 @@ export const manifests: Array<UmbExtensionManifest> = [
       label: 'Kanban',
       icon: 'icon-columns',
       pathName: 'kanban',
+    },
+    conditions: [
+      {
+        alias: 'Umb.Condition.CollectionAlias',
+        match: KANBAN_DOCUMENT_COLLECTION_ALIAS,
+      },
+    ],
+  },
+  {
+    type: 'collectionView',
+    alias: KANBAN_COLLECTION_VIEW_CALENDAR_ALIAS,
+    name: 'Kanban Calendar Collection View',
+    element: () => import('./collection-view-calendar.element.js'),
+    weight: 240,
+    meta: {
+      label: 'Calendar',
+      icon: 'icon-calendar',
+      pathName: 'kanban-calendar',
     },
     conditions: [
       {

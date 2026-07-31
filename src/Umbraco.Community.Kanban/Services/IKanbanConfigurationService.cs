@@ -10,4 +10,7 @@ public interface IKanbanConfigurationService
 
     /// <summary>The board configuration stored on a data type, or null if that data type is not a board.</summary>
     Task<KanbanBoardConfiguration?> GetBoardConfigurationAsync(Guid key);
+
+    /// <summary>The calendar configuration stored on a data type, or null if that data type is not a calendar.</summary>
+    Task<KanbanCalendarConfiguration?> GetCalendarConfigurationAsync(Guid key);
 }
