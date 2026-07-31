@@ -87,7 +87,9 @@ export class UmbCommunityKanbanCalendarElement extends UmbLitElement {
   }
 
   override updated() {
-    if (!this.parentId || !this.configId || !this.datasource) return;
+    // configId is optional: without one the server resolves the configuration from the parent's
+    // collection data type, the same two-step rule the board endpoint applies.
+    if (!this.parentId || !this.datasource) return;
 
     const key = [this.parentId, this.configId, this.culture ?? '', this._view, this._anchor].join('|');
 
@@ -106,14 +108,14 @@ export class UmbCommunityKanbanCalendarElement extends UmbLitElement {
   }
 
   async load() {
-    if (!this.parentId || !this.configId || !this.datasource) return;
+    if (!this.parentId || !this.datasource) return;
 
     this._state = 'loading';
 
     const { from, to } = this.#range;
     const outcome = await this.datasource.getCalendar({
       parentId: this.parentId,
-      configId: this.configId,
+      configId: this.configId || undefined,
       culture: this.culture,
       from,
       to,

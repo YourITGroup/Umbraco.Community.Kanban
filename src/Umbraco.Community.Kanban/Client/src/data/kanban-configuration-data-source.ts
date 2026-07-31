@@ -13,8 +13,8 @@ export interface KanbanConfigurationModel {
   tabIcon?: string | null;
 }
 
-/** Every Kanban Board configuration, for the Data Type workspace picker. */
-export async function getBoardConfigurations(host: UmbControllerHost): Promise<KanbanConfigurationModel[]> {
+/** Every Kanban configuration, boards and calendars alike. Empty on any request failure. */
+export async function getAllConfigurations(host: UmbControllerHost): Promise<KanbanConfigurationModel[]> {
   const { data, error } = await tryExecute(
     host,
     umbHttpClient.get<KanbanConfigurationModel[]>({
@@ -23,7 +23,24 @@ export async function getBoardConfigurations(host: UmbControllerHost): Promise<K
     }),
   );
 
-  if (error || !data) return [];
+  return error || !data ? [] : data;
+}
 
-  return data.filter((configuration) => configuration.kind === 'Board');
+/** Every Kanban configuration of one kind, for the Data Type workspace pickers. */
+export async function getConfigurationsOfKind(
+  host: UmbControllerHost,
+  kind: 'Board' | 'Calendar',
+): Promise<KanbanConfigurationModel[]> {
+  const all = await getAllConfigurations(host);
+
+  return all.filter((configuration) => configuration.kind === kind);
+}
+
+/** Every Kanban Board configuration, for the Data Type workspace picker. */
+export async function getBoardConfigurations(host: UmbControllerHost): Promise<KanbanConfigurationModel[]> {
+  return getConfigurationsOfKind(host, 'Board');
+}
+
+export async function getCalendarConfigurations(host: UmbControllerHost): Promise<KanbanConfigurationModel[]> {
+  return getConfigurationsOfKind(host, 'Calendar');
 }

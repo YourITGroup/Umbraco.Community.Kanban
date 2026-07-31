@@ -31,7 +31,11 @@ export class UmbCommunityKanbanStandaloneCalendarElement extends UmbLitElement {
   @property({ attribute: 'parent-id' })
   parentId?: string;
 
-  /** The calendar configuration key. Required — there is no data type here to resolve one from. */
+  /**
+   * The calendar configuration key. Optional: when unset the server resolves the configuration
+   * from the parent's collection data type (`kanban.calendarConfigId`) — which is exactly what
+   * the collection-view host relies on. Third-party hosts with no data type pass it explicitly.
+   */
   @property({ attribute: 'config-id' })
   configId?: string;
 
@@ -175,12 +179,12 @@ export class UmbCommunityKanbanStandaloneCalendarElement extends UmbLitElement {
   }
 
   override render() {
-    if (!this.parentId || !this.configId) return html`<uui-loader></uui-loader>`;
+    if (!this.parentId) return html`<uui-loader></uui-loader>`;
 
     return html`
       <umb-community-kanban-calendar
         parent-id=${this.parentId}
-        config-id=${this.configId}
+        config-id=${this.configId ?? ''}
         .culture=${this.culture}
         .datasource=${this.#datasource}
         @kanban-open-document=${this.#onOpenDocument}

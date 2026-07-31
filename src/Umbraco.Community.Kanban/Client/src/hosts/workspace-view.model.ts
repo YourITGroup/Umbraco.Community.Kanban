@@ -3,6 +3,7 @@ import type { KanbanConfigurationModel } from '../data/kanban-configuration-data
 import {
   KANBAN_DOCUMENT_TYPE_APPLIES_CONDITION_ALIAS,
   KANBAN_WORKSPACE_VIEW_BOARD_ALIAS_PREFIX,
+  KANBAN_WORKSPACE_VIEW_CALENDAR_ALIAS_PREFIX,
 } from '@/constants.js';
 
 /** The standard workspace-view meta plus the configuration key the shared element reads back. */
@@ -36,19 +37,56 @@ const DOCUMENT_WORKSPACE_ALIAS = 'Umb.Workspace.Document';
 export function boardWorkspaceViewManifests(
   configurations: KanbanConfigurationModel[],
 ): Array<KanbanBoardWorkspaceViewManifest> {
+  return workspaceViewManifests(configurations, {
+    kind: 'Board',
+    aliasPrefix: KANBAN_WORKSPACE_VIEW_BOARD_ALIAS_PREFIX,
+    name: 'Kanban Board Workspace View',
+    pathnamePrefix: 'kanban-',
+    defaultIcon: 'icon-columns',
+    element: () => import('./kanban-workspace-view-board.element.js'),
+  });
+}
+
+/** The calendar tabs, derived by exactly the board rules — only the kind, routing and icon differ. */
+export function calendarWorkspaceViewManifests(
+  configurations: KanbanConfigurationModel[],
+): Array<KanbanBoardWorkspaceViewManifest> {
+  return workspaceViewManifests(configurations, {
+    kind: 'Calendar',
+    aliasPrefix: KANBAN_WORKSPACE_VIEW_CALENDAR_ALIAS_PREFIX,
+    name: 'Kanban Calendar Workspace View',
+    pathnamePrefix: 'kanban-calendar-',
+    defaultIcon: 'icon-calendar',
+    element: () => import('./kanban-workspace-view-calendar.element.js'),
+  });
+}
+
+interface WorkspaceViewShape {
+  kind: KanbanConfigurationModel['kind'];
+  aliasPrefix: string;
+  name: string;
+  pathnamePrefix: string;
+  defaultIcon: string;
+  element: () => Promise<unknown>;
+}
+
+function workspaceViewManifests(
+  configurations: KanbanConfigurationModel[],
+  shape: WorkspaceViewShape,
+): Array<KanbanBoardWorkspaceViewManifest> {
   return configurations
-    .filter((configuration) => configuration.kind === 'Board' && configuration.appliesTo.length > 0)
+    .filter((configuration) => configuration.kind === shape.kind && configuration.appliesTo.length > 0)
     .map((configuration) => {
       const manifest: KanbanBoardWorkspaceViewManifest = {
         type: 'workspaceView',
-        alias: `${KANBAN_WORKSPACE_VIEW_BOARD_ALIAS_PREFIX}${configuration.key}`,
-        name: `Kanban Board Workspace View (${configuration.name})`,
-        element: () => import('./kanban-workspace-view-board.element.js'),
+        alias: `${shape.aliasPrefix}${configuration.key}`,
+        name: `${shape.name} (${configuration.name})`,
+        element: shape.element as KanbanBoardWorkspaceViewManifest['element'],
         weight: 90,
         meta: {
           label: configuration.tabName || configuration.name,
-          pathname: `kanban-${configuration.key}`,
-          icon: configuration.tabIcon || 'icon-columns',
+          pathname: `${shape.pathnamePrefix}${configuration.key}`,
+          icon: configuration.tabIcon || shape.defaultIcon,
           kanbanConfigId: configuration.key,
         },
         conditions: [

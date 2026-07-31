@@ -13,10 +13,16 @@ import { UmbModalRouteRegistrationController } from '@umbraco-cms/backoffice/rou
 import {
   KANBAN_BOARD_CONFIG_ID_KEY,
   KANBAN_BOARD_EDITOR_UI_ALIAS,
+  KANBAN_CALENDAR_CONFIG_ID_KEY,
+  KANBAN_CALENDAR_EDITOR_UI_ALIAS,
   KANBAN_COLLECTION_PROPERTY_EDITOR_UI_ALIAS,
 } from '@/constants.js';
-import { getBoardConfigurations, type KanbanConfigurationModel } from '@/data/kanban-configuration-data-source.js';
-import { buildBoardDataTypeName } from './board-data-type-name.js';
+import {
+  getBoardConfigurations,
+  getCalendarConfigurations,
+  type KanbanConfigurationModel,
+} from '@/data/kanban-configuration-data-source.js';
+import { buildBoardDataTypeName, buildCalendarDataTypeName } from './board-data-type-name.js';
 
 /**
  * Lets an editor choose which Kanban Board configuration a Collection data type's board
@@ -44,6 +50,12 @@ export class UmbCommunityKanbanDataTypeViewElement extends UmbLitElement {
   @state()
   private _selected = '';
 
+  @state()
+  private _calendarConfigurations: KanbanConfigurationModel[] = [];
+
+  @state()
+  private _selectedCalendar = '';
+
   /**
    * Whether the data type modal's route is registered yet. `open()` silently does nothing until the
    * router hands over a builder, so buttons rendered before then would be dead on click.
@@ -63,6 +75,12 @@ export class UmbCommunityKanbanDataTypeViewElement extends UmbLitElement {
    * `open()` decides which.
    */
   #dataTypeModal: UmbModalRouteRegistrationController<
+    typeof UMB_DATATYPE_WORKSPACE_MODAL.DATA,
+    typeof UMB_DATATYPE_WORKSPACE_MODAL.VALUE
+  >;
+
+  /** The calendar twin of the modal above; its own path segment and its own create preset. */
+  #calendarDataTypeModal: UmbModalRouteRegistrationController<
     typeof UMB_DATATYPE_WORKSPACE_MODAL.DATA,
     typeof UMB_DATATYPE_WORKSPACE_MODAL.VALUE
   >;
@@ -109,11 +127,27 @@ export class UmbCommunityKanbanDataTypeViewElement extends UmbLitElement {
       .observeRouteBuilder(() => {
         this._modalReady = true;
       });
+
+    this.#calendarDataTypeModal = new UmbModalRouteRegistrationController(this, UMB_DATATYPE_WORKSPACE_MODAL)
+      .addAdditionalPath('kanban-calendar')
+      .onSetup(() => ({
+        data: {
+          preset: {
+            editorUiAlias: KANBAN_CALENDAR_EDITOR_UI_ALIAS,
+            name: buildCalendarDataTypeName(this.#workspace?.getName()),
+          },
+        },
+      }))
+      .onSubmit((value) => {
+        if (value?.unique) this.#onSavedCalendar(value.unique);
+      });
   }
 
   async #load() {
     this._configurations = await getBoardConfigurations(this);
     this._selected = this.#workspace?.getPropertyValue<string>(KANBAN_BOARD_CONFIG_ID_KEY) ?? '';
+    this._calendarConfigurations = await getCalendarConfigurations(this);
+    this._selectedCalendar = this.#workspace?.getPropertyValue<string>(KANBAN_CALENDAR_CONFIG_ID_KEY) ?? '';
   }
 
   #onCreate() {
@@ -182,6 +216,64 @@ export class UmbCommunityKanbanDataTypeViewElement extends UmbLitElement {
     await this.#workspace?.setPropertyValue(KANBAN_BOARD_CONFIG_ID_KEY, undefined);
   }
 
+  // The calendar handlers mirror the board's above, against their own key, list and modal.
+
+  #onCreateCalendar() {
+    this.#calendarDataTypeModal.open(
+      {},
+      UMB_CREATE_DATA_TYPE_WORKSPACE_PATH_PATTERN.generateLocal({
+        parentEntityType: UMB_DATA_TYPE_ENTITY_TYPE,
+        parentUnique: null,
+      }),
+    );
+  }
+
+  #onEditCalendar() {
+    if (!this._selectedCalendar || !this._modalReady) return;
+
+    this.#calendarDataTypeModal.open(
+      {},
+      UMB_EDIT_DATA_TYPE_WORKSPACE_PATH_PATTERN.generateLocal({ unique: this._selectedCalendar }),
+    );
+  }
+
+  async #onSavedCalendar(unique: string) {
+    await this.#load();
+
+    if (this._selectedCalendar === unique) return;
+    if (!this._calendarConfigurations.some((configuration) => configuration.key === unique)) return;
+
+    await this.#selectCalendar(unique);
+  }
+
+  async #onChooseCalendar() {
+    const keys = new Set(this._calendarConfigurations.map((configuration) => configuration.key));
+
+    const picked = await umbOpenModal(this, UMB_DATA_TYPE_PICKER_MODAL, {
+      data: {
+        hideTreeRoot: true,
+        multiple: false,
+        pickableFilter: (item) => keys.has(item.unique ?? ''),
+      },
+      value: { selection: this._selectedCalendar ? [this._selectedCalendar] : [] },
+    }).catch(() => undefined);
+
+    const unique = picked?.selection?.[0];
+    if (!unique) return;
+
+    await this.#selectCalendar(unique);
+  }
+
+  async #selectCalendar(unique: string) {
+    this._selectedCalendar = unique;
+    await this.#workspace?.setPropertyValue(KANBAN_CALENDAR_CONFIG_ID_KEY, unique);
+  }
+
+  async #onRemoveCalendar() {
+    this._selectedCalendar = '';
+    await this.#workspace?.setPropertyValue(KANBAN_CALENDAR_CONFIG_ID_KEY, undefined);
+  }
+
   override render() {
     if (!this._applies) return nothing;
 
@@ -191,6 +283,11 @@ export class UmbCommunityKanbanDataTypeViewElement extends UmbLitElement {
           label="Board configuration"
           description="Which Kanban Board configuration this collection's Kanban layout uses.">
           <div slot="editor" class="editor">${this.#renderEditor()}</div>
+        </umb-property-layout>
+        <umb-property-layout
+          label="Calendar configuration"
+          description="Which Kanban Calendar configuration this collection's Calendar layout uses.">
+          <div slot="editor" class="editor">${this.#renderCalendarEditor()}</div>
         </umb-property-layout>
       </uui-box>
     `;
@@ -225,6 +322,50 @@ export class UmbCommunityKanbanDataTypeViewElement extends UmbLitElement {
         </uui-action-bar>
       </uui-ref-node>
     `;
+  }
+
+  #renderCalendarEditor() {
+    if (this._selectedCalendar) return this.#renderSelectedCalendar();
+
+    return html`
+      ${this._calendarConfigurations.length
+        ? html`<uui-button look="placeholder" label="Choose" @click=${this.#onChooseCalendar}></uui-button>`
+        : html`<span class="hint">No Kanban Calendar data types exist yet.</span>`}
+      ${this.#renderCreateCalendar()}
+    `;
+  }
+
+  #renderSelectedCalendar() {
+    const configuration = this._calendarConfigurations.find((item) => item.key === this._selectedCalendar);
+
+    return html`
+      <uui-ref-node
+        standalone
+        name=${configuration?.name ?? 'Unknown configuration'}
+        detail=${configuration ? '' : 'This data type no longer exists'}
+        @open=${this.#onEditCalendar}>
+        <uui-icon slot="icon" name="icon-calendar"></uui-icon>
+        <uui-action-bar slot="actions">
+          ${this._modalReady
+            ? html`<uui-button label="Edit" @click=${this.#onEditCalendar}>Edit</uui-button>`
+            : nothing}
+          <uui-button label="Remove" @click=${this.#onRemoveCalendar}>Remove</uui-button>
+        </uui-action-bar>
+      </uui-ref-node>
+    `;
+  }
+
+  #renderCreateCalendar() {
+    if (this._modalReady) {
+      return html`<uui-button
+        look="secondary"
+        label="Create Kanban Calendar data type"
+        @click=${this.#onCreateCalendar}></uui-button>`;
+    }
+
+    return this._calendarConfigurations.length
+      ? nothing
+      : html`<span class="hint">Create one under Settings → Data Types.</span>`;
   }
 
   #renderCreate() {

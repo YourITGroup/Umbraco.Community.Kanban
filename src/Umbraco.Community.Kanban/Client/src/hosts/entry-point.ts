@@ -1,8 +1,12 @@
 import type { UmbEntryPointOnInit, UmbEntryPointOnUnload } from '@umbraco-cms/backoffice/extension-api';
 import type { ManifestCollection } from '@umbraco-cms/backoffice/collection';
 import { KANBAN_DOCUMENT_COLLECTION_ALIAS } from '@/constants.js';
-import { getBoardConfigurations } from '@/data/kanban-configuration-data-source.js';
-import { boardWorkspaceViewManifests, type KanbanBoardWorkspaceViewManifest } from './workspace-view.model.js';
+import { getAllConfigurations } from '@/data/kanban-configuration-data-source.js';
+import {
+  boardWorkspaceViewManifests,
+  calendarWorkspaceViewManifests,
+  type KanbanBoardWorkspaceViewManifest,
+} from './workspace-view.model.js';
 
 /**
  * Core's document collection manifest, exactly as it was registered, kept so `onUnload` can put it back.
@@ -62,19 +66,22 @@ export const onInit: UmbEntryPointOnInit = (host, extensionRegistry) => {
  * collection in the backoffice rendering an element from a package that is no longer loaded.
  */
 /**
- * Fetches every board configuration and registers one workspace-view tab per applicable one.
- * getBoardConfigurations returns [] on any request failure, so the common failure cannot throw;
- * the try/catch covers the uncommon ones for the same reason — no Kanban problem may degrade the
- * backoffice.
+ * Fetches every configuration and registers one workspace-view tab per applicable one — board
+ * and calendar tabs alike. getAllConfigurations returns [] on any request failure, so the common
+ * failure cannot throw; the try/catch covers the uncommon ones for the same reason — no Kanban
+ * problem may degrade the backoffice.
  */
 async function registerBoardWorkspaceViews(
   host: Parameters<UmbEntryPointOnInit>[0],
   extensionRegistry: Parameters<UmbEntryPointOnInit>[1],
 ): Promise<void> {
   try {
-    const configurations = await getBoardConfigurations(host);
+    const configurations = await getAllConfigurations(host);
 
-    registeredWorkspaceViews = boardWorkspaceViewManifests(configurations);
+    registeredWorkspaceViews = [
+      ...boardWorkspaceViewManifests(configurations),
+      ...calendarWorkspaceViewManifests(configurations),
+    ];
 
     if (registeredWorkspaceViews.length > 0) {
       extensionRegistry.registerMany(registeredWorkspaceViews);
