@@ -19,6 +19,10 @@ public class KanbanCalendarPropertyEditorTests
 
         aliases.Should().BeEquivalentTo(
             "dateProperty",
+            "endDateProperty",
+            "categoryProperty",
+            "categoryManualValues",
+            "categoryOverrides",
             "cardProperties",
             "showAgenda",
             "allowDrag",
