@@ -2,7 +2,7 @@ using Umbraco.Community.Kanban.Grouping;
 using Umbraco.Community.Kanban.Grouping.Sources;
 using Umbraco.Community.Kanban.Models;
 
-namespace Umbraco.Community.Kanban.Tests.Lanes;
+namespace Umbraco.Community.Kanban.Tests.Grouping;
 
 public class ManualGroupSourceTests
 {

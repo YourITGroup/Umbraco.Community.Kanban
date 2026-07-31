@@ -5,7 +5,7 @@ namespace Umbraco.Community.Kanban.Tests.Fakes;
 
 internal sealed class FakeKanbanGroupResolver : IKanbanGroupResolver
 {
-    public List<KanbanGroup> Lanes { get; } = [];
+    public List<KanbanGroup> Groups { get; } = [];
 
     public List<(Guid ContentTypeKey, KanbanBoardConfiguration Configuration)> Calls { get; } = [];
 
@@ -13,6 +13,6 @@ internal sealed class FakeKanbanGroupResolver : IKanbanGroupResolver
     {
         Calls.Add((contentTypeKey, configuration));
 
-        return Task.FromResult(new KanbanGroupResolution(Lanes, []));
+        return Task.FromResult(new KanbanGroupResolution(Groups, []));
     }
 }

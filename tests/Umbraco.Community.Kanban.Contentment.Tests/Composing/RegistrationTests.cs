@@ -39,6 +39,11 @@ public class RegistrationTests
         builder.Services.RemoveAll<IContentmentDataListItems>();
         builder.Services.AddSingleton<IContentmentDataListItems>(new FakeContentmentDataListItems());
 
+        // Likewise for the core package's content-instance seam, whose real implementation needs an
+        // IContentService this project does not stand up either.
+        builder.Services.RemoveAll<IKanbanContentInstanceLookup>();
+        builder.Services.AddSingleton<IKanbanContentInstanceLookup>(new FakeKanbanContentInstanceLookup());
+
         builder.Build();
 
         using ServiceProvider provider = builder.Services.BuildServiceProvider();

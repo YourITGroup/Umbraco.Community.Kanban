@@ -46,11 +46,11 @@ public class ContentmentLaneResolutionTests
         KanbanGroupResolution result = await Resolver(items, StatusIsADataList())
             .ResolveAsync(ContentTypeKey, configuration);
 
-        result.Lanes.Where(lane => lane.IsUnassigned == false).Select(lane => lane.Value)
+        result.Groups.Where(lane => lane.IsUnassigned == false).Select(lane => lane.Value)
             .Should().Equal("pending", "confirmed");
 
         // The resolver always puts the unassigned lane first.
-        result.Lanes.First().IsUnassigned.Should().BeTrue();
+        result.Groups.First().IsUnassigned.Should().BeTrue();
     }
 
     [Fact]
@@ -62,7 +62,7 @@ public class ContentmentLaneResolutionTests
         KanbanGroupResolution result = await Resolver(items, StatusIsADataList())
             .ResolveAsync(ContentTypeKey, configuration);
 
-        result.Lanes.First().Colour.Should().NotBeNullOrWhiteSpace();
+        result.Groups.First().Colour.Should().NotBeNullOrWhiteSpace();
     }
 
     [Fact]
@@ -81,7 +81,7 @@ public class ContentmentLaneResolutionTests
         KanbanGroupResolution result = await Resolver(items, StatusIsADataList())
             .ResolveAsync(ContentTypeKey, configuration);
 
-        result.Lanes.Where(lane => lane.IsUnassigned == false).Select(lane => lane.Value)
+        result.Groups.Where(lane => lane.IsUnassigned == false).Select(lane => lane.Value)
             .Should().Equal("custom");
     }
 }

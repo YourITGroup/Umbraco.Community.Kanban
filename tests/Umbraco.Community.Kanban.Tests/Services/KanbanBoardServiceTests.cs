@@ -67,7 +67,7 @@ public class KanbanBoardServiceTests
 
         var permissions = new FakeContentPermissionAuthorizer();
         var laneResolver = new FakeKanbanGroupResolver();
-        laneResolver.Lanes.AddRange([
+        laneResolver.Groups.AddRange([
             new KanbanGroup { Value = "todo", Name = "To do" },
             new KanbanGroup { Value = "doing", Name = "Doing" },
             KanbanGroup.Unassigned(),

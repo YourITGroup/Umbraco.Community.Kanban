@@ -117,7 +117,7 @@ public sealed class KanbanBoardService(
         var pageSize = Math.Max(1, request.Take ?? configuration.LanePageSize);
 
         return KanbanBoardComposer.Compose(new KanbanBoardComposerRequest(
-            lanes.Lanes,
+            lanes.Groups,
             assignments,
             page.TotalChildCount,
             truncated,

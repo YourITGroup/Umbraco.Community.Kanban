@@ -1,7 +1,7 @@
 using Umbraco.Community.Kanban.Grouping;
 using Umbraco.Community.Kanban.Models;
 
-namespace Umbraco.Community.Kanban.Tests.Lanes;
+namespace Umbraco.Community.Kanban.Tests.Grouping;
 
 public class KanbanGroupOrderApplierTests
 {

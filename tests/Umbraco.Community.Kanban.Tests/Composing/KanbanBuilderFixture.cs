@@ -41,6 +41,12 @@ public static class KanbanBuilderFixture
     public static IUmbracoBuilder CreateUmbracoBuilder()
     {
         var services = new ServiceCollection();
+
+        // UmbracoBuilder's testing constructor does not register logging, and ContentInstanceGroupSource
+        // takes an ILogger<>. A real host always has logging, so registering it here keeps the fixture
+        // faithful rather than papering over a missing production registration.
+        services.AddLogging();
+
         var config = new ConfigurationBuilder().Build();
 
         var assemblyProvider = new DefaultUmbracoAssemblyProvider(typeof(KanbanBuilderFixture).Assembly, NullLoggerFactory.Instance);

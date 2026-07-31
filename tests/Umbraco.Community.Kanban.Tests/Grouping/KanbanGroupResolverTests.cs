@@ -3,7 +3,7 @@ using Umbraco.Community.Kanban.Grouping.Sources;
 using Umbraco.Community.Kanban.Models;
 using Umbraco.Community.Kanban.Tests.Fakes;
 
-namespace Umbraco.Community.Kanban.Tests.Lanes;
+namespace Umbraco.Community.Kanban.Tests.Grouping;
 
 public class KanbanGroupResolverTests
 {
@@ -21,7 +21,7 @@ public class KanbanGroupResolverTests
 
         var result = await Resolver(lookup).ResolveAsync(ContentTypeKey, configuration);
 
-        result.Lanes.Where(x => x.IsUnassigned == false).Select(x => x.Value).Should().Equal("Open", "Done");
+        result.Groups.Where(x => x.IsUnassigned == false).Select(x => x.Value).Should().Equal("Open", "Done");
     }
 
     [Fact]
@@ -38,7 +38,7 @@ public class KanbanGroupResolverTests
 
         var result = await Resolver(lookup).ResolveAsync(ContentTypeKey, configuration);
 
-        result.Lanes.Where(x => x.IsUnassigned == false).Select(x => x.Value).Should().Equal("custom");
+        result.Groups.Where(x => x.IsUnassigned == false).Select(x => x.Value).Should().Equal("custom");
     }
 
     [Fact]
@@ -57,7 +57,7 @@ public class KanbanGroupResolverTests
 
         var result = await Resolver(lookup).ResolveAsync(ContentTypeKey, configuration);
 
-        result.Lanes.Where(x => x.IsUnassigned == false).Select(x => x.Value).Should().Equal("custom");
+        result.Groups.Where(x => x.IsUnassigned == false).Select(x => x.Value).Should().Equal("custom");
     }
 
     [Fact]
@@ -70,8 +70,8 @@ public class KanbanGroupResolverTests
 
         var result = await Resolver(lookup).ResolveAsync(ContentTypeKey, configuration);
 
-        result.Lanes.First().IsUnassigned.Should().BeTrue();
-        result.Lanes.Should().ContainSingle(x => x.IsUnassigned);
+        result.Groups.First().IsUnassigned.Should().BeTrue();
+        result.Groups.Should().ContainSingle(x => x.IsUnassigned);
     }
 
     [Fact]
@@ -87,8 +87,8 @@ public class KanbanGroupResolverTests
 
         var result = await Resolver(lookup).ResolveAsync(ContentTypeKey, configuration);
 
-        result.Lanes.Select(lane => lane.Value).Should().Equal(string.Empty, "Done", "Open");
-        result.Lanes.First().IsUnassigned.Should().BeTrue();
+        result.Groups.Select(lane => lane.Value).Should().Equal(string.Empty, "Done", "Open");
+        result.Groups.First().IsUnassigned.Should().BeTrue();
     }
 
     [Fact]
@@ -107,9 +107,9 @@ public class KanbanGroupResolverTests
             ContentTypeKey,
             new KanbanBoardConfiguration { LaneProperty = "status", LaneOrder = ["Done", "Open"] });
 
-        var naturalColours = natural.Lanes.ToDictionary(lane => lane.Value, lane => lane.Colour);
+        var naturalColours = natural.Groups.ToDictionary(lane => lane.Value, lane => lane.Colour);
 
-        reordered.Lanes.Should().OnlyContain(lane => lane.Colour == naturalColours[lane.Value]);
+        reordered.Groups.Should().OnlyContain(lane => lane.Colour == naturalColours[lane.Value]);
     }
 
     [Fact]
@@ -123,9 +123,9 @@ public class KanbanGroupResolverTests
 
         // The leading unassigned lane is neutral and does not consume a palette position, so the
         // first real lane still gets the first palette colour.
-        result.Lanes[0].Colour.Should().Be("grey");
-        result.Lanes[1].Colour.Should().Be("yellow");
-        result.Lanes[2].Colour.Should().Be("pink");
+        result.Groups[0].Colour.Should().Be("grey");
+        result.Groups[1].Colour.Should().Be("yellow");
+        result.Groups[2].Colour.Should().Be("pink");
     }
 
     /// <summary>
@@ -150,9 +150,9 @@ public class KanbanGroupResolverTests
 
         var result = await Resolver(lookup).ResolveAsync(ContentTypeKey, configuration);
 
-        result.Lanes[1].Colour.Should().Be("red");
-        result.Lanes[1].Name.Should().Be("Blocked");
-        result.Lanes[2].Colour.Should().Be("pink");
+        result.Groups[1].Colour.Should().Be("red");
+        result.Groups[1].Name.Should().Be("Blocked");
+        result.Groups[2].Colour.Should().Be("pink");
     }
 
     [Fact]
@@ -177,7 +177,7 @@ public class KanbanGroupResolverTests
         var result = await Resolver(new FakePropertyDataTypeLookup())
             .ResolveAsync(ContentTypeKey, new KanbanBoardConfiguration());
 
-        result.Lanes.Should().ContainSingle().Which.IsUnassigned.Should().BeTrue();
+        result.Groups.Should().ContainSingle().Which.IsUnassigned.Should().BeTrue();
     }
 
     [Fact]
@@ -189,7 +189,7 @@ public class KanbanGroupResolverTests
 
         var result = await Resolver(lookup).ResolveAsync(ContentTypeKey, configuration);
 
-        result.Lanes.Should().ContainSingle().Which.IsUnassigned.Should().BeTrue();
+        result.Groups.Should().ContainSingle().Which.IsUnassigned.Should().BeTrue();
     }
 
     [Fact]
@@ -208,6 +208,6 @@ public class KanbanGroupResolverTests
 
         var result = await Resolver(lookup).ResolveAsync(ContentTypeKey, configuration);
 
-        result.Lanes.Where(x => x.IsUnassigned == false).Select(x => x.Value).Should().Equal("custom");
+        result.Groups.Where(x => x.IsUnassigned == false).Select(x => x.Value).Should().Equal("custom");
     }
 }

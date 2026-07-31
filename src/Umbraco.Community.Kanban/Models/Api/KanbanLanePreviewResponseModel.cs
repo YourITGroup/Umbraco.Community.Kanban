@@ -29,7 +29,7 @@ public sealed class KanbanLanePreviewResponseModel
 
     public static KanbanLanePreviewResponseModel From(KanbanGroupResolution resolution) => new()
     {
-        Lanes = resolution.Lanes
+        Lanes = resolution.Groups
             .Select(lane => new KanbanLaneModel
             {
                 Value = lane.Value,

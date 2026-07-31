@@ -1,9 +1,11 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Community.Kanban.Controllers;
 using Umbraco.Community.Kanban.Extensions;
 using Umbraco.Community.Kanban.Grouping;
 using Umbraco.Community.Kanban.Grouping.Sources;
+using Umbraco.Community.Kanban.Tests.Fakes;
 
 namespace Umbraco.Community.Kanban.Tests.Composing;
 
@@ -20,6 +22,13 @@ public class RegistrationTests
         IUmbracoBuilder builder = KanbanBuilderFixture.CreateUmbracoBuilder();
 
         builder.AddKanban();
+
+        // The content-instance seam is swapped for a fake purely so the collection can be
+        // constructed: the real one needs IContentService, whose dependencies this project does not
+        // stand up. The test below asserts the registration this replaces.
+        builder.Services.RemoveAll<IKanbanContentInstanceLookup>();
+        builder.Services.AddSingleton<IKanbanContentInstanceLookup>(new FakeKanbanContentInstanceLookup());
+
         builder.Build();
 
         using ServiceProvider provider = builder.Services.BuildServiceProvider();
@@ -27,6 +36,23 @@ public class RegistrationTests
 
         sources.First().Should().BeOfType<ManualGroupSource>();
         sources.Should().ContainSingle(x => x is CoreListEditorGroupSource);
+        sources.Should().ContainSingle(x => x is ContentInstanceGroupSource);
+    }
+
+    [Fact]
+    public void AddKanban_RegistersTheContentInstanceLookup()
+    {
+        // Asserted as a registration rather than resolved, for the reason the test below documents:
+        // KanbanContentInstanceLookup depends on IContentService/IContentTypeService, whose own
+        // dependencies this test project deliberately does not stand up.
+        IUmbracoBuilder builder = KanbanBuilderFixture.CreateUmbracoBuilder();
+
+        builder.AddKanban();
+
+        builder.Services.Should().ContainSingle(d =>
+            d.ServiceType == typeof(IKanbanContentInstanceLookup) &&
+            d.ImplementationType == typeof(KanbanContentInstanceLookup) &&
+            d.Lifetime == ServiceLifetime.Singleton);
     }
 
     [Fact]

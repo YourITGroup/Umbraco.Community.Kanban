@@ -43,7 +43,7 @@ The package registers two content-editor-facing data types. Both are configured 
 | Setting | Purpose |
 | -- | -- |
 | Lane property | The child-document property whose value decides which lane a card lands in. |
-| Define lanes manually | Off (default): lanes come from the lane property's own options. On: use the manual lane list below instead. |
+| Define lanes manually | Off (default): lanes come from the lane property's own options — see "Where lanes come from" below. On: use the manual lane list below instead. |
 | Manual lanes | A hand-typed list of lane values, used only when "Define lanes manually" is on. |
 | Lane appearance | Per-lane colour/icon/label overrides, and drag-to-reorder the lane display order. |
 | Card properties | Which document properties appear as a summary on each card, and in what order. Defaults to "Created" and "Last edited". |
@@ -67,6 +67,33 @@ The package registers two content-editor-facing data types. Both are configured 
 | Agenda view | Whether to offer an Agenda view alongside Month/Week (default on). |
 | Applies to content types | Optional document types that should show this calendar as a Content App tab. |
 | Content app name / icon | Label and icon for that tab, when "Applies to" is set. |
+
+### Where lanes come from
+
+Unless you define lanes by hand, they are read from the lane property's own data type — and a
+calendar's categories are read the same way, from the category property. Which reader applies is
+decided by the property's editor:
+
+| Lane/category property is… | Lanes/categories become… |
+| -- | -- |
+| Dropdown, Radio button list, Checkbox list | The editor's configured options. |
+| **Content picker or Multi node tree picker, restricted to one or more document types** | **Every document of those types.** Restrict a "Resource" picker to your "Meeting Room" type and you get a lane per room, named after the document and badged with its document type's icon. |
+| Contentment Data List | The Data List's data source — needs the [Contentment add-on](src/Umbraco.Community.Kanban.Contentment/README.md). |
+| Anything else | Nothing, so the board shows a single "Unassigned" lane. Use manual lanes instead. |
+
+Notes on the document-instance lanes:
+
+- The picker **must** name its allowed document types ("Accepted types" on a content picker,
+  "Allow items of type" on a tree picker). An unrestricted picker offers no lanes, rather than every
+  document on the site.
+- Unpublished documents still appear, so a lane never disappears out from under its cards.
+- Trashed documents do not. At most 200 lanes are offered; past that the package logs a warning.
+- Dragging a card to one of these lanes writes that document's reference into the picker, exactly as
+  picking it by hand would.
+- A multi-value picker holding more than one document puts its card in "Unassigned" — a card belongs
+  to one lane.
+- Tree pickers rooted in Media or Members are ignored: those restrict media/member types, which are
+  not documents.
 
 ### Wiring a Board/Calendar to a Collection
 

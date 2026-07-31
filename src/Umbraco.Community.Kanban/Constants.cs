@@ -33,6 +33,16 @@ public static class Constants
     /// </summary>
     public const string ManualGroupSourceAlias = "manual";
 
+    /// <summary>The alias of the group source that lists the documents a picker property allows.</summary>
+    public const string ContentInstanceGroupSourceAlias = "content-instances";
+
+    /// <summary>
+    /// The most groups a source may produce. A board of hundreds of swimlanes is unusable long before
+    /// this, so the cap exists to keep a picker aimed at a large document type from rendering a board
+    /// nobody can scroll; the source logs when it bites.
+    /// </summary>
+    public const int DefaultGroupCap = 200;
+
     /// <summary>How many children a board reads before it reports itself truncated.</summary>
     public const int DefaultChildCap = 1000;
 

@@ -231,7 +231,7 @@ public class KanbanCalendarServiceTests
             CategoryProperty = "kind",
             CategoryOverrides = [new KanbanGroupOverride { Value = "workshop", Colour = "red" }],
         });
-        harness.LaneResolver.Lanes.AddRange([
+        harness.LaneResolver.Groups.AddRange([
             new KanbanGroup { Value = "workshop", Name = "Workshop", Colour = "red" },
             KanbanGroup.Unassigned(),
         ]);

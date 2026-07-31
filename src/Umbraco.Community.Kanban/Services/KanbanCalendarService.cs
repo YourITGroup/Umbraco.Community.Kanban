@@ -199,7 +199,7 @@ public sealed class KanbanCalendarService(
             LaneOverrides = configuration.CategoryOverrides,
         });
 
-        return resolution.Lanes
+        return resolution.Groups
             .Where(lane => lane.IsUnassigned == false)
             .Select(lane => new KanbanCategoryModel
             {

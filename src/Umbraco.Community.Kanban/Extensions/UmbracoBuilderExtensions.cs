@@ -22,6 +22,7 @@ public static class UmbracoBuilderExtensions
         builder.AddKanbanOpenApiDocument();
 
         builder.Services.AddSingleton<IKanbanPropertyDataTypeLookup, KanbanPropertyDataTypeLookup>();
+        builder.Services.AddSingleton<IKanbanContentInstanceLookup, KanbanContentInstanceLookup>();
         builder.Services.AddSingleton<IKanbanGroupResolver, KanbanGroupResolver>();
         builder.Services.AddSingleton<IKanbanConfigurationService, KanbanConfigurationService>();
         builder.Services.AddSingleton<IKanbanContentTypeLookup, KanbanContentTypeLookup>();
@@ -37,10 +38,12 @@ public static class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IKanbanCalendarService, KanbanCalendarService>();
 
         // Manual is appended first so a configuration that pins it wins over an
-        // editor-matching source.
+        // editor-matching source. The other two claim disjoint editors, so their
+        // order relative to each other carries no meaning.
         builder.KanbanGroupSources()
             .Append<ManualGroupSource>()
-            .Append<CoreListEditorGroupSource>();
+            .Append<CoreListEditorGroupSource>()
+            .Append<ContentInstanceGroupSource>();
 
         return builder;
     }
