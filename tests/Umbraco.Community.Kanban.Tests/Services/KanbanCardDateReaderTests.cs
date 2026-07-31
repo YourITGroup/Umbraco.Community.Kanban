@@ -67,24 +67,58 @@ public class KanbanCardDateReaderTests
     }
 
     [Fact]
-    public void Reads_a_modern_json_value_as_stored_ignoring_the_offset()
+    public void Reads_a_modern_json_value_with_the_moment_it_names()
     {
-        // A 09:00+10:00 booking is 09:00 on that date for every viewer, matching the editor.
+        // A named zone means the client can place the booking in the viewer's zone, exactly as the
+        // board's value summary already renders it. The wall clock still reads as stored, so a
+        // client that ignores the instant behaves as it did before.
         var content = ContentWith("start", """{"date":"2026-08-15T09:00:00+10:00","timeZone":"Australia/Sydney"}""");
 
         KanbanCardDate? result = KanbanCardDateReader.Read(content, "start", culture: null);
 
-        result.Should().Be(new KanbanCardDate(new DateOnly(2026, 8, 15), new TimeOnly(9, 0)));
+        result.Should().Be(new KanbanCardDate(
+            new DateOnly(2026, 8, 15),
+            new TimeOnly(9, 0),
+            new DateTimeOffset(2026, 8, 15, 9, 0, 0, TimeSpan.FromHours(10))));
     }
 
     [Fact]
-    public void Reads_a_json_value_without_timezone()
+    public void Reads_a_json_value_without_timezone_as_a_bare_wall_clock()
     {
+        // No zone was recorded, so there is no moment to carry and nothing to convert.
         var content = ContentWith("start", """{"date":"2026-08-15T14:15:00"}""");
 
         KanbanCardDate? result = KanbanCardDateReader.Read(content, "start", culture: null);
 
         result.Should().Be(new KanbanCardDate(new DateOnly(2026, 8, 15), new TimeOnly(14, 15)));
+        result!.Value.Instant.Should().BeNull();
+    }
+
+    [Fact]
+    public void Reads_a_utc_system_date_with_the_moment_it_names()
+    {
+        var content = ContentWith("start", null);
+        content.UpdateDate = new DateTime(2026, 8, 15, 23, 30, 0, DateTimeKind.Utc);
+
+        KanbanCardDate? result = KanbanCardDateReader.Read(content, "updateDate", culture: null);
+
+        result.Should().Be(new KanbanCardDate(
+            new DateOnly(2026, 8, 15),
+            new TimeOnly(23, 30),
+            new DateTimeOffset(2026, 8, 15, 23, 30, 0, TimeSpan.Zero)));
+    }
+
+    [Fact]
+    public void Reads_a_plain_string_with_an_offset_with_the_moment_it_names()
+    {
+        var content = ContentWith("start", "2026-08-15T09:00:00+10:00");
+
+        KanbanCardDate? result = KanbanCardDateReader.Read(content, "start", culture: null);
+
+        result.Should().Be(new KanbanCardDate(
+            new DateOnly(2026, 8, 15),
+            new TimeOnly(9, 0),
+            new DateTimeOffset(2026, 8, 15, 9, 0, 0, TimeSpan.FromHours(10))));
     }
 
     [Fact]
@@ -106,6 +140,7 @@ public class KanbanCardDateReaderTests
         KanbanCardDate? result = KanbanCardDateReader.Read(content, "start", culture: null);
 
         result.Should().Be(new KanbanCardDate(new DateOnly(2026, 8, 15), new TimeOnly(9, 0)));
+        result!.Value.Instant.Should().BeNull();
     }
 
     [Theory]

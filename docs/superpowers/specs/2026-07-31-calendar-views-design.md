@@ -16,8 +16,14 @@ rescheduling.
   JSON-storing editors (`Umbraco.DateTime`, `DateTimeUnspecified`, `DateTimeWithTimeZone`,
   `DateOnly`; `TimeOnly` has no calendar date and is rejected at read time), plus the system
   properties `updateDate` and `createDate`.
-- **Values display as stored.** A card whose value is `2026-08-15T09:00+10:00` sits on Aug 15 at
-  09:00 for every viewer. No browser- or server-timezone conversion anywhere.
+- **A value is placed the way a board card renders it** (revised 2026-08-01; this originally read
+  "values display as stored", which left a card reading one time in its property row and sitting at
+  another on the grid). A value that states its own zone — `DateTimeWithTimeZone`, or a UTC value —
+  is placed in the **viewer's** zone, because that is what the backoffice's own value summary does
+  with it (`DateTime.fromISO(date, { zone }).toLocal()`). A bare wall clock (`DateTimeUnspecified`,
+  `DateOnly`, legacy) is placed **as stored**: no offset was ever recorded, so there is nothing to
+  convert. Conversion happens in the browser, the only place that knows the viewer's zone; the
+  server carries the moment (`instant` / `endInstant`) and leaves `date`/`time` as stored.
 - **Undated cards are omitted** from all views; the response carries their count so the UI can show
   a quiet "N items have no date".
 - **Two views: month and week (time-gridded)**, plus the agenda list (`showAgenda`).
@@ -44,13 +50,18 @@ Existing settings keep their meaning: `dateProperty` (default `updateDate`), `ca
 
 ### `IKanbanCardDateReader`
 
-Given a content item, a property alias, and a culture, returns `(DateOnly Date, TimeOnly? Time)?`:
+Given a content item, a property alias, and a culture, returns
+`(DateOnly Date, TimeOnly? Time, DateTimeOffset? Instant)?`:
 
 - `updateDate` / `createDate` → the content's own dates.
 - Anything else → parse the **raw stored value** with core's `DateTimePropertyEditorHelper.
   TryParseToIntermediateValue`, which normalises both legacy strings and the modern
-  `{date, timeZone}` JSON to a `DateTimeDto`. Use `dto.Date.DateTime` — the wall-clock value as
-  stored, offset ignored, no conversion.
+  `{date, timeZone}` JSON to a `DateTimeDto`. `Date`/`Time` are always `dto.Date.DateTime` — the
+  wall clock as stored.
+- `Instant` carries the moment, and only when the value states its own zone: a non-null `timeZone`
+  in the JSON, a `DateTimeKind.Utc` object, or an offset written into a migrated string. The client
+  converts it into the viewer's zone (see the timezone rule above). Null means the wall clock is
+  already the answer, so a client that ignores the field behaves exactly as before it existed.
 - `Time` is null when the stored time is exactly midnight (legacy date-only values store midnight),
   so date-only cards render without a time chip and land in the week view's all-day strip.
 - Unparseable/missing → null (the card counts as undated).

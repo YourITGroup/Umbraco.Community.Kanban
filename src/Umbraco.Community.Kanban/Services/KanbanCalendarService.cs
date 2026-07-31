@@ -1,3 +1,4 @@
+using System.Globalization;
 using Umbraco.Cms.Core.Actions;
 using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Models.Membership;
@@ -85,7 +86,10 @@ public sealed class KanbanCalendarService(
                 continue;
             }
 
-            if (start.Value.Date < request.From || start.Value.Date > request.To)
+            // A day of slack either side: a zone-bearing value is filtered here by its stored wall
+            // clock, but the client places it in the viewer's zone, which can move it across a
+            // boundary. The client drops whatever still falls outside the window it asked for.
+            if (start.Value.Date < request.From.AddDays(-1) || start.Value.Date > request.To.AddDays(1))
             {
                 continue;
             }
@@ -102,10 +106,12 @@ public sealed class KanbanCalendarService(
             .Take(Constants.DefaultCalendarCap)
             .Select(entry => new KanbanCalendarItemModel
             {
-                Date = entry.Start.Date.ToString("yyyy-MM-dd"),
-                Time = entry.Start.Time?.ToString("HH:mm"),
-                EndDate = entry.End?.Date.ToString("yyyy-MM-dd"),
-                EndTime = entry.End?.Time?.ToString("HH:mm"),
+                Date = entry.Start.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                Time = entry.Start.Time?.ToString("HH:mm", CultureInfo.InvariantCulture),
+                EndDate = entry.End?.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                EndTime = entry.End?.Time?.ToString("HH:mm", CultureInfo.InvariantCulture),
+                Instant = entry.Start.Instant?.ToString("O", CultureInfo.InvariantCulture),
+                EndInstant = entry.End?.Instant?.ToString("O", CultureInfo.InvariantCulture),
                 Category = ReadCategory(entry.Content, configuration, request.Culture),
                 Card = KanbanCardMapper.Map(
                     entry.Content,

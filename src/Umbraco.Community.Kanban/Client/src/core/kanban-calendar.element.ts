@@ -1,6 +1,8 @@
 import { css, customElement, html, nothing, property, state } from '@umbraco-cms/backoffice/external/lit';
 import { UmbLitElement } from '@umbraco-cms/backoffice/lit-element';
 import { extractUmbColorVariable } from '@umbraco-cms/backoffice/resources';
+import { getClientTimeZone } from '@umbraco-cms/backoffice/utils';
+import { placeInViewerTimeZone } from './viewer-time.model.js';
 import { laneColourStyle } from './lane.model.js';
 import type { KanbanDataSource } from '../data/kanban-data-source.js';
 import type { KanbanCalendarItemModel, KanbanCalendarModel } from '../data/kanban-calendar.types.js';
@@ -75,6 +77,9 @@ export class UmbCommunityKanbanCalendarElement extends UmbLitElement {
 
   /** The inputs the last load ran for, so re-renders are not re-fetches. */
   #loadedFor?: string;
+
+  /** The viewer's zone, read once: it identifies the browser, not anything that changes per render. */
+  #viewerTimeZone = getClientTimeZone().value;
 
   constructor() {
     super();
@@ -179,8 +184,16 @@ export class UmbCommunityKanbanCalendarElement extends UmbLitElement {
     return `${from} – ${to}`;
   }
 
+  /**
+   * The loaded items in the viewer's zone, trimmed to the range asked for. Every view reads items
+   * through here, so a card sits where its own property row says it does — the board's rule.
+   */
+  get #items(): KanbanCalendarItemModel[] {
+    return placeInViewerTimeZone(this._calendar?.items ?? [], this.#viewerTimeZone, this.#range);
+  }
+
   get #itemsByDay(): Map<string, KanbanCalendarItemModel[]> {
-    return placeByDay(this._calendar?.items ?? []);
+    return placeByDay(this.#items);
   }
 
   get #weeks(): CalendarWeek[] {
@@ -256,7 +269,7 @@ export class UmbCommunityKanbanCalendarElement extends UmbLitElement {
     if (this.#effectiveView === 'agenda') {
       return html`
         <umb-community-kanban-agenda
-          .days=${agendaDays(this._calendar?.items ?? [])}
+          .days=${agendaDays(this.#items)}
           .appearanceFor=${this.#appearanceFor}
           today=${todayIso()}></umb-community-kanban-agenda>
       `;

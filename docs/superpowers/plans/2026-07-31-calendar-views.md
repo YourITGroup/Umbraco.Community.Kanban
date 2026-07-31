@@ -16,6 +16,7 @@
 - No mocking frameworks — hand-written fakes (see `tests/Umbraco.Community.Kanban.Tests` and existing `*.test.ts` for the house style).
 - Lit privates `#name`, `@state()` fields `_name`. C#: file-scoped namespaces, primary constructors, no underscore-prefixed private fields.
 - **Timezone rule (from the spec):** values display **as stored** — never convert through `Date`'s local-timezone constructor in models. All model date maths uses `{year, month, day}` parts or ISO `yyyy-MM-dd` strings.
+  - *Superseded 2026-08-01, after this plan shipped:* a value that states its own zone is now placed in the **viewer's** zone, matching how a board card's value summary renders the same property. `viewer-time.model.ts` is the one model allowed to interpret a real moment (`new Date(instant)` + `Intl` with an explicit `timeZone`); every other model still does date-part arithmetic only. See the design doc's revised timezone bullet.
 - Never kill/start the Umbraco dev server on :44353.
 
 ---

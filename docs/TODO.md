@@ -119,8 +119,10 @@ view, categories, and slot-click creation. Delivered:
 - `GET /calendar` (`CalendarController` + `KanbanCalendarService`, board-identical pipeline) with
   inclusive range, undated count, truncation flag, categories resolved through the lane pipeline.
 - `KanbanCardDateReader`: every date editor family (legacy DateTime object, the four modern
-  `{date, timeZone}` JSON editors, plain-string fallback) plus `updateDate`/`createDate`, always
-  **as stored** — no timezone conversion anywhere. Midnight reads as date-only (all-day).
+  `{date, timeZone}` JSON editors, plain-string fallback) plus `updateDate`/`createDate`. A bare wall
+  clock reads **as stored**; a value that states its own zone also carries its moment, which the
+  client places in the viewer's zone so the grid agrees with the card's own property row (see
+  `viewer-time.model.ts`). Midnight reads as date-only (all-day).
 - Configuration gains `endDateProperty` (spans; 1h nominal fallback), `categoryProperty`,
   `categoryManualValues` + `categoryOverrides` (lane machinery + precedence reused); calendar
   `cardProperties` now uses the board's card-properties editor (converter keeps old bare arrays).
