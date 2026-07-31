@@ -27,6 +27,8 @@ export interface KanbanCalendarModel {
   categories: KanbanCategoryModel[];
   /** Null for system date properties, which cannot be preset on creation. */
   datePropertyEditorAlias?: string | null;
+  /** Whether the configuration shows the agenda list — echoed so hosts need only the config key. */
+  showAgenda?: boolean;
   undatedCount: number;
   truncated: boolean;
 }

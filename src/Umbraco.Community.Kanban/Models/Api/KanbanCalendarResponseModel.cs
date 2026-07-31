@@ -45,6 +45,9 @@ public sealed class KanbanCalendarResponseModel
     /// </summary>
     public string? DatePropertyEditorAlias { get; init; }
 
+    /// <summary>Whether the configuration shows the agenda list — echoed so hosts need only the config key.</summary>
+    public bool ShowAgenda { get; init; }
+
     /// <summary>Children with no (or an unparseable) date value — omitted from Items, but not silently.</summary>
     public required int UndatedCount { get; init; }
 
