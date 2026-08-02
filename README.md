@@ -47,6 +47,7 @@ The package registers two content-editor-facing data types. Both are configured 
 | Manual lanes | A hand-typed list of lane values, used only when "Define lanes manually" is on. |
 | Lane appearance | Per-lane colour/icon/label overrides, hide individual lanes, and drag-to-reorder the lane display order. Hiding a lane also hides the cards in it. |
 | Card properties | Which document properties appear as a summary on each card, and in what order. Defaults to "Created" and "Last edited". |
+| Sort cards by / direction | The order cards appear in within their lane (Sort order, Name, Last edited, or Created). Defaults to sort order ascending, which is what the table layout shows. |
 | Show child items | Lists each card's own children on the card, with edit/add buttons. |
 | Sort child items by / direction | Controls the order children are listed in when "Show child items" is on (Sort order, Name, Last edited, or Created). |
 | Cards per lane | How many cards load per lane before showing a "Show more" link (default 25). |

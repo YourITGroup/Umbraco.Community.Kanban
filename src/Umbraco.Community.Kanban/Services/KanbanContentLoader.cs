@@ -14,10 +14,9 @@ public sealed class KanbanContentLoader(
 
     public IContent? GetById(int id) => contentService.GetById(id);
 
-    public KanbanChildPage GetChildren(int parentId, int cap)
+    public KanbanChildPage GetChildren(int parentId, int cap, Ordering ordering)
     {
-        // A null ordering falls back to sortOrder ascending, which is what the table layout
-        // shows. Templates are not loaded — a card never needs one.
+        // Templates are not loaded — a card never needs one.
         IEnumerable<IContent> children = contentService.GetPagedChildren(
             parentId,
             pageIndex: 0,
@@ -25,7 +24,7 @@ public sealed class KanbanContentLoader(
             out var totalRecords,
             propertyAliases: null,
             filter: null,
-            ordering: null,
+            ordering: ordering,
             loadTemplates: false);
 
         return new KanbanChildPage(

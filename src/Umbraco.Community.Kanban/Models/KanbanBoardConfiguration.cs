@@ -84,6 +84,19 @@ public class KanbanBoardConfiguration
     public KanbanCardProperty[] CardProperties { get; set; } = [];
 
     /// <summary>
+    /// Which field cards are ordered by within their lane: one of the fields
+    /// <see cref="Services.KanbanChildOrdering" /> understands. Null means sort order.
+    /// </summary>
+    [ConfigurationField("cardSortBy")]
+    [JsonConverter(typeof(SingleSelectDropdownJsonConverter))]
+    public string? CardSortBy { get; set; }
+
+    /// <summary>"asc" or "desc". Null means ascending.</summary>
+    [ConfigurationField("cardSortDirection")]
+    [JsonConverter(typeof(SingleSelectDropdownJsonConverter))]
+    public string? CardSortDirection { get; set; }
+
+    /// <summary>
     /// Whether each card lists its own children. Off by default, and the board skips the query that
     /// reads them entirely when it is off — so a board whose cards have no meaningful children pays
     /// nothing for the feature.

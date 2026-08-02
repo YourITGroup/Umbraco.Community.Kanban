@@ -16,7 +16,8 @@ internal sealed class FakeKanbanContentLoader : IKanbanContentLoader
     /// <summary>Overrides the reported total, to simulate more children than were read.</summary>
     public int? TotalChildCountOverride { get; set; }
 
-    public List<(int ParentId, int Cap)> ChildRequests { get; } = [];
+    /// <summary>Every GetChildren call, so a test can assert the ordering it asked for.</summary>
+    public List<(int ParentId, int Cap, Ordering Ordering)> ChildRequests { get; } = [];
 
     /// <summary>Grandchildren the fake returns, in the order given — the fake does not sort.</summary>
     public List<IContent> Grandchildren { get; } = [];
@@ -31,9 +32,9 @@ internal sealed class FakeKanbanContentLoader : IKanbanContentLoader
 
     public IContent? GetById(int id) => ContentById.TryGetValue(id, out IContent? content) ? content : null;
 
-    public KanbanChildPage GetChildren(int parentId, int cap)
+    public KanbanChildPage GetChildren(int parentId, int cap, Ordering ordering)
     {
-        ChildRequests.Add((parentId, cap));
+        ChildRequests.Add((parentId, cap, ordering));
 
         return new KanbanChildPage(
             Children.Take(cap).ToList(),

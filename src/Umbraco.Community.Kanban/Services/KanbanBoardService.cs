@@ -67,7 +67,15 @@ public sealed class KanbanBoardService(
 
         KanbanGroupResolution lanes = await laneResolver.ResolveAsync(laneContentTypeKey, configuration);
 
-        KanbanChildPage page = contentLoader.GetChildren(parent.Id, Constants.DefaultChildCap);
+        // Cards keep the order they are read in all the way through grouping and lane paging, so the
+        // configured card sort is applied here — in SQL, before the cap — rather than per lane after.
+        KanbanChildPage page = contentLoader.GetChildren(
+            parent.Id,
+            Constants.DefaultChildCap,
+            KanbanChildOrdering.From(
+                configuration.CardSortBy,
+                configuration.CardSortDirection,
+                request.Culture));
         List<Guid> keys = page.Children.Select(child => child.Key).ToList();
 
         // Children of the cards, for the per-card child list. Skipped entirely when the board does not

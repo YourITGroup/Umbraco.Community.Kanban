@@ -196,6 +196,17 @@ Contentment's `IContentmentDataSource`, so a board can group by a booking's `sta
 
 Smaller pieces of work that landed outside the design's own milestone list.
 
+### Cards sort by a configured field — done 2026-08-03
+
+The board read its children with no ordering at all, so cards were always sort order ascending no
+matter what the data type said — only *child items* had a configurable order. `cardSortBy` /
+`cardSortDirection` now sit alongside them on the board configuration, map through the same
+`KanbanChildOrdering` helper, and are applied in the `GetPagedChildren` call — in SQL, before the
+child cap — so the order survives grouping, lane paging and truncation. Defaults are sort order
+ascending, which is what the read used to hard-code, so no existing board changes. The calendar
+passes the same default explicitly: it places items by their date property, so read order only
+decides what the cap keeps.
+
 ### Lanes from picked documents, and "group source" — done 2026-08-01
 
 Two changes, one vocabulary.

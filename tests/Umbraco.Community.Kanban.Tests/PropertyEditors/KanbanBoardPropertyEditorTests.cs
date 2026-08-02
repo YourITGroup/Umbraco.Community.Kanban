@@ -26,6 +26,8 @@ public class KanbanBoardPropertyEditorTests
             "laneOrder",
             "laneOverrides",
             "cardProperties",
+            "cardSortBy",
+            "cardSortDirection",
             "showChildItems",
             "childItemsSortBy",
             "childItemsSortDirection",

@@ -122,6 +122,16 @@ public class KanbanBoardServiceTests
         return grandchild;
     }
 
+    private static KanbanBoardConfiguration WithCardSort(string? sortBy, string? direction) =>
+        new()
+        {
+            LaneProperty = "status",
+            CardProperties = CardPropertyList.Of("status"),
+            LanePageSize = 25,
+            CardSortBy = sortBy,
+            CardSortDirection = direction,
+        };
+
     private static KanbanBoardConfiguration WithChildItems(string? sortBy = null, string? direction = null) =>
         new()
         {
@@ -213,7 +223,36 @@ public class KanbanBoardServiceTests
 
         await harness.Service.GetBoardAsync(Request(), User);
 
-        harness.Loader.ChildRequests.Single().Should().Be((1234, Constants.DefaultChildCap));
+        (int parentId, int cap, Ordering _) = harness.Loader.ChildRequests.Single();
+
+        parentId.Should().Be(1234);
+        cap.Should().Be(Constants.DefaultChildCap);
+    }
+
+    [Fact]
+    public async Task Reads_children_in_the_configured_card_order()
+    {
+        Harness harness = Configured(WithCardSort("name", "desc"));
+
+        await harness.Service.GetBoardAsync(Request(), User);
+
+        Ordering ordering = harness.Loader.ChildRequests.Single().Ordering;
+
+        ordering.OrderBy.Should().Be("name");
+        ordering.Direction.Should().Be(Direction.Descending);
+    }
+
+    [Fact]
+    public async Task Reads_children_in_sort_order_ascending_when_no_card_order_is_configured()
+    {
+        Harness harness = Configured();
+
+        await harness.Service.GetBoardAsync(Request(), User);
+
+        Ordering ordering = harness.Loader.ChildRequests.Single().Ordering;
+
+        ordering.OrderBy.Should().Be("sortOrder");
+        ordering.Direction.Should().Be(Direction.Ascending);
     }
 
     [Fact]

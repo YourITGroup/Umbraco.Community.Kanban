@@ -26,11 +26,11 @@ public interface IKanbanContentLoader
     IContent? GetById(int id);
 
     /// <summary>
-    /// The parent's children in sort order, at most <paramref name="cap" /> of them, with the
-    /// true total. Draft values, because a card moved but not yet published must show in its
-    /// new lane.
+    /// The parent's children in <paramref name="ordering" /> order, at most <paramref name="cap" />
+    /// of them, with the true total. Draft values, because a card moved but not yet published must
+    /// show in its new lane.
     /// </summary>
-    KanbanChildPage GetChildren(int parentId, int cap);
+    KanbanChildPage GetChildren(int parentId, int cap, Ordering ordering);
 
     /// <summary>
     /// Every document at <paramref name="level" /> below the tree rooted at
