@@ -19,7 +19,7 @@
     <Authors>Your IT Group</Authors>
 		<Copyright>Copyright © 2026 - $([System.DateTime]::Now.Year) © $(Company)</Copyright>
     <PackageProjectUrl>https://github.com/YourITGroup/Umbraco.Community.Kanban</PackageProjectUrl>
-		<PackageIconUrl>https://raw.githubusercontent.com/YourITGroup/Umbraco.Community.Kanban/master/assets/Kanban_logo.png</PackageIconUrl>
+		<PackageIconUrl>https://raw.githubusercontent.com/YourITGroup/Umbraco.Community.Kanban/master/GithubFiles/Logo/Kanban_Logo.png</PackageIconUrl>
     <RepositoryUrl>https://github.com/YourITGroup/Umbraco.Community.Kanban</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
