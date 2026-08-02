@@ -28,6 +28,8 @@ describe('board property editor manifests', () => {
       'allowDrag',
       'appliesTo',
       'cardProperties',
+      'cardSortBy',
+      'cardSortDirection',
       'childItemsSortBy',
       'childItemsSortDirection',
       'laneOverrides',
@@ -72,13 +74,15 @@ describe('board property editor manifests', () => {
     expect(defaults.allowDrag).toBe(true);
   });
 
-  it('defaults child items to sort order ascending, and leaves showChildItems unset', () => {
+  it('defaults cards and child items to sort order ascending, and leaves showChildItems unset', () => {
     // showChildItems has no default: absent means off, and a default of false would be noise.
     const ui = manifests.find((m) => m.type === 'propertyEditorUi') as any;
     const defaults = Object.fromEntries(
       ui.meta.settings.defaultData.map((d: { alias: string; value: unknown }) => [d.alias, d.value]),
     );
 
+    expect(defaults.cardSortBy).toBe('sortOrder');
+    expect(defaults.cardSortDirection).toBe('asc');
     expect(defaults.childItemsSortBy).toBe('sortOrder');
     expect(defaults.childItemsSortDirection).toBe('asc');
     expect('showChildItems' in defaults).toBe(false);

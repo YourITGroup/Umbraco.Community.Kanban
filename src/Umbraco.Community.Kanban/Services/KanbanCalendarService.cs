@@ -73,7 +73,12 @@ public sealed class KanbanCalendarService(
         KanbanCalendarConfiguration configuration,
         IUser user)
     {
-        KanbanChildPage page = contentLoader.GetChildren(parent.Id, Constants.DefaultChildCap);
+        // Sort order ascending: the calendar places items by their date property, so the read order
+        // only decides which items the cap keeps, and that matches what the table layout shows.
+        KanbanChildPage page = contentLoader.GetChildren(
+            parent.Id,
+            Constants.DefaultChildCap,
+            KanbanChildOrdering.From(null, null, request.Culture));
 
         // One bulk permission call, never one per node — the same rule the board documents.
         ISet<Guid> browseable = await permissionAuthorizer.FilterAuthorizedAsync(

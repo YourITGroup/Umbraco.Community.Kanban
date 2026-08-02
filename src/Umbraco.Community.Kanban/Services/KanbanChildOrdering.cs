@@ -4,8 +4,8 @@ using Umbraco.Cms.Core.Services;
 namespace Umbraco.Community.Kanban.Services;
 
 /// <summary>
-/// Maps a board's child-item sort settings onto an Umbraco <see cref="Ordering" />. Pure, so the
-/// mapping is tested without a database.
+/// Maps a board's sort settings — for cards and for child items alike, both stored the same way —
+/// onto an Umbraco <see cref="Ordering" />. Pure, so the mapping is tested without a database.
 /// </summary>
 /// <remarks>
 /// Settings are stored as strings rather than an enum, like every other Board setting, which means

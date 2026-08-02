@@ -3,9 +3,12 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
   <ItemGroup>
+    <!-- The sample site only; the packages themselves reference the narrower Umbraco projects below. -->
+    <PackageVersion Include="Umbraco.Cms" Version="18.0.2" />
     <PackageVersion Include="Umbraco.Cms.Web.Website" Version="18.0.2" />
     <PackageVersion Include="Umbraco.Cms.Api.Management" Version="18.0.2" />
     <PackageVersion Include="Umbraco.Community.Contentment" Version="[7.0.1, 8.0.0)" />
+    <PackageVersion Include="uSync" Version="18.0.3" />
   </ItemGroup>
   <ItemGroup>
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />

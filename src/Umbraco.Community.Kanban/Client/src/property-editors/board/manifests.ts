@@ -61,6 +61,37 @@ export const manifests: Array<UmbExtensionManifest> = [
             propertyEditorUiAlias: KANBAN_CARD_PROPERTIES_UI_ALIAS,
           },
           {
+            alias: 'cardSortBy',
+            label: 'Sort cards by',
+            description: 'The order cards appear in within their lane.',
+            propertyEditorUiAlias: 'Umb.PropertyEditorUi.Dropdown',
+            config: [
+              {
+                alias: 'items',
+                value: [
+                  { name: 'Sort order', value: 'sortOrder' },
+                  { name: 'Name', value: 'name' },
+                  { name: 'Last edited', value: 'updateDate' },
+                  { name: 'Created', value: 'createDate' },
+                ],
+              },
+            ],
+          },
+          {
+            alias: 'cardSortDirection',
+            label: 'Sort cards',
+            propertyEditorUiAlias: 'Umb.PropertyEditorUi.Dropdown',
+            config: [
+              {
+                alias: 'items',
+                value: [
+                  { name: 'Ascending', value: 'asc' },
+                  { name: 'Descending', value: 'desc' },
+                ],
+              },
+            ],
+          },
+          {
             alias: 'showChildItems',
             label: 'Show child items',
             description: 'List each card’s own children on the card, with an edit button and an add button.',
@@ -131,6 +162,8 @@ export const manifests: Array<UmbExtensionManifest> = [
         defaultData: [
           { alias: 'lanePageSize', value: 25 },
           { alias: 'allowDrag', value: true },
+          { alias: 'cardSortBy', value: 'sortOrder' },
+          { alias: 'cardSortDirection', value: 'asc' },
           { alias: 'childItemsSortBy', value: 'sortOrder' },
           { alias: 'childItemsSortDirection', value: 'asc' },
           {
