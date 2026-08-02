@@ -13,6 +13,7 @@ Nuget Packages:
 | Package | Version | Downloads |
 | -- | -- | -- |
 | Umbraco.Community.Kanban | [![NuGet release](https://img.shields.io/nuget/v/Umbraco.Community.Kanban.svg)](https://www.nuget.org/packages/Umbraco.Community.Kanban/) | [![NuGet release](https://img.shields.io/nuget/dt/Umbraco.Community.Kanban.svg)](https://www.nuget.org/packages/Umbraco.Community.Kanban/) |
+| Umbraco.Community.Kanban.Contentment | [![NuGet release](https://img.shields.io/nuget/v/Umbraco.Community.Kanban.Contentment.svg)](https://www.nuget.org/packages/Umbraco.Community.Kanban.Contentment/) | [![NuGet release](https://img.shields.io/nuget/dt/Umbraco.Community.Kanban.Contentment.svg)](https://www.nuget.org/packages/Umbraco.Community.Kanban.Contentment/) |
 
 Umbraco Package: [![Umbraco.Community.Kanban project page](https://img.shields.io/badge/umbraco-marketplace-green.svg)](https://marketplace.umbraco.com/package/Umbraco.Community.Kanban)
 
